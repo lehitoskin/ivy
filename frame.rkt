@@ -11,6 +11,34 @@
 (define image-bmp (make-parameter (make-bitmap 50 50)))
 (define previous-path (find-system-path 'home-dir))
 
+(define (load-image path)
+  (define-values (base name must-be-dir?) (split-path path))
+  (set! previous-path base)
+  (image-path (path->symbol path))
+  ; make sure the bitmap loaded correctly
+  (define load-success (send (image-bmp) load-file path))
+  (cond [load-success
+         ; if we've set tags for this file before...
+         (cond [(hash-has-key? master (image-path))
+                (define tag
+                  (string-join (hash-ref master (image-path)) ","))
+                ; ...put them in the tfield
+                (send ivy-tag-tfield set-value tag)]
+               ; ...otherwise clear the tfield
+               [else (send ivy-tag-tfield set-value "")])
+         
+         (define width (send (image-bmp) get-width))
+         (define height (send (image-bmp) get-height))
+         (send ivy-canvas set-on-paint!
+               (λ ()
+                 (send ivy-canvas set-canvas-background
+                       (make-object color% "black"))
+                 (send (send ivy-canvas get-dc) draw-bitmap
+                       (image-bmp) 0 0)))
+         (send ivy-canvas init-auto-scrollbars width height 0.0 0.0)
+         (send ivy-canvas refresh)]
+        [else (printf "Error loading file ~a~n" path)]))
+
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
                        [width 800]
@@ -23,6 +51,15 @@
                                [parent ivy-menu-bar]
                                [label "&File"]))
 
+#|
+; turn the bitmap into a pict
+(define icon-pict (bitmap icon-bitmap))
+; scale the pict to 40x40
+(define icon-pict-small (scale-to-fit icon-pict 40 40))
+; set avatar parameter to our scaled icon
+(my-avatar (pict->bitmap icon-pict-small))
+|#
+
 (define ivy-menu-bar-file-open
   (new menu-item%
        [parent ivy-menu-bar-file]
@@ -34,33 +71,7 @@
                                           #f
                                           previous-path))
                    ; make sure the path is a real path
-                   (when path
-                     (define-values (base name must-be-dir?) (split-path path))
-                     (set! previous-path base)
-                     (image-path (path->symbol path))
-                     ; make sure the bitmap loaded correctly
-                     (define load-success (send (image-bmp) load-file path))
-                     (cond [load-success
-                            ; if we've set tags for this file before...
-                            (cond [(hash-has-key? master (image-path))
-                                   (define tag
-                                     (string-join (hash-ref master (image-path)) ","))
-                                   ; ...put them in the tfield
-                                   (send ivy-tag-tfield set-value tag)]
-                                  ; ...otherwise clear the tfield
-                                  [else (send ivy-tag-tfield set-value "")])
-                            
-                            (define width (send (image-bmp) get-width))
-                            (define height (send (image-bmp) get-height))
-                            (send ivy-canvas set-on-paint!
-                                  (λ ()
-                                    (send ivy-canvas set-canvas-background
-                                          (make-object color% "black"))
-                                    (send (send ivy-canvas get-dc) draw-bitmap
-                                          (image-bmp) 0 0)))
-                            (send ivy-canvas init-auto-scrollbars width height 0.0 0.0)
-                            (send ivy-canvas refresh)]
-                           [else (printf "Error loading file ~a~n" path)])))]))
+                   (when path (load-image path)))]))
 
 (define ivy-menu-bar-file-quit
   (new menu-item%
@@ -117,4 +128,5 @@
        [style '(hscroll vscroll)]
        [min-height 550]
        [paint-callback (λ (canvas dc)
-                         (send canvas set-canvas-background (make-object color% "black")))]))
+                         (send canvas set-canvas-background
+                               (make-object color% "black")))]))
