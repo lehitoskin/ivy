@@ -96,14 +96,39 @@
           
           (define bmp-center-x (/ width 2))
           (define bmp-center-y (/ height 2))
-          (define canvas-center-x (/ (send ivy-canvas get-width) 2))
-          (define canvas-center-y (/ (send ivy-canvas get-height) 2))
+          (define canvas-x (send ivy-canvas get-width))
+          (define canvas-y (send ivy-canvas get-height))
+          (define canvas-center-x (/ canvas-x 2))
+          (define canvas-center-y (/ canvas-y 2))
           
+          ; keep the background black
           (send ivy-canvas set-canvas-background
                 (make-object color% "black"))
-          (send dc draw-bitmap bmp
-                (- canvas-center-x bmp-center-x)
-                (- canvas-center-y bmp-center-y))))
+          
+          (if (eq? scale 'none)
+              (cond
+                ; if the image is really big, place it at (0,0)
+                [(and (> width canvas-x)
+                      (> height canvas-y))
+                 (send dc draw-bitmap bmp 0 0)]
+                ; if the image is wider than the canvas,
+                ; place it at (0,y)
+                [(> width canvas-x)
+                 (send dc draw-bitmap bmp
+                       0 (- canvas-center-y bmp-center-y))]
+                ; if the image is taller than the canvas,
+                ; place it at (x,0)
+                [(> height canvas-y)
+                 (send dc draw-bitmap bmp
+                       (- canvas-center-x bmp-center-x) 0)]
+                ; otherwise, place it at the normal position
+                [else
+                 (send dc draw-bitmap bmp
+                       (- canvas-center-x bmp-center-x)
+                       (- canvas-center-y bmp-center-y))])
+              (send dc draw-bitmap bmp
+                    (- canvas-center-x bmp-center-x)
+                    (- canvas-center-y bmp-center-y)))))
   (send ivy-canvas init-auto-scrollbars width height 0.0 0.0)
   (send ivy-canvas refresh))
 
