@@ -72,6 +72,11 @@
      ; make sure the bitmap loaded correctly
      (define load-success (send image-bmp-master load-file img))
      (cond [load-success
+            (send ivy-frame set-label (path->string name))
+            (send status-bar-dimensions set-label
+                  (format "~a x ~a pixels"
+                          (send image-bmp-master get-width)
+                          (send image-bmp-master get-height)))
             (set! image-pict (scale-image image-bmp-master scale))
             ; if we've set tags for this file before...
             (cond [(hash-has-key? master image-path)
@@ -306,3 +311,16 @@
        [paint-callback (λ (canvas dc)
                          (send canvas set-canvas-background
                                (make-object color% "black")))]))
+
+(define status-bar-hpanel
+  (new horizontal-panel%
+       [parent ivy-frame]
+       [stretchable-height #f]))
+
+(define status-bar-dimensions
+  (new message%
+       [parent status-bar-hpanel]
+       [label (format "~a x ~a pixels"
+                      (send image-bmp-master get-width)
+                      (send image-bmp-master get-height))]
+       [auto-resize #t]))
