@@ -88,7 +88,7 @@
                   [else (send ivy-tag-tfield set-value "")])]
            [else (printf "Error loading file ~a~n" img)])]
     [else
-     ; we already have the bitmap
+     ; we already have the image loaded
      (set! image-pict (scale-image img scale))])
   
   (define bmp (pict->bitmap image-pict))
@@ -110,30 +110,31 @@
           (send ivy-canvas set-canvas-background
                 (make-object color% "black"))
           
-          (if (eq? scale 'none)
-              (cond
-                ; if the image is really big, place it at (0,0)
-                [(and (> width canvas-x)
-                      (> height canvas-y))
-                 (send dc draw-bitmap bmp 0 0)]
-                ; if the image is wider than the canvas,
-                ; place it at (0,y)
-                [(> width canvas-x)
-                 (send dc draw-bitmap bmp
-                       0 (- canvas-center-y bmp-center-y))]
-                ; if the image is taller than the canvas,
-                ; place it at (x,0)
-                [(> height canvas-y)
-                 (send dc draw-bitmap bmp
-                       (- canvas-center-x bmp-center-x) 0)]
-                ; otherwise, place it at the normal position
-                [else
-                 (send dc draw-bitmap bmp
-                       (- canvas-center-x bmp-center-x)
-                       (- canvas-center-y bmp-center-y))])
-              (send dc draw-bitmap bmp
-                    (- canvas-center-x bmp-center-x)
-                    (- canvas-center-y bmp-center-y)))))
+          (cond
+            ; if the image is really big, place it at (0,0)
+            [(and (> width canvas-x)
+                  (> height canvas-y))
+             (send ivy-canvas show-scrollbars #t #t)
+             (send dc draw-bitmap bmp 0 0)]
+            ; if the image is wider than the canvas,
+            ; place it at (0,y)
+            [(> width canvas-x)
+             (send ivy-canvas show-scrollbars #t #f)
+             (send dc draw-bitmap bmp
+                   0 (- canvas-center-y bmp-center-y))]
+            ; if the image is taller than the canvas,
+            ; place it at (x,0)
+            [(> height canvas-y)
+             (send ivy-canvas show-scrollbars #f #t)
+             (send dc draw-bitmap bmp
+                   (- canvas-center-x bmp-center-x) 0)]
+            ; otherwise, place it at the normal position
+            [else
+             (send ivy-canvas show-scrollbars #f #f)
+             (send dc draw-bitmap bmp
+                   (- canvas-center-x bmp-center-x)
+                   (- canvas-center-y bmp-center-y))])))
+  
   (send ivy-canvas init-auto-scrollbars width height 0.0 0.0)
   (send ivy-canvas refresh))
 
@@ -239,14 +240,16 @@
        [parent actions-hpanel]
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
-                   (load-image image-pict 'larger))]))
+                   (when image-pict
+                     (load-image image-pict 'larger)))]))
 
 (define ivy-actions-zoom-out
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
-                   (load-image image-pict 'smaller))]))
+                   (when image-pict
+                     (load-image image-pict 'smaller)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -293,6 +296,7 @@
   (class canvas%
     (super-new)
     (init-field paint-callback)
+    
     (define (do-on-paint)
       (when paint-callback
         (paint-callback this (send this get-dc))))
@@ -301,7 +305,16 @@
       (do-on-paint))
     
     (define/public (set-on-paint! thunk)
-      (set! do-on-paint thunk))))
+      (set! do-on-paint thunk))
+    
+    (define/override (on-char key)
+      (define type (send key get-key-code))
+      (cond [(eq? type 'wheel-down)
+             (when image-pict
+               (load-image image-pict 'smaller))]
+            [(eq? type 'wheel-up)
+             (when image-pict
+               (load-image image-pict 'larger))]))))
 
 (define ivy-canvas
   (new ivy-canvas%
