@@ -1,142 +1,10 @@
 #lang racket/gui
 ; frame.rkt
 ; main frame file for ivy, the taggable image viewer
-(require "base.rkt" pict)
+(require pict
+         "base.rkt"
+         "search-results.rkt")
 (provide (all-defined-out))
-
-; path of the currently displayed image
-(define image-path '/)
-; master bitmap of loaded image-path
-(define image-bmp-master (make-bitmap 50 50))
-; pict of the currently displayed image
-(define image-pict #f)
-; directory containing the currently displayed image
-(define image-dir (find-system-path 'home-dir))
-; all files contained within image-dir
-(define (path-files)
-  (directory-list image-dir #:build? #t))
-
-; get index of an item in the list
-; numbering starts from 0
-(define (get-index item lst)
-  (define len (length lst))
-  (define pos (member item lst))
-  (if pos
-      (- len (length pos))
-      #f))
-
-; scales an image to the current canvas size
-; img is either a pict or a bitmap%
-; type is a symbol
-; returns a pict
-(define (scale-image img type)
-  ; width and height of the image
-  (define img-width (if (pict? img)
-                        (pict-width img)
-                        (send img get-width)))
-  (define img-height (if (pict? img)
-                         (pict-height img)
-                         (send img get-height)))
-  
-  ; width and height of the canvas
-  (define max-width (send ivy-canvas get-width))
-  (define max-height (send ivy-canvas get-height))
-  
-  (case type
-    ; might deal with either pict or bitmap% for initial scaling
-    [(default)
-     (cond [(and (> img-width max-width)
-                 (> img-height max-height))
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
-           [(> img-width max-width)
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width img-height)]
-           [(> img-height max-height)
-            (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
-           [else (bitmap img)])]
-    ; only used by zoom-in, definitely a pict
-    [(larger)
-     (scale-to-fit img (* img-width 1.2) (* img-height 1.2))]
-    ; only used by zoom-out, definitely a pict
-    [(smaller)
-     (scale-to-fit img (* img-width 0.8) (* img-height 0.8))]
-    [(none) (bitmap img)]))
-
-; procedure that loads the given image to the canvas
-(define (load-image img [scale 'default])
-  (cond
-    ; need to load the path into a bitmap first
-    [(path? img)
-     (define-values (base name must-be-dir?) (split-path img))
-     (set! image-dir base)
-     (set! image-path (path->symbol img))
-     ; make sure the bitmap loaded correctly
-     (define load-success (send image-bmp-master load-file img))
-     (cond [load-success
-            (send ivy-frame set-label (path->string name))
-            (send status-bar-dimensions set-label
-                  (format "~a x ~a pixels"
-                          (send image-bmp-master get-width)
-                          (send image-bmp-master get-height)))
-            (set! image-pict (scale-image image-bmp-master scale))
-            ; if we've set tags for this file before...
-            (cond [(hash-has-key? master image-path)
-                   (define tag
-                     (string-join (hash-ref master image-path) ","))
-                   ; ...put them in the tfield
-                   (send ivy-tag-tfield set-value tag)]
-                  ; ...otherwise clear the tfield
-                  [else (send ivy-tag-tfield set-value "")])]
-           [else (printf "Error loading file ~a~n" img)])]
-    [else
-     ; we already have the image loaded
-     (set! image-pict (scale-image img scale))])
-  
-  (define bmp (pict->bitmap image-pict))
-  (define width (send bmp get-width))
-  (define height (send bmp get-height))
-  
-  (send ivy-canvas set-on-paint!
-        (λ ()
-          (define dc (send ivy-canvas get-dc))
-          
-          (define bmp-center-x (/ width 2))
-          (define bmp-center-y (/ height 2))
-          (define canvas-x (send ivy-canvas get-width))
-          (define canvas-y (send ivy-canvas get-height))
-          (define canvas-center-x (/ canvas-x 2))
-          (define canvas-center-y (/ canvas-y 2))
-          
-          ; keep the background black
-          (send ivy-canvas set-canvas-background
-                (make-object color% "black"))
-          
-          (cond
-            ; if the image is really big, place it at (0,0)
-            [(and (> width canvas-x)
-                  (> height canvas-y))
-             (send ivy-canvas show-scrollbars #t #t)
-             (send dc draw-bitmap bmp 0 0)]
-            ; if the image is wider than the canvas,
-            ; place it at (0,y)
-            [(> width canvas-x)
-             (send ivy-canvas show-scrollbars #t #f)
-             (send dc draw-bitmap bmp
-                   0 (- canvas-center-y bmp-center-y))]
-            ; if the image is taller than the canvas,
-            ; place it at (x,0)
-            [(> height canvas-y)
-             (send ivy-canvas show-scrollbars #f #t)
-             (send dc draw-bitmap bmp
-                   (- canvas-center-x bmp-center-x) 0)]
-            ; otherwise, place it at the normal position
-            [else
-             (send ivy-canvas show-scrollbars #f #f)
-             (send dc draw-bitmap bmp
-                   (- canvas-center-x bmp-center-x)
-                   (- canvas-center-y bmp-center-y))])))
-  
-  (send ivy-canvas init-auto-scrollbars width height 0.0 0.0)
-  (send ivy-canvas refresh))
 
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
@@ -161,7 +29,12 @@
                                           #f
                                           image-dir))
                    ; make sure the path is not false
-                   (when path (load-image path)))]))
+                   (when path
+                     (load-image path)
+                     (pfs (path-files))
+                     (define index (get-index (symbol->path image-path) (pfs)))
+                     (send status-bar-position set-label
+                           (format "~a / ~a" (+ index 1) (length (pfs))))))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%
@@ -172,13 +45,23 @@
                    (define search-tag-dialog
                      (new dialog%
                           [label "Ivy - Search Tags"]
-                          [width 200]
+                          [width 400]
                           [height 100]
                           [style '(close-button)]))
+                   (define search-tfield
+                     (new text-field%
+                          [parent search-tag-dialog]
+                          [label "Search for tags: "]))
+                   (define type-rbox
+                     (new radio-box%
+                          [parent search-tag-dialog]
+                          [label "Search type"]
+                          [choices '("or" "xor" "and")]))
                    (define button-hpanel
                      (new horizontal-panel%
                           [parent search-tag-dialog]
-                          [alignment '(right center)]))
+                          [alignment '(right center)]
+                          [stretchable-height #f]))
                    (define cancel-button
                      (new button%
                           [parent button-hpanel]
@@ -189,8 +72,17 @@
                      (new button%
                           [parent button-hpanel]
                           [label "&Ok"]
-                          [callback (λ (button event)
-                                      (send search-tag-dialog show #f))]))
+                          [callback
+                           (λ (button event)
+                             (send search-tag-dialog show #f)
+                             (define tags
+                               (sort (string-split
+                                      (send search-tfield get-value) ",") string<?))
+                             (define search-type
+                               (string->symbol
+                                (send type-rbox get-item-label
+                                      (send type-rbox get-selection))))
+                             (display-tags search-type tags))]))
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit
@@ -213,12 +105,20 @@
        [label (pict->bitmap (arrow 15 pi))]
        [callback (λ (button event)
                    (unless (eq? image-path '/)
-                     (define pfs (path-files))
-                     (define index (get-index (symbol->path image-path) pfs))
-                     (when (and index (> (length pfs) 1))
-                       (if (zero? index)
-                           (load-image (last pfs))
-                           (load-image (list-ref pfs (- index 1)))))))]))
+                     (define index (get-index (symbol->path image-path) (pfs)))
+                     (when (and index (> (length (pfs)) 1))
+                       (cond [(zero? index)
+                              (define img (last (pfs))) ; this is a path
+                              (define cur-pos (get-index img (pfs)))
+                              (load-image img)
+                              (send status-bar-position set-label
+                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]
+                             [else
+                              (define img (list-ref (pfs) (- index 1)))
+                              (define cur-pos (get-index img (pfs)))
+                              (load-image img)
+                              (send status-bar-position set-label
+                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]))))]))
 
 (define ivy-actions-next
   (new button%
@@ -226,12 +126,20 @@
        [label (pict->bitmap (arrow 15 0))]
        [callback (λ (button event)
                    (unless (eq? image-path '/)
-                     (define pfs (path-files))
-                     (define index (get-index (symbol->path image-path) pfs))
-                     (when (and index (> (length pfs) 1))
-                       (if (= index (- (length pfs) 1))
-                           (load-image (first pfs))
-                           (load-image (list-ref pfs (+ index 1)))))))]))
+                     (define prev-index (get-index (symbol->path image-path) (pfs)))
+                     (when (and prev-index (> (length (pfs)) 1))
+                       (cond [(= prev-index (- (length (pfs)) 1))
+                              (define img (first (pfs))) ; this is a path
+                              (define cur-pos (get-index img (pfs)))
+                              (load-image img)
+                              (send status-bar-position set-label
+                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]
+                             [else
+                              (define img (list-ref (pfs) (+ prev-index 1)))
+                              (define cur-pos (get-index img (pfs)))
+                              (load-image img)
+                              (send status-bar-position set-label
+                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]))))]))
 
 ; the pict functions are finicky and need to be done juuuust right
 ; otherwise the circle is cut off on the right side.
@@ -241,7 +149,10 @@
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    (when image-pict
-                     (load-image image-pict 'larger)))]))
+                     (load-image image-pict 'larger)
+                     #|(define index (get-index (symbol->path image-path) (pfs)))
+                     (send status-bar-position set-label
+                           (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -249,31 +160,40 @@
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    (when image-pict
-                     (load-image image-pict 'smaller)))]))
+                     (load-image image-pict 'smaller)
+                     #|(define index (get-index (symbol->path image-path) (pfs)))
+                     (send status-bar-position set-label
+                           (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
 
 (define ivy-actions-zoom-normal
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
-                   (load-image image-bmp-master 'none))]))
+                   (load-image image-bmp-master 'none)
+                   #|(define index (get-index (symbol->path image-path) (pfs)))
+                   (send status-bar-position set-label
+                         (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
 
 (define ivy-actions-zoom-fit
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
-                   (load-image image-bmp-master))]))
+                   (load-image image-bmp-master)
+                   #|(define index (get-index (symbol->path image-path) (pfs)))
+                   (send status-bar-position set-label
+                         (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
 
 ; list of tags separated by commas
 ; e.g. flower,castle,too many cooks,fuzzy wuzzy wuz a bear,etc
 (define ivy-tag-hpanel (new horizontal-panel%
                             [parent ivy-frame]
                             [stretchable-height #f]))
-(define ivy-tag-tfield
-  (new text-field%
-       [parent ivy-tag-hpanel]
-       [label "Edit tag(s): "]))
+(ivy-tag-tfield
+ (new text-field%
+      [parent ivy-tag-hpanel]
+      [label "Edit tag(s): "]))
 
 (define ivy-tag-button
   (new button%
@@ -309,31 +229,56 @@
     
     (define/override (on-char key)
       (define type (send key get-key-code))
-      (cond [(eq? type 'wheel-down)
-             (when image-pict
-               (load-image image-pict 'smaller))]
-            [(eq? type 'wheel-up)
-             (when image-pict
-               (load-image image-pict 'larger))]))))
+      (case type
+        [(wheel-down)
+         (when image-pict
+           (load-image image-pict 'smaller)
+           #|(define index (get-index (symbol->path image-path) (pfs)))
+             (send status-bar-position set-label
+                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]
+        [(wheel-up)
+         (when image-pict
+           (load-image image-pict 'larger)
+           #|(define index (get-index (symbol->path image-path) (pfs)))
+             (send status-bar-position set-label
+                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))))
 
-(define ivy-canvas
-  (new ivy-canvas%
-       [parent ivy-frame]
-       [label "Ivy Image Canvas"]
-       [style '(hscroll vscroll)]
-       [paint-callback (λ (canvas dc)
-                         (send canvas set-canvas-background
-                               (make-object color% "black")))]))
+(ivy-canvas
+ (new ivy-canvas%
+      [parent ivy-frame]
+      [label "Ivy Image Canvas"]
+      [style '(hscroll vscroll)]
+      [paint-callback (λ (canvas dc)
+                        (send canvas set-canvas-background
+                              (make-object color% "black")))]))
 
 (define status-bar-hpanel
   (new horizontal-panel%
        [parent ivy-frame]
        [stretchable-height #f]))
 
-(define status-bar-dimensions
-  (new message%
+(define dimensions-hpanel
+  (new horizontal-panel%
        [parent status-bar-hpanel]
-       [label (format "~a x ~a pixels"
-                      (send image-bmp-master get-width)
-                      (send image-bmp-master get-height))]
+       [stretchable-height #f]
+       [alignment '(left center)]))
+
+(define position-hpanel
+  (new horizontal-panel%
+       [parent status-bar-hpanel]
+       [stretchable-height #f]
+       [alignment '(right center)]))
+
+(status-bar-dimensions
+ (new message%
+      [parent dimensions-hpanel]
+      [label (format "~a x ~a pixels"
+                     (send image-bmp-master get-width)
+                     (send image-bmp-master get-height))]
+      [auto-resize #t]))
+
+(define status-bar-position
+  (new message%
+       [parent position-hpanel]
+       [label "0 / 0"]
        [auto-resize #t]))
