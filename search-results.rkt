@@ -103,7 +103,7 @@
   (define imgs (apply search-dict master type tags))
   (set! searched-images imgs)
   (unless (empty? imgs)
-    (define imgs-str (map path->string imgs))
+    (define imgs-str (sort (map path->string imgs) string<?))
     (define imgs-grid (grid-list imgs-str 6))
     
     ; generate the icon in case it does not exist

@@ -56,7 +56,7 @@
                      (new radio-box%
                           [parent search-tag-dialog]
                           [label "Search type"]
-                          [choices '("or" "xor" "and")]))
+                          [choices '("or" "and")]))
                    (define button-hpanel
                      (new horizontal-panel%
                           [parent search-tag-dialog]
@@ -200,7 +200,7 @@
        [parent ivy-tag-hpanel]
        [label "Set"]
        [callback (λ (button event)
-                   (define tag (send ivy-tag-tfield get-value))
+                   (define tag (send (ivy-tag-tfield) get-value))
                    ; empty tag string means delete the entry
                    (cond [(string=? tag "")
                           ; no failure if key doesn't exist

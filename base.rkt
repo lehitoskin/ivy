@@ -62,89 +62,40 @@
       (printf "Removing ~s from dictionary.~n" file-path)
       (dict-remove! dct file-sym))))
 
+; saves only the entries in the list that are duplicates.
+; if there are more than two identical entries, they are
+; counted more than once, so a final sort and remove-duplicates
+; (how ironic) is possibly necessary.
+(define (keep-duplicates lst [dups empty])
+  (define sorted (sort lst equal?))
+  (define len (length sorted))
+  (cond [(< len 2) dups]
+        [(>= len 2)
+         (if (equal? (first sorted) (second sorted))
+             (keep-duplicates (rest sorted) (cons (first sorted) dups))
+             (keep-duplicates (rest sorted) dups))]))
+
 ; enter a dictionary (master) and tag strings to search for.
 ; returns a list of image paths or empty on failure
-;
-; TODO:
-; search dictionary and only return images that fit ALL
-;   the tags given
-; make it an option to do specific search or general search?
-;
-; default is 'or search (this tag OR that tag)
-;
-; need the whole tag list for that image instead of the list
-; returned from member to compare the next item in the search
-; results
-;
-; what is really needed is the opposite of remove-duplicates,
-; something like keep-duplicates... look at andmap/ormap
-(define (test-search lst)
+(define (search-dict dct type . items)
   (define search-results
-    (for/list ([(paths tags) (in-dict master)])
-      (define result (if (member (car lst) tags) tags #f))
-      (for/list ([l (cdr lst)])
-        (cond [result (if (member l result)
-                          tags
-                          #f)]
-              [else #f]))
-      ; take the tags and turn them into symbol-paths
-      (if result
-          (map (λ (j) (if (false? j) j paths)) result)
-          #f)))
-  (define filtered (sort (filter symbol? (flatten search-results)) symbol<?))
-  (remove-duplicates (map symbol->path filtered)))
-
-#|
-(let ([or-results
-         (flatten
-          (for/list ([(path tag) (in-dict master)])
-            (define results
-              (flatten
-               (for/list ([item '("Tsutomu Nihei" "beach")])
-                 (define res (if (member item tag) tag #f))
-                 (if res
-                     (map (λ (l) (if (false? l) l path)) res)
-                     #f))))
-            (filter symbol? results)))])
-    (define xor
-      (remove-duplicates or-results))
-    xor)
-|#
-
-(define (search-dict dct [type 'or] . items)
+    (flatten
+     (for/list ([(path tag) (in-dict dct)])
+       ; list of tags and #f
+       (define result (map (λ (i) (member i tag)) items))
+       ; check for false through the result list
+       ; if not false, return the path for the result
+       ; list of symbol-paths and #f
+       (map (λ (l) (if (false? l) l path)) result))))
+  ; filter out any false
+  ; list of symbol-paths only
+  (define filtered (filter symbol? search-results))
   (case type
     [(or)
-     (define search-results
-       (flatten
-        (for/list ([(path tag) (in-dict dct)])
-          ; list of tags and #f
-          (define result (map (λ (i) (member i tag)) items))
-          ; check for false through the result list
-          ; if not false, return the path for the result
-          ; list of symbol-paths and #f
-          (map (λ (l) (if (false? l) l path)) result))))
-     ; filter out any false
-     ; list of symbol-paths only
-     (define filtered (filter symbol? search-results))
      ; turn the symbols into paths and remove any duplicates
      (remove-duplicates (map symbol->path filtered))]
-    [(xor)
-     (define or-results
-       (for/list ([(path tag) (in-dict master)])
-         (define results
-           (flatten
-            (for/list ([item items])
-              (define res (if (member item tag) tag #f))
-              (if res
-                  (map (λ (l) (if (false? l) l path)) res)
-                  #f))))
-         (filter symbol? results)))
-     (remove-duplicates (flatten or-results))]))
-    #;[(and)
-     (define search-results
-       (flatten
-        (for/list ([(paths tags) (in-dict dct)])
-          (define result (map (λ (i) (member i tags)) items)))))]
+    [(and)
+     (remove-duplicates (map symbol->path (keep-duplicates filtered)))]))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
@@ -301,22 +252,22 @@
       (list-ref lst (+ (* i x) n)))))
 
 ; generates 100x100 icons from a list of strings paths
-; e.g. (generate-icons (map path->string (search-dict master "beach")))
+; e.g. (generate-icons (map path->string (search-dict master 'or "beach")))
 (define (generate-icons imgs)
-    (for ([path (in-list imgs)])
-      ; create and load the bitmap
-      (define bmp (make-bitmap 100 100))
-      (send bmp load-file path)
-      ; cannot have slashes in the actual name
-      ; fraction slash: U+2044
-      (define str (string-append (string-replace path "/" "⁄") ".png"))
-      (define bmp-path (build-path icons-path str))
-      ; use pict to scale the image to 100x100
-      (define pct (bitmap bmp))
-      (define bmp-small (pict->bitmap (scale-to-fit pct 100 100)))
-      (define bmp-port-out (open-output-file bmp-path
-                                             #:mode 'binary
-                                             #:exists 'truncate/replace))
-      (printf "Writing bytes to ~a~n" bmp-path)
-      (write-bytes (convert bmp-small 'png-bytes) bmp-port-out)
-      (close-output-port bmp-port-out)))
+  (for ([path (in-list imgs)])
+    ; create and load the bitmap
+    (define bmp (make-bitmap 100 100))
+    (send bmp load-file path)
+    ; cannot have slashes in the actual name
+    ; fraction slash: U+2044
+    (define str (string-append (string-replace path "/" "⁄") ".png"))
+    (define bmp-path (build-path icons-path str))
+    ; use pict to scale the image to 100x100
+    (define pct (bitmap bmp))
+    (define bmp-small (pict->bitmap (scale-to-fit pct 100 100)))
+    (define bmp-port-out (open-output-file bmp-path
+                                           #:mode 'binary
+                                           #:exists 'truncate/replace))
+    (printf "Writing bytes to ~a~n" bmp-path)
+    (write-bytes (convert bmp-small 'png-bytes) bmp-port-out)
+    (close-output-port bmp-port-out)))
