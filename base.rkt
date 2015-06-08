@@ -166,6 +166,7 @@
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
+  (send tag-tfield set-label "Edit tag(s) : ")
   (cond
     ; need to load the path into a bitmap first
     [(path? img)

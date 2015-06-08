@@ -190,24 +190,41 @@
 (define ivy-tag-hpanel (new horizontal-panel%
                             [parent ivy-frame]
                             [stretchable-height #f]))
+
 (ivy-tag-tfield
  (new text-field%
       [parent ivy-tag-hpanel]
-      [label "Edit tag(s): "]))
+      [label "Edit tag(s) : "]
+      [callback (λ (tf evt)
+                  (cond [(eq? (send evt get-event-type) 'text-field-enter)
+                         (define tags (send tf get-value))
+                         (send tf set-label "Edit tag(s) : ")
+                         ; empty tag string means delete the entry
+                         (cond [(string=? tags "")
+                                ; no failure if key doesn't exist
+                                (dict-remove! master image-path)]
+                               [(not (eq? image-path '/))
+                                ; turn the string of tag(s) into a list then sort it
+                                (define tag-lst (sort (string-split tags ",") string<?))
+                                ; set and save the dictionary
+                                (dict-set! master image-path tag-lst)
+                                (save-dict! master)])]
+                        [else (send tf set-label "Edit tag(s)*: ")]))]))
 
 (define ivy-tag-button
   (new button%
        [parent ivy-tag-hpanel]
        [label "Set"]
        [callback (λ (button event)
-                   (define tag (send (ivy-tag-tfield) get-value))
+                   (define tags (send (ivy-tag-tfield) get-value))
+                   (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
                    ; empty tag string means delete the entry
-                   (cond [(string=? tag "")
+                   (cond [(string=? tags "")
                           ; no failure if key doesn't exist
                           (dict-remove! master image-path)]
                          [(not (eq? image-path '/))
                           ; turn the string of tag(s) into a list then sort it
-                          (define tag-lst (sort (string-split tag ",") string<?))
+                          (define tag-lst (sort (string-split tags ",") string<?))
                           ; set and save the dictionary
                           (dict-set! master image-path tag-lst)
                           (save-dict! master)]))]))
