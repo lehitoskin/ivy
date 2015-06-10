@@ -27,14 +27,14 @@
        [callback (λ (i e)
                    (define path (get-file "Select an image to view."
                                           #f
-                                          image-dir))
+                                          (image-dir)))
                    ; make sure the path is not false
                    (when path
-                     (load-image path)
+                     (define-values (base name dir?) (split-path path))
+                     (image-dir base)
+                     (image-path path)
                      (pfs (path-files))
-                     (define index (get-index (symbol->path image-path) (pfs)))
-                     (send status-bar-position set-label
-                           (format "~a / ~a" (+ index 1) (length (pfs))))))]))
+                     (load-image path)))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%
@@ -104,42 +104,14 @@
        [parent actions-hpanel]
        [label (pict->bitmap (arrow 15 pi))]
        [callback (λ (button event)
-                   (unless (eq? image-path '/)
-                     (define index (get-index (symbol->path image-path) (pfs)))
-                     (when (and index (> (length (pfs)) 1))
-                       (cond [(zero? index)
-                              (define img (last (pfs))) ; this is a path
-                              (define cur-pos (get-index img (pfs)))
-                              (load-image img)
-                              (send status-bar-position set-label
-                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]
-                             [else
-                              (define img (list-ref (pfs) (- index 1)))
-                              (define cur-pos (get-index img (pfs)))
-                              (load-image img)
-                              (send status-bar-position set-label
-                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]))))]))
+                   (load-previous-image))]))
 
 (define ivy-actions-next
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (arrow 15 0))]
        [callback (λ (button event)
-                   (unless (eq? image-path '/)
-                     (define prev-index (get-index (symbol->path image-path) (pfs)))
-                     (when (and prev-index (> (length (pfs)) 1))
-                       (cond [(= prev-index (- (length (pfs)) 1))
-                              (define img (first (pfs))) ; this is a path
-                              (define cur-pos (get-index img (pfs)))
-                              (load-image img)
-                              (send status-bar-position set-label
-                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]
-                             [else
-                              (define img (list-ref (pfs) (+ prev-index 1)))
-                              (define cur-pos (get-index img (pfs)))
-                              (load-image img)
-                              (send status-bar-position set-label
-                                    (format "~a / ~a" (+ cur-pos 1) (length (pfs))))]))))]))
+                   (load-next-image))]))
 
 ; the pict functions are finicky and need to be done juuuust right
 ; otherwise the circle is cut off on the right side.
@@ -150,8 +122,8 @@
        [callback (λ (button event)
                    (when image-pict
                      (load-image image-pict 'larger)
-                     #|(define index (get-index (symbol->path image-path) (pfs)))
-                     (send status-bar-position set-label
+                     #|(define index (get-index (symbol->path (image-path)) (pfs)))
+                     (send (status-bar-position) set-label
                            (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
 
 (define ivy-actions-zoom-out
@@ -161,8 +133,8 @@
        [callback (λ (button event)
                    (when image-pict
                      (load-image image-pict 'smaller)
-                     #|(define index (get-index (symbol->path image-path) (pfs)))
-                     (send status-bar-position set-label
+                     #|(define index (get-index (symbol->path (image-path)) (pfs)))
+                     (send (status-bar-position) set-label
                            (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
 
 (define ivy-actions-zoom-normal
@@ -171,8 +143,8 @@
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
                    (load-image image-bmp-master 'none)
-                   #|(define index (get-index (symbol->path image-path) (pfs)))
-                   (send status-bar-position set-label
+                   #|(define index (get-index (symbol->path (image-path)) (pfs)))
+                   (send (status-bar-position) set-label
                          (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
 
 (define ivy-actions-zoom-fit
@@ -181,8 +153,8 @@
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
                    (load-image image-bmp-master)
-                   #|(define index (get-index (symbol->path image-path) (pfs)))
-                   (send status-bar-position set-label
+                   #|(define index (get-index (symbol->path (image-path)) (pfs)))
+                   (send (status-bar-position) set-label
                          (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
 
 ; list of tags separated by commas
@@ -202,14 +174,19 @@
                          ; empty tag string means delete the entry
                          (cond [(string=? tags "")
                                 ; no failure if key doesn't exist
-                                (dict-remove! master image-path)]
-                               [(not (eq? image-path '/))
+                                (dict-remove! master (image-path))]
+                               [(not (eq? (image-path) '/))
                                 ; turn the string of tag(s) into a list then sort it
                                 (define tag-lst (sort (string-split tags ",") string<?))
                                 ; set and save the dictionary
-                                (dict-set! master image-path tag-lst)
-                                (save-dict! master)])]
-                        [else (send tf set-label "Edit tag(s)*: ")]))]))
+                                (dict-set! master (image-path) tag-lst)
+                                (save-dict! master)])
+                         (send tf set-field-background (make-object color% "spring green"))
+                         (send (ivy-canvas) focus)]
+                        [else
+                         (send tf set-label "Edit tag(s)*: ")
+                         ; see color-database<%> for more named colors
+                         (send tf set-field-background (make-object color% "gold"))]))]))
 
 (define ivy-tag-button
   (new button%
@@ -218,16 +195,18 @@
        [callback (λ (button event)
                    (define tags (send (ivy-tag-tfield) get-value))
                    (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
+                   (send (ivy-tag-tfield) set-field-background (make-object color% "spring green"))
                    ; empty tag string means delete the entry
                    (cond [(string=? tags "")
                           ; no failure if key doesn't exist
-                          (dict-remove! master image-path)]
-                         [(not (eq? image-path '/))
+                          (dict-remove! master (image-path))]
+                         [(not (eq? (image-path) '/))
                           ; turn the string of tag(s) into a list then sort it
                           (define tag-lst (sort (string-split tags ",") string<?))
                           ; set and save the dictionary
-                          (dict-set! master image-path tag-lst)
-                          (save-dict! master)]))]))
+                          (dict-set! master (image-path) tag-lst)
+                          (save-dict! master)])
+                   (send (ivy-canvas) focus))]))
 
 (define ivy-canvas%
   (class canvas%
@@ -250,15 +229,17 @@
         [(wheel-down)
          (when image-pict
            (load-image image-pict 'smaller)
-           #|(define index (get-index (symbol->path image-path) (pfs)))
-             (send status-bar-position set-label
+           #|(define index (get-index (symbol->path (image-path)) (pfs)))
+             (send (status-bar-position) set-label
                    (format "~a / ~a" (+ index 1) (length (pfs))))|#)]
         [(wheel-up)
          (when image-pict
            (load-image image-pict 'larger)
-           #|(define index (get-index (symbol->path image-path) (pfs)))
-             (send status-bar-position set-label
-                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))))
+           #|(define index (get-index (symbol->path (image-path)) (pfs)))
+             (send (status-bar-position) set-label
+                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]
+        [(left) (load-previous-image)]
+        [(right) (load-next-image)]))))
 
 (ivy-canvas
  (new ivy-canvas%
@@ -294,7 +275,7 @@
                      (send image-bmp-master get-height))]
       [auto-resize #t]))
 
-(define status-bar-position
+(status-bar-position
   (new message%
        [parent position-hpanel]
        [label "0 / 0"]

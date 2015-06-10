@@ -1,3 +1,4 @@
+#!/usr/bin/env racket
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
@@ -15,10 +16,13 @@
  "Supplying a path will tell Ivy to load the provided image."
  #:args requested-image
  (unless (empty? requested-image)
-   (define requested-path (string->path (first requested-image)))
-   (if (relative-path? requested-path)
-       (image-path (build-path (current-directory-for-user) requested-path))
-       (image-path requested-path))
-   (load-image (image-path))))
+   (define requested-path
+     (simplify-path (expand-user-path (first requested-image))))
+   (define-values (base name dir?) (split-path requested-path))
+   (image-path requested-path)
+   (image-dir base)
+   (pfs (path-files))
+   (load-image (image-path) 'cmd)))
 
+(send (ivy-canvas) focus)
 (send ivy-frame show #t)

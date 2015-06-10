@@ -9,7 +9,9 @@
          racket/list
          racket/class
          racket/string
-         file/convertible)
+         file/convertible
+         #;(only-in srfi/13
+                  string-contains-ci))
 (provide (all-defined-out))
 
 (define (path->symbol p)
@@ -33,16 +35,16 @@
                                     "Library/Application Support/ivy")]))
 (define master-file (build-path ivy-path "catalog.json"))
 ; path of the currently displayed image
-(define image-path '/)
+(define image-path (make-parameter '/))
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
 (define image-pict #f)
 ; directory containing the currently displayed image
-(define image-dir (find-system-path 'home-dir))
+(define image-dir (make-parameter (find-system-path 'home-dir)))
 ; all files contained within image-dir
 (define (path-files)
-  (directory-list image-dir #:build? #t))
+  (directory-list (image-dir) #:build? #t))
 ; parameter listof path
 (define pfs (make-parameter (list (build-path "/"))))
 ; path for cached icons
@@ -69,11 +71,30 @@
 (define (keep-duplicates lst [dups empty])
   (define sorted (sort lst equal?))
   (define len (length sorted))
-  (cond [(< len 2) dups]
+  (cond [(< len 2) (remove-duplicates dups)]
         [(>= len 2)
          (if (equal? (first sorted) (second sorted))
              (keep-duplicates (rest sorted) (cons (first sorted) dups))
              (keep-duplicates (rest sorted) dups))]))
+
+#|
+(let ([dct master] [items (list "Ah!" "beach")])
+    (define search-results
+      (flatten
+       (for/list ([(path tag) (in-dict dct)])
+         (for/list ([i items])
+           ; list of tags and #f
+           ;(define result (map (λ (i) (member i tag)) items))
+           (define result (map (λ (t) (string-contains-ci t i)) tag))
+           ; check for false through the result list
+           ; if not false, return the path for the result
+           ; list of symbol-paths and #f
+           (map (λ (l) (if (false? l) l path)) result)))))
+    ; filter out any false
+    ; list of symbol-paths only
+    (define filtered (filter symbol? search-results))
+    (remove-duplicates (map symbol->path (keep-duplicates filtered))))
+|#
 
 ; enter a dictionary (master) and tag strings to search for.
 ; returns a list of image paths or empty on failure
@@ -81,12 +102,14 @@
   (define search-results
     (flatten
      (for/list ([(path tag) (in-dict dct)])
+       ;(for/list ([i items])
        ; list of tags and #f
        (define result (map (λ (i) (member i tag)) items))
+       ;(define result (map (λ (t) (string-contains-ci t i)) tag))
        ; check for false through the result list
        ; if not false, return the path for the result
        ; list of symbol-paths and #f
-       (map (λ (l) (if (false? l) l path)) result))))
+       (map (λ (l) (if (false? l) l path)) result))));)
   ; filter out any false
   ; list of symbol-paths only
   (define filtered (filter symbol? search-results))
@@ -95,7 +118,7 @@
      ; turn the symbols into paths and remove any duplicates
      (remove-duplicates (map symbol->path filtered))]
     [(and)
-     (remove-duplicates (map symbol->path (keep-duplicates filtered)))]))
+     (map symbol->path (keep-duplicates filtered))]))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
@@ -148,6 +171,18 @@
            [(> img-height max-height)
             (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
            [else (bitmap img)])]
+    [(cmd)
+     ; canvas is very small before everything is completely loaded
+     (set! max-width 800)
+     (set! max-height 501)
+     (cond [(and (> img-width max-width)
+                 (> img-height max-height))
+            (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
+           [(> img-width max-width)
+            (scale-to-fit (if (pict? img) img (bitmap img)) max-width img-height)]
+           [(> img-height max-height)
+            (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
+           [else (bitmap img)])]
     ; only used by zoom-in, definitely a pict
     [(larger)
      (scale-to-fit img (* img-width 1.2) (* img-height 1.2))]
@@ -160,19 +195,24 @@
 (define ivy-canvas (make-parameter #f))
 (define ivy-tag-tfield (make-parameter #f))
 (define status-bar-dimensions (make-parameter #f))
+(define status-bar-position (make-parameter #f))
 
 ; procedure that loads the given image to the canvas
+; takes care of updating the dimensions message and
+; the position message
 (define (load-image img [scale 'default])
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
+  (define sbp (status-bar-position))
   (send tag-tfield set-label "Edit tag(s) : ")
+  (send tag-tfield set-field-background (make-object color% "white"))
   (cond
     ; need to load the path into a bitmap first
     [(path? img)
      (define-values (base name must-be-dir?) (split-path img))
-     (set! image-dir base)
-     (set! image-path (path->symbol img))
+     (image-dir base)
+     (image-path (path->symbol img))
      ; make sure the bitmap loaded correctly
      (define load-success (send image-bmp-master load-file img))
      (cond [load-success
@@ -182,10 +222,14 @@
                           (send image-bmp-master get-width)
                           (send image-bmp-master get-height)))
             (set! image-pict (scale-image canvas image-bmp-master scale))
+            (send (status-bar-position) set-label
+                  (format "~a / ~a"
+                          (+ (get-index img (pfs)) 1)
+                          (length (pfs))))
             ; if we've set tags for this file before...
-            (cond [(hash-has-key? master image-path)
+            (cond [(hash-has-key? master (image-path))
                    (define tag
-                     (string-join (hash-ref master image-path) ","))
+                     (string-join (hash-ref master (image-path)) ","))
                    ; ...put them in the tfield
                    (send tag-tfield set-value tag)]
                   ; ...otherwise clear the tfield
@@ -196,15 +240,15 @@
      (set! image-pict (scale-image canvas img scale))])
   
   (define bmp (pict->bitmap image-pict))
-  (define width (send bmp get-width))
-  (define height (send bmp get-height))
+  (define bmp-width (send bmp get-width))
+  (define bmp-height (send bmp get-height))
   
   (send canvas set-on-paint!
         (λ ()
           (define dc (send canvas get-dc))
           
-          (define bmp-center-x (/ width 2))
-          (define bmp-center-y (/ height 2))
+          (define bmp-center-x (/ bmp-width 2))
+          (define bmp-center-y (/ bmp-height 2))
           (define canvas-x (send canvas get-width))
           (define canvas-y (send canvas get-height))
           (define canvas-center-x (/ canvas-x 2))
@@ -216,19 +260,19 @@
           
           (cond
             ; if the image is really big, place it at (0,0)
-            [(and (> width canvas-x)
-                  (> height canvas-y))
+            [(and (> bmp-width canvas-x)
+                  (> bmp-height canvas-y))
              (send canvas show-scrollbars #t #t)
              (send dc draw-bitmap bmp 0 0)]
             ; if the image is wider than the canvas,
             ; place it at (0,y)
-            [(> width canvas-x)
+            [(> bmp-width canvas-x)
              (send canvas show-scrollbars #t #f)
              (send dc draw-bitmap bmp
                    0 (- canvas-center-y bmp-center-y))]
             ; if the image is taller than the canvas,
             ; place it at (x,0)
-            [(> height canvas-y)
+            [(> bmp-height canvas-y)
              (send canvas show-scrollbars #f #t)
              (send dc draw-bitmap bmp
                    (- canvas-center-x bmp-center-x) 0)]
@@ -239,8 +283,59 @@
                    (- canvas-center-x bmp-center-x)
                    (- canvas-center-y bmp-center-y))])))
   
-  (send canvas init-auto-scrollbars width height 0.0 0.0)
+  (send canvas init-auto-scrollbars bmp-width bmp-height 0.0 0.0)
   (send canvas refresh))
+
+; curried procedure to abstract loading an image in a collection
+; mmm... curry
+(define ((load-image-in-collection direction))
+  (unless (or (false? image-pict) (eq? (image-path) '/))
+    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
+    (case direction
+      [(previous)
+       (when (and prev-index (> (length (pfs)) 1))
+         (cond [(zero? prev-index)
+                (define img (last (pfs))) ; this is a path
+                (load-image img)]
+               [else
+                (define img (list-ref (pfs) (- prev-index 1)))
+                (load-image img)]))]
+      [(next)
+       (when (and prev-index (> (length (pfs)) 1))
+         (cond [(= prev-index (- (length (pfs)) 1))
+                (define img (first (pfs))) ; this is a path
+                (load-image img)]
+               [else
+                (define img (list-ref (pfs) (+ prev-index 1)))
+                (load-image img)]))])))
+
+; is this complicating things? I have no idea, but we should never
+; underestimate the `cool' factor
+(define load-previous-image (load-image-in-collection 'previous))
+(define load-next-image (load-image-in-collection 'next))
+
+; load previous image in the list of files
+#;(define (load-previous-image)
+  (unless (or (false? image-pict) (eq? (image-path) '/))
+    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
+    (when (and prev-index (> (length (pfs)) 1))
+      (cond [(zero? prev-index)
+             (define img (last (pfs))) ; this is a path
+             (load-image img)]
+            [else
+             (define img (list-ref (pfs) (- prev-index 1)))
+             (load-image img)]))))
+
+#;(define (load-next-image)
+  (unless (or (false? image-pict) (eq? (image-path) '/))
+    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
+    (when (and prev-index (> (length (pfs)) 1))
+      (cond [(= prev-index (- (length (pfs)) 1))
+             (define img (first (pfs))) ; this is a path
+             (load-image img)]
+            [else
+             (define img (list-ref (pfs) (+ prev-index 1)))
+             (load-image img)]))))
 
 ; takes a list lst and a width x and
 ; returns a list of lists of lengths no more than x
