@@ -29,8 +29,8 @@
        [help-string "Create a virtual directory containing the search results."]
        [callback (λ (button event)
                    (unless (empty? searched-images)
-                     (load-image (car searched-images))
-                     (pfs searched-images)))]))
+                     (pfs searched-images)
+                     (load-image (first searched-images))))]))
 
 (define file-close
   (new menu-item%
@@ -101,40 +101,47 @@
 ; search for the tags and display everything
 (define (display-tags type tags)
   (define imgs (apply search-dict master type tags))
-  (set! searched-images imgs)
-  (unless (empty? imgs)
-    (define imgs-str (sort (map path->string imgs) string<?))
-    (define imgs-grid (grid-list imgs-str 6))
-    
-    ; generate the icon in case it does not exist
-    (for ([img-path imgs-str])
-      (define str (string-append (string-replace img-path "/" "⁄") ".png"))
-      (define icon-path (build-path icons-path str))
-      (unless (file-exists? icon-path)
-        (generate-icons (list img-path))))
-    
-    (send results-canvas set-on-paint!
-          (λ ()
-            (define dc (send results-canvas get-dc))
-            
-            (send results-canvas set-canvas-background
-                  (make-object color% "black"))
-            (for ([img-list imgs-grid]
-                  [y (in-naturals)])
-              (for ([path img-list]
-                    [x (in-naturals)])
-                (define str (string-append (string-replace path "/" "⁄") ".png"))
-                (define bmp-path (build-path icons-path str))
-                (define bmp-port-in (open-input-file bmp-path #:mode 'binary))
-                (define bmp (make-object bitmap% bmp-port-in))
-                (close-input-port bmp-port-in)
-                (send dc draw-bitmap bmp (* 100 x) (* 100 y))))))
-    
-    (when (positive? (length imgs-str))
-      (send results-canvas init-auto-scrollbars #f
-            (* 100 (length imgs-grid)) 0.0 0.0))
-    (if (< (length imgs-grid) 4)
-        (send results-canvas show-scrollbars #f #f)
-        (send results-canvas show-scrollbars #f #t))
-    
-    (send results-frame show #t)))
+  (cond [(empty? imgs)
+         (message-box "Ivy - No Images Found"
+                      "Sorry! No images with those tags have been found."
+                      #f
+                      (list 'ok 'stop))]
+        [else
+         (define imgs-str (sort (map path->string imgs) string<?))
+         (set! searched-images (map string->path imgs-str))
+         (define imgs-grid (grid-list imgs-str 6))
+         
+         ; generate the icon in case it does not exist
+         (for ([img-path imgs-str])
+           (define str (string-append (string-replace img-path "/" "⁄") ".png"))
+           (define icon-path (build-path icons-path str))
+           (unless (file-exists? icon-path)
+             (generate-icons (list img-path))))
+         
+         (send results-canvas set-on-paint!
+               (λ ()
+                 (define dc (send results-canvas get-dc))
+                 
+                 (send results-canvas set-canvas-background
+                       (make-object color% "black"))
+                 (for ([img-list imgs-grid]
+                       [y (in-naturals)])
+                   (for ([path img-list]
+                         [x (in-naturals)])
+                     (define str (string-append
+                                  (string-replace path "/" "⁄") ".png"))
+                     (define bmp-path (build-path icons-path str))
+                     (define bmp-port-in
+                       (open-input-file bmp-path #:mode 'binary))
+                     (define bmp (make-object bitmap% bmp-port-in))
+                     (close-input-port bmp-port-in)
+                     (send dc draw-bitmap bmp (* 100 x) (* 100 y))))))
+         
+         (when (positive? (length imgs-str))
+           (send results-canvas init-auto-scrollbars #f
+                 (* 100 (length imgs-grid)) 0.0 0.0))
+         (if (< (length imgs-grid) 4)
+             (send results-canvas show-scrollbars #f #f)
+             (send results-canvas show-scrollbars #f #t))
+         
+         (send results-frame show #t)]))

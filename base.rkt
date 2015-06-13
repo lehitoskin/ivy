@@ -10,7 +10,7 @@
          racket/class
          racket/string
          file/convertible
-         #;(only-in srfi/13
+         (only-in srfi/13
                   string-contains-ci))
 (provide (all-defined-out))
 
@@ -56,7 +56,8 @@
     #:exists 'truncate/replace
     #:mode 'text))
 
-(define (clear-dict! dct)
+; removes entries for files that no longer exist
+(define (clean-dict! dct)
   (for ([file-sym (in-dict-keys dct)])
     (define file-path (symbol->path file-sym))
     (printf "Checking ~s...~n" file-path)
@@ -77,47 +78,38 @@
              (keep-duplicates (rest sorted) (cons (first sorted) dups))
              (keep-duplicates (rest sorted) dups))]))
 
-#|
-(let ([dct master] [items (list "Ah!" "beach")])
-    (define search-results
-      (flatten
-       (for/list ([(path tag) (in-dict dct)])
-         (for/list ([i items])
-           ; list of tags and #f
-           ;(define result (map (λ (i) (member i tag)) items))
-           (define result (map (λ (t) (string-contains-ci t i)) tag))
-           ; check for false through the result list
-           ; if not false, return the path for the result
-           ; list of symbol-paths and #f
-           (map (λ (l) (if (false? l) l path)) result)))))
-    ; filter out any false
-    ; list of symbol-paths only
-    (define filtered (filter symbol? search-results))
-    (remove-duplicates (map symbol->path (keep-duplicates filtered))))
-|#
-
 ; enter a dictionary (master) and tag strings to search for.
 ; returns a list of image paths or empty on failure
 (define (search-dict dct type . items)
   (define search-results
     (flatten
-     (for/list ([(path tag) (in-dict dct)])
-       ;(for/list ([i items])
-       ; list of tags and #f
-       (define result (map (λ (i) (member i tag)) items))
-       ;(define result (map (λ (t) (string-contains-ci t i)) tag))
-       ; check for false through the result list
-       ; if not false, return the path for the result
-       ; list of symbol-paths and #f
-       (map (λ (l) (if (false? l) l path)) result))));)
+     (for/list ([(path tags) (in-dict dct)])
+       (define ts
+         ; go through each tag and search if it matches the list
+         ; for that image
+         (for/list ([i items])
+           ; list of tags and #f
+           ;(define result (map (λ (i) (member i tags)) items))
+           ; list of numbers and #f
+           (define result (map (λ (t) (string-contains-ci t i)) tags))
+           ; check for false through the result list
+           ; if not false, return the path for the result
+           ; list of symbol-paths and #f
+           (map (λ (l) (if (false? l) l path)) result)))
+       ; remove any duplicate string-contains-ci matches
+       ; for images that have tags containing more than
+       ; one of the same phrase (e.g. images with the tags
+       ; "beach" "beach towel" will appear more than once)
+       (map remove-duplicates ts))))
   ; filter out any false
   ; list of symbol-paths only
   (define filtered (filter symbol? search-results))
   (case type
     [(or)
      ; turn the symbols into paths and remove any duplicates
-     (remove-duplicates (map symbol->path filtered))]
+     (map symbol->path (remove-duplicates filtered))]
     [(and)
+     ; turn the symbols into paths and keep any duplicates
      (map symbol->path (keep-duplicates filtered))]))
 
 ; create the config directory
@@ -229,7 +221,7 @@
             ; if we've set tags for this file before...
             (cond [(hash-has-key? master (image-path))
                    (define tag
-                     (string-join (hash-ref master (image-path)) ","))
+                     (string-join (hash-ref master (image-path)) ", "))
                    ; ...put them in the tfield
                    (send tag-tfield set-value tag)]
                   ; ...otherwise clear the tfield
@@ -246,6 +238,19 @@
   (send canvas set-on-paint!
         (λ ()
           (define dc (send canvas get-dc))
+          
+          ; have the canvas re-scale the image so when the canvas is
+          ; resized, it'll also be the proper size
+          (define bmp
+            (cond [(path? img)
+                   (set! image-pict (scale-image canvas image-bmp-master scale))
+                   (pict->bitmap image-pict)]
+                  [else
+                   (set! image-pict (scale-image canvas image-pict scale))
+                   (pict->bitmap image-pict)]))
+          
+          (define bmp-width (send bmp get-width))
+          (define bmp-height (send bmp get-height))
           
           (define bmp-center-x (/ bmp-width 2))
           (define bmp-center-y (/ bmp-height 2))

@@ -39,8 +39,9 @@
 (define ivy-menu-bar-search-tag
   (new menu-item%
        [parent ivy-menu-bar-file]
-       [label "&Search Tags"]
-       [help-string "Search tags for an image."]
+       [label "&Find Images with Tags"]
+       [shortcut #\F]
+       [help-string "Search for images with tags."]
        [callback (λ (i e)
                    (define search-tag-dialog
                      (new dialog%
@@ -51,7 +52,22 @@
                    (define search-tfield
                      (new text-field%
                           [parent search-tag-dialog]
-                          [label "Search for tags: "]))
+                          [label "Search for tags: "]
+                          [callback
+                           (λ (tf evt)
+                             (when (and
+                                    (eq? (send evt get-event-type) 'text-field-enter)
+                                    (not (string=? (send tf get-value) "")))
+                               (send search-tag-dialog show #f)
+                               (define tags
+                                 (sort (string-split
+                                        (send search-tfield get-value) ", ")
+                                       string<?))
+                               (define search-type
+                                 (string->symbol
+                                  (send type-rbox get-item-label
+                                        (send type-rbox get-selection))))
+                               (display-tags search-type tags)))]))
                    (define type-rbox
                      (new radio-box%
                           [parent search-tag-dialog]
@@ -74,15 +90,18 @@
                           [label "&Ok"]
                           [callback
                            (λ (button event)
-                             (send search-tag-dialog show #f)
-                             (define tags
-                               (sort (string-split
-                                      (send search-tfield get-value) ",") string<?))
-                             (define search-type
-                               (string->symbol
-                                (send type-rbox get-item-label
-                                      (send type-rbox get-selection))))
-                             (display-tags search-type tags))]))
+                             (unless (string=? (send search-tfield get-value) "")
+                               (send search-tag-dialog show #f)
+                               (define tags
+                                 (sort (string-split
+                                        (send search-tfield get-value) ", ")
+                                       string<?))
+                               (define search-type
+                                 (string->symbol
+                                  (send type-rbox get-item-label
+                                        (send type-rbox get-selection))))
+                               (display-tags search-type tags)))]))
+                   (send search-tfield focus)
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit
@@ -121,10 +140,7 @@
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    (when image-pict
-                     (load-image image-pict 'larger)
-                     #|(define index (get-index (symbol->path (image-path)) (pfs)))
-                     (send (status-bar-position) set-label
-                           (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
+                     (load-image image-pict 'larger)))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -132,30 +148,21 @@
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    (when image-pict
-                     (load-image image-pict 'smaller)
-                     #|(define index (get-index (symbol->path (image-path)) (pfs)))
-                     (send (status-bar-position) set-label
-                           (format "~a / ~a" (+ index 1) (length (pfs))))|#))]))
+                     (load-image image-pict 'smaller)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
-                   (load-image image-bmp-master 'none)
-                   #|(define index (get-index (symbol->path (image-path)) (pfs)))
-                   (send (status-bar-position) set-label
-                         (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
+                   (load-image image-bmp-master 'none))]))
 
 (define ivy-actions-zoom-fit
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
-                   (load-image image-bmp-master)
-                   #|(define index (get-index (symbol->path (image-path)) (pfs)))
-                   (send (status-bar-position) set-label
-                         (format "~a / ~a" (+ index 1) (length (pfs))))|#)]))
+                   (load-image image-bmp-master))]))
 
 ; list of tags separated by commas
 ; e.g. flower,castle,too many cooks,fuzzy wuzzy wuz a bear,etc
@@ -167,46 +174,49 @@
  (new text-field%
       [parent ivy-tag-hpanel]
       [label "Edit tag(s) : "]
-      [callback (λ (tf evt)
-                  (cond [(eq? (send evt get-event-type) 'text-field-enter)
-                         (define tags (send tf get-value))
-                         (send tf set-label "Edit tag(s) : ")
-                         ; empty tag string means delete the entry
-                         (cond [(string=? tags "")
-                                ; no failure if key doesn't exist
-                                (dict-remove! master (image-path))]
-                               [(not (eq? (image-path) '/))
-                                ; turn the string of tag(s) into a list then sort it
-                                (define tag-lst (sort (string-split tags ",") string<?))
-                                ; set and save the dictionary
-                                (dict-set! master (image-path) tag-lst)
-                                (save-dict! master)])
-                         (send tf set-field-background (make-object color% "spring green"))
-                         (send (ivy-canvas) focus)]
-                        [else
-                         (send tf set-label "Edit tag(s)*: ")
-                         ; see color-database<%> for more named colors
-                         (send tf set-field-background (make-object color% "gold"))]))]))
+      [callback
+       (λ (tf evt)
+         (cond [(eq? (send evt get-event-type) 'text-field-enter)
+                (define tags (send tf get-value))
+                (send tf set-label "Edit tag(s) : ")
+                ; empty tag string means delete the entry
+                (cond [(string=? tags "")
+                       ; no failure if key doesn't exist
+                       (dict-remove! master (image-path))]
+                      [(not (eq? (image-path) '/))
+                       ; turn the string of tag(s) into a list then sort it
+                       (define tag-lst (sort (string-split tags ", ") string<?))
+                       ; set and save the dictionary
+                       (dict-set! master (image-path) tag-lst)
+                       (save-dict! master)])
+                (send tf set-field-background (make-object color% "spring green"))
+                (send (ivy-canvas) focus)]
+               [else
+                (send tf set-label "Edit tag(s)*: ")
+                ; see color-database<%> for more named colors
+                (send tf set-field-background (make-object color% "gold"))]))]))
 
 (define ivy-tag-button
   (new button%
        [parent ivy-tag-hpanel]
        [label "Set"]
-       [callback (λ (button event)
-                   (define tags (send (ivy-tag-tfield) get-value))
-                   (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
-                   (send (ivy-tag-tfield) set-field-background (make-object color% "spring green"))
-                   ; empty tag string means delete the entry
-                   (cond [(string=? tags "")
-                          ; no failure if key doesn't exist
-                          (dict-remove! master (image-path))]
-                         [(not (eq? (image-path) '/))
-                          ; turn the string of tag(s) into a list then sort it
-                          (define tag-lst (sort (string-split tags ",") string<?))
-                          ; set and save the dictionary
-                          (dict-set! master (image-path) tag-lst)
-                          (save-dict! master)])
-                   (send (ivy-canvas) focus))]))
+       [callback
+        (λ (button event)
+          (define tags (send (ivy-tag-tfield) get-value))
+          (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
+          (send (ivy-tag-tfield) set-field-background
+                (make-object color% "spring green"))
+          ; empty tag string means delete the entry
+          (cond [(string=? tags "")
+                 ; no failure if key doesn't exist
+                 (dict-remove! master (image-path))]
+                [(not (eq? (image-path) '/))
+                 ; turn the string of tag(s) into a list then sort it
+                 (define tag-lst (sort (string-split tags ", ") string<?))
+                 ; set and save the dictionary
+                 (dict-set! master (image-path) tag-lst)
+                 (save-dict! master)])
+          (send (ivy-canvas) focus))]))
 
 (define ivy-canvas%
   (class canvas%
@@ -228,16 +238,10 @@
       (case type
         [(wheel-down)
          (when image-pict
-           (load-image image-pict 'smaller)
-           #|(define index (get-index (symbol->path (image-path)) (pfs)))
-             (send (status-bar-position) set-label
-                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]
+           (load-image image-pict 'smaller))]
         [(wheel-up)
          (when image-pict
-           (load-image image-pict 'larger)
-           #|(define index (get-index (symbol->path (image-path)) (pfs)))
-             (send (status-bar-position) set-label
-                   (format "~a / ~a" (+ index 1) (length (pfs))))|#)]
+           (load-image image-pict 'larger))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]))))
 
