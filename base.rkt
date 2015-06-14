@@ -231,22 +231,18 @@
      ; we already have the image loaded
      (set! image-pict (scale-image canvas img scale))])
   
-  (define bmp (pict->bitmap image-pict))
-  (define bmp-width (send bmp get-width))
-  (define bmp-height (send bmp get-height))
-  
   (send canvas set-on-paint!
         (λ ()
           (define dc (send canvas get-dc))
           
-          ; have the canvas re-scale the image so when the canvas is
-          ; resized, it'll also be the proper size
           (define bmp
             (cond [(path? img)
+                   ; have the canvas re-scale the image so when the canvas is
+                   ; resized, it'll also be the proper size
                    (set! image-pict (scale-image canvas image-bmp-master scale))
                    (pict->bitmap image-pict)]
                   [else
-                   (set! image-pict (scale-image canvas image-pict scale))
+                   ; if we've messed with its size already, don't do anything
                    (pict->bitmap image-pict)]))
           
           (define bmp-width (send bmp get-width))
@@ -288,7 +284,9 @@
                    (- canvas-center-x bmp-center-x)
                    (- canvas-center-y bmp-center-y))])))
   
-  (send canvas init-auto-scrollbars bmp-width bmp-height 0.0 0.0)
+  (let* ([width (inexact->exact (round (pict-width image-pict)))]
+         [height (inexact->exact (round (pict-height image-pict)))])
+    (send canvas init-auto-scrollbars width height 0.0 0.0))
   (send canvas refresh))
 
 ; curried procedure to abstract loading an image in a collection
