@@ -27,7 +27,14 @@
        [callback (λ (i e)
                    (define path (get-file "Select an image to view."
                                           #f
-                                          (image-dir)))
+                                          (image-dir)
+                                          #f
+                                          #f
+                                          null
+                                          `(("All images" ,(string-append
+                                                            "*."
+                                                            (string-join supported-extensions ";*.")))
+                                            ("Any" "*.*"))))
                    ; make sure the path is not false
                    (when path
                      (define-values (base name dir?) (split-path path))

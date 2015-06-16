@@ -9,6 +9,7 @@
          racket/list
          racket/class
          racket/string
+         racket/path
          file/convertible
          (only-in srfi/13
                   string-contains-ci))
@@ -42,9 +43,20 @@
 (define image-pict #f)
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-; all files contained within image-dir
-(define (path-files)
+(define supported-extensions '("png" "jpg" "jpeg" "bmp" "gif"))
+; all image files contained within image-dir
+#;(define (path-files)
   (directory-list (image-dir) #:build? #t))
+(define (path-files)
+  (define dir-lst (directory-list (image-dir) #:build? #t))
+  (define file-lst
+    (for/list ([file dir-lst])
+      (define ext (filename-extension file))
+      (cond [(false? ext) #f]
+            [else
+             (define ext-str (string-downcase (bytes->string/utf-8 ext)))
+             (if (false? (member ext-str supported-extensions)) #f file)])))
+  (filter path? file-lst))
 ; parameter listof path
 (define pfs (make-parameter (list (build-path "/"))))
 ; path for cached icons
