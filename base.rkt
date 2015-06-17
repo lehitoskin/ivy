@@ -45,8 +45,6 @@
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '("png" "jpg" "jpeg" "bmp" "gif"))
 ; all image files contained within image-dir
-#;(define (path-files)
-  (directory-list (image-dir) #:build? #t))
 (define (path-files)
   (define dir-lst (directory-list (image-dir) #:build? #t))
   (define file-lst
@@ -151,7 +149,8 @@
 ; img is either a pict or a bitmap%
 ; type is a symbol
 ; returns a pict
-(define (scale-image canvas img type)
+(define (scale-image img type)
+  (define canvas (ivy-canvas))
   ; width and height of the image
   (define img-width (if (pict? img)
                         (pict-width img)
@@ -225,7 +224,7 @@
                   (format "~a x ~a pixels"
                           (send image-bmp-master get-width)
                           (send image-bmp-master get-height)))
-            (set! image-pict (scale-image canvas image-bmp-master scale))
+            (set! image-pict (scale-image image-bmp-master scale))
             (send (status-bar-position) set-label
                   (format "~a / ~a"
                           (+ (get-index img (pfs)) 1)
@@ -241,7 +240,11 @@
            [else (printf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
-     (set! image-pict (scale-image canvas img scale))])
+     (set! image-pict (scale-image img scale))])
+  
+  ;(define bmp (pict->bitmap image-pict))
+  ;(define bmp-width (send bmp get-width))
+  ;(define bmp-height (send bmp get-height))
   
   (send canvas set-on-paint!
         (λ ()
@@ -251,7 +254,7 @@
             (cond [(path? img)
                    ; have the canvas re-scale the image so when the canvas is
                    ; resized, it'll also be the proper size
-                   (set! image-pict (scale-image canvas image-bmp-master scale))
+                   (set! image-pict (scale-image image-bmp-master 'default))
                    (pict->bitmap image-pict)]
                   [else
                    ; if we've messed with its size already, don't do anything

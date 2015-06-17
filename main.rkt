@@ -14,23 +14,27 @@
  #:usage-help
  "Calling Ivy without a path will simply open the GUI."
  "Supplying a path will tell Ivy to load the provided image."
- #:args requested-image
- (unless (empty? requested-image)
-   ; absolute path to the image
-   (define requested-path
-     (simplify-path (expand-user-path (first requested-image))))
-   (define-values (base name dir?) (split-path requested-path))
-   ; in case the user called ivy in the same directory as the image
-   ; e.g. `ivy batman.jpg'
-   (cond [(eq? base 'relative)
-          (define path (build-path (current-directory-for-user) name))
-          (define-values (base-dir img-name dir?) (split-path path))
-          (image-path path)
-          (image-dir base-dir)]
+ "Supplying multiple paths will tell Ivy to load them as a collection."
+ #:args requested-images
+ (unless (empty? requested-images)
+   (define requested-paths
+     (map (λ (img) (simplify-path (expand-user-path img)))
+          requested-images))
+   (define checked-paths
+     (for/list ([rp requested-paths])
+       ; in case the user called ivy in the same directory
+       ; as the image
+       (define-values (base name dir?) (split-path rp))
+       (cond [(eq? base 'relative)
+              (build-path (current-directory-for-user) name)]
+             [else rp])))
+   (cond [(> (length requested-paths) 1)
+          (pfs checked-paths)]
          [else
-          (image-path requested-path)
-          (image-dir base)])
-   (pfs (path-files))
+          (define-values (base name dir?) (split-path (first checked-paths)))
+          (image-dir base)
+          (pfs (path-files))])
+   (image-path (first checked-paths))
    (load-image (image-path) 'cmd)))
 
 (send (ivy-canvas) focus)
