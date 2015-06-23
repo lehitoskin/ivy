@@ -68,12 +68,13 @@
 
 ; removes entries for files that no longer exist
 (define (clean-dict! dct)
-  (for ([file-sym (in-dict-keys dct)])
-    (define file-path (symbol->path file-sym))
-    (printf "Checking ~s...~n" file-path)
-    (unless (file-exists? file-path)
-      (printf "Removing ~s from dictionary.~n" file-path)
-      (dict-remove! dct file-sym))))
+  (define old-dct (dict-copy dct))
+  (for ([sym (in-dict-keys old-dct)])
+    (define path (symbol->path sym))
+    (unless (file-exists? path)
+      (printf "Removing ~s from dictionary.~n" path)
+      (dict-remove! dct sym)))
+  (save-dict! dct))
 
 ; saves only the entries in the list that are duplicates.
 ; if there are more than two identical entries, they are
@@ -242,29 +243,20 @@
      ; we already have the image loaded
      (set! image-pict (scale-image img scale))])
   
-  ;(define bmp (pict->bitmap image-pict))
-  ;(define bmp-width (send bmp get-width))
-  ;(define bmp-height (send bmp get-height))
-  
   (send canvas set-on-paint!
         (λ ()
           (define dc (send canvas get-dc))
           
-          (define bmp
-            (cond [(path? img)
-                   ; have the canvas re-scale the image so when the canvas is
-                   ; resized, it'll also be the proper size
-                   (set! image-pict (scale-image image-bmp-master 'default))
-                   (pict->bitmap image-pict)]
-                  [else
-                   ; if we've messed with its size already, don't do anything
-                   (pict->bitmap image-pict)]))
+          (when (or (path? img) (eq? scale 'default))
+            ; have the canvas re-scale the image so when the canvas is
+            ; resized, it'll also be the proper size
+            (set! image-pict (scale-image image-bmp-master 'default)))
           
-          (define bmp-width (send bmp get-width))
-          (define bmp-height (send bmp get-height))
+          (define img-width (inexact->exact (round (pict-width image-pict))))
+          (define img-height (inexact->exact (round (pict-height image-pict))))
           
-          (define bmp-center-x (/ bmp-width 2))
-          (define bmp-center-y (/ bmp-height 2))
+          (define img-center-x (/ img-width 2))
+          (define img-center-y (/ img-height 2))
           (define canvas-x (send canvas get-width))
           (define canvas-y (send canvas get-height))
           (define canvas-center-x (/ canvas-x 2))
@@ -276,28 +268,28 @@
           
           (cond
             ; if the image is really big, place it at (0,0)
-            [(and (> bmp-width canvas-x)
-                  (> bmp-height canvas-y))
+            [(and (> img-width canvas-x)
+                  (> img-height canvas-y))
              (send canvas show-scrollbars #t #t)
-             (send dc draw-bitmap bmp 0 0)]
+             (draw-pict image-pict dc 0 0)]
             ; if the image is wider than the canvas,
             ; place it at (0,y)
-            [(> bmp-width canvas-x)
+            [(> img-width canvas-x)
              (send canvas show-scrollbars #t #f)
-             (send dc draw-bitmap bmp
-                   0 (- canvas-center-y bmp-center-y))]
+             (draw-pict image-pict dc
+                        0 (- canvas-center-y img-center-y))]
             ; if the image is taller than the canvas,
             ; place it at (x,0)
-            [(> bmp-height canvas-y)
+            [(> img-height canvas-y)
              (send canvas show-scrollbars #f #t)
-             (send dc draw-bitmap bmp
-                   (- canvas-center-x bmp-center-x) 0)]
+             (draw-pict image-pict dc
+                        (- canvas-center-x img-center-x) 0)]
             ; otherwise, place it at the normal position
             [else
              (send canvas show-scrollbars #f #f)
-             (send dc draw-bitmap bmp
-                   (- canvas-center-x bmp-center-x)
-                   (- canvas-center-y bmp-center-y))])))
+             (draw-pict image-pict dc
+                        (- canvas-center-x img-center-x)
+                        (- canvas-center-y img-center-y))])))
   
   (let* ([width (inexact->exact (round (pict-width image-pict)))]
          [height (inexact->exact (round (pict-height image-pict)))])
@@ -331,29 +323,6 @@
 ; underestimate the `cool' factor
 (define load-previous-image (load-image-in-collection 'previous))
 (define load-next-image (load-image-in-collection 'next))
-
-; load previous image in the list of files
-#;(define (load-previous-image)
-  (unless (or (false? image-pict) (eq? (image-path) '/))
-    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
-    (when (and prev-index (> (length (pfs)) 1))
-      (cond [(zero? prev-index)
-             (define img (last (pfs))) ; this is a path
-             (load-image img)]
-            [else
-             (define img (list-ref (pfs) (- prev-index 1)))
-             (load-image img)]))))
-
-#;(define (load-next-image)
-  (unless (or (false? image-pict) (eq? (image-path) '/))
-    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
-    (when (and prev-index (> (length (pfs)) 1))
-      (cond [(= prev-index (- (length (pfs)) 1))
-             (define img (first (pfs))) ; this is a path
-             (load-image img)]
-            [else
-             (define img (list-ref (pfs) (+ prev-index 1)))
-             (load-image img)]))))
 
 ; takes a list lst and a width x and
 ; returns a list of lists of lengths no more than x

@@ -24,24 +24,29 @@
        [label "&Open"]
        [shortcut #\O]
        [help-string "Open a file to view."]
-       [callback (λ (i e)
-                   (define path (get-file "Select an image to view."
-                                          #f
-                                          (image-dir)
-                                          #f
-                                          #f
-                                          null
-                                          `(("All images" ,(string-append
-                                                            "*."
-                                                            (string-join supported-extensions ";*.")))
-                                            ("Any" "*.*"))))
-                   ; make sure the path is not false
-                   (when path
-                     (define-values (base name dir?) (split-path path))
-                     (image-dir base)
-                     (image-path path)
-                     (pfs (path-files))
-                     (load-image path)))]))
+       [callback
+        (λ (i e)
+          (define paths (get-file-list
+                        "Select an image or images to view."
+                        #f
+                        (image-dir)
+                        #f
+                        #f
+                        null
+                        `(("All images"
+                           ,(string-append
+                             "*."
+                             (string-join supported-extensions ";*.")))
+                          ("Any" "*.*"))))
+          ; make sure the path is not false
+          (when paths
+            (cond [(> (length paths) 1) (pfs paths)]
+                  [else
+                   (define-values (base name dir?) (split-path (first paths)))
+                   (image-dir base)
+                   (pfs (path-files))])
+            (image-path (first paths))
+            (load-image (first paths))))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%

@@ -8,7 +8,8 @@ tracked solely by the application. Ivy operates as follows:
   multiple images and will put them into a collection, where only the images
   specified will be shown (until you specify to open a new image, of course).
   Example: `ivy "praise the sun.jpg"` or
-  `ivy ../vacation/DMC/001.JPG /tmp/icon.png`
+  `ivy ../vacation/DMC/001.JPG /tmp/icon.png`. The same effect occurs when
+  selecting images from File -> Open.
 
 - To add a tag or list of tags to an image, simply enter them into the tag text
   field, separated by a comma and a space. E.g. `flower, beach, roller coaster`
