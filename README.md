@@ -2,7 +2,27 @@ Ivy, the Taggable Image Viewer
 ==============================
 
 Ivy is an image viewer that allows the user to set or remove tags that are
-tracked solely by the application. Ivy operates as follows:
+tracked solely by the application.
+
+
+## Installation
+
+Ivy requires [Racket](http://racket-lang.org/) version 6.0 and up. Beyond that,
+you actually don't *need* to install Ivy, per se. Simply point the Racket
+interpreter to the location of the `main.rkt` file. However, it will be easier
+to use Ivy if the executable is in your PATH. Compiling Ivy is simple. In the
+directory where you saved Ivy, you can just run this command:
+
+``` bash
+raco exe -o ivy main.rkt
+```
+
+This creates an executable binary (called `ivy`), which you can then move to
+any directory in your PATH. You should then be able to call `ivy` from
+anywhere.
+
+
+## Usage
 
 - Calling `ivy` by itself will start Ivy with the image-viewing area blank. You can
   then load images from the menu (File -> Open), or with the keyboard shortcut
