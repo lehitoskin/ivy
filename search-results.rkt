@@ -65,6 +65,7 @@
 (define (display-tags type tags)
   ; make sure there aren't any nonexistant files in the dictionary
   (clean-dict! master)
+  ; do the searching
   (define imgs (apply search-dict master type tags))
   (cond [(empty? imgs)
          (message-box "Ivy - No Images Found"

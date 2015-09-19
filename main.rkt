@@ -29,8 +29,10 @@
               (build-path (current-directory-for-user) name)]
              [else rp])))
    (cond [(> (length requested-paths) 1)
+          ; we want to load a collection
           (pfs checked-paths)]
          [else
+          ; we want to load the image from the directory
           (define-values (base name dir?) (split-path (first checked-paths)))
           (image-dir base)
           (pfs (path-files))])

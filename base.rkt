@@ -131,9 +131,7 @@
 ; this could get very big!
 (when (file-exists? master-file)
   (define json-port (open-input-file master-file))
-  (define dict-json (read-json json-port))
-  (for ([(k v) (in-dict dict-json)])
-    (dict-set! master k v))
+  (set! master (read-json json-port))
   (close-input-port json-port))
 
 (unless (directory-exists? icons-path)
