@@ -131,9 +131,9 @@
 ; this could get very big!
 (when (file-exists? master-file)
   (define json-port (open-input-file master-file))
-  (define json (read-json json-port))
-  (for ([(k v) (in-dict json)])
-    (dict-set! master k v))
+  ; Racket v6.2.1 read-json returns immutable hash.
+  ; we need to operate with a mutable one
+  (set! master (hash-copy (read-json json-port)))
   (close-input-port json-port))
 
 (unless (directory-exists? icons-path)
