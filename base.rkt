@@ -36,7 +36,7 @@
                                     "Library/Application Support/ivy")]))
 (define master-file (build-path ivy-path "catalog.json"))
 ; path of the currently displayed image
-(define image-path (make-parameter '/))
+(define image-path (make-parameter (build-path "/")))
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
@@ -56,6 +56,8 @@
              (if (false? (member ext-str supported-extensions)) #f file)])))
   (filter path? file-lst))
 ; parameter listof path
+; if pfs is empty, attempting to append a single image would
+; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list (build-path "/"))))
 ; path for cached icons
 (define icons-path (build-path ivy-path "icons"))
@@ -216,7 +218,8 @@
     [(path? img)
      (define-values (base name must-be-dir?) (split-path img))
      (image-dir base)
-     (image-path (path->symbol img))
+     (image-path img)
+     (define img-sym (path->symbol img))
      ; make sure the bitmap loaded correctly
      (define load-success (send image-bmp-master load-file img))
      (cond [load-success
@@ -226,14 +229,14 @@
                           (send image-bmp-master get-width)
                           (send image-bmp-master get-height)))
             (set! image-pict (scale-image image-bmp-master scale))
-            (send (status-bar-position) set-label
+            (send sbp set-label
                   (format "~a / ~a"
                           (+ (get-index img (pfs)) 1)
                           (length (pfs))))
             ; if we've set tags for this file before...
-            (cond [(hash-has-key? master (image-path))
+            (cond [(hash-has-key? master img-sym)
                    (define tag
-                     (string-join (hash-ref master (image-path)) ", "))
+                     (string-join (hash-ref master img-sym) ", "))
                    ; ...put them in the tfield
                    (send tag-tfield set-value tag)]
                   ; ...otherwise clear the tfield
@@ -299,8 +302,8 @@
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry
 (define ((load-image-in-collection direction))
-  (unless (or (false? image-pict) (eq? (image-path) '/))
-    (define prev-index (get-index (symbol->path (image-path)) (pfs)))
+  (unless (or (false? image-pict) (eq? (path->symbol (image-path)) '/))
+    (define prev-index (get-index (image-path) (pfs)))
     (case direction
       [(previous)
        (when (and prev-index (> (length (pfs)) 1))

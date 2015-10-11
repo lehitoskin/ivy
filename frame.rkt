@@ -18,26 +18,28 @@
                                [parent ivy-menu-bar]
                                [label "&File"]))
 
+; opening a single image will have the current directory
+; contents be the collection
 (define ivy-menu-bar-file-open
   (new menu-item%
        [parent ivy-menu-bar-file]
-       [label "&Open"]
+       [label "&Open new collection"]
        [shortcut #\O]
-       [help-string "Open a file to view."]
+       [help-string "Open a file or files to view."]
        [callback
         (λ (i e)
           (define paths (get-file-list
-                        "Select an image or images to view."
-                        #f
-                        (image-dir)
-                        #f
-                        #f
-                        null
-                        `(("All images"
-                           ,(string-append
-                             "*."
-                             (string-join supported-extensions ";*.")))
-                          ("Any" "*.*"))))
+                         "Select an image or images to view."
+                         #f
+                         (image-dir)
+                         #f
+                         #f
+                         null
+                         `(("All images"
+                            ,(string-append
+                              "*."
+                              (string-join supported-extensions ";*.")))
+                           ("Any" "*.*"))))
           ; make sure the path is not false
           (when paths
             (cond [(> (length paths) 1) (pfs paths)]
@@ -47,6 +49,51 @@
                    (pfs (path-files))])
             (image-path (first paths))
             (load-image (first paths))))]))
+
+(define ivy-menu-bar-file-append
+  (new menu-item%
+       [parent ivy-menu-bar-file]
+       [label "&Append images to collection"]
+       [shortcut #\A]
+       [help-string "Append images to existing collection"]
+       [callback
+        (λ (i e)
+          (define paths (get-file-list
+                         "Select an image or images to view."
+                         #f
+                         (image-dir)
+                         #f
+                         #f
+                         null
+                         `(("All images"
+                            ,(string-append
+                              "*."
+                              (string-join supported-extensions ";*.")))
+                           ("Any" "*.*"))))
+          ; the user did not click cancel
+          (when paths
+            (define path-default? (equal? (first (pfs)) (build-path "/")))
+            (cond
+              ; empty collection and adding more than 1 image
+              [(and path-default? (> (length paths) 1))
+               (pfs paths)]
+              ; empty collection, adding 1 image
+              ; like file-open, but only open the single image
+              [path-default?
+               (define-values (base name dir?) (split-path (first paths)))
+               (image-dir base)
+               (pfs paths)
+               (image-path (first paths))
+               (load-image (first paths))]
+              ; collection has images; appending to collection
+              [else
+               (pfs (append (pfs) paths))
+               ; change label because it usually isn't called until
+               ; (load-image) is called and we want to see the changes now
+               (send (status-bar-position) set-label
+                     (format "~a / ~a"
+                             (+ (get-index (image-path) (pfs)) 1)
+                             (length (pfs))))])))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%
@@ -292,7 +339,7 @@
       [auto-resize #t]))
 
 (status-bar-position
-  (new message%
-       [parent position-hpanel]
-       [label "0 / 0"]
-       [auto-resize #t]))
+ (new message%
+      [parent position-hpanel]
+      [label "0 / 0"]
+      [auto-resize #t]))
