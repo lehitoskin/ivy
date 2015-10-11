@@ -238,15 +238,16 @@
          (cond [(eq? (send evt get-event-type) 'text-field-enter)
                 (define tags (send tf get-value))
                 (send tf set-label "Edit tag(s) : ")
+                (define img-sym (path->symbol (image-path)))
                 ; empty tag string means delete the entry
                 (cond [(string=? tags "")
                        ; no failure if key doesn't exist
-                       (dict-remove! master (image-path))]
-                      [(not (eq? (image-path) '/))
+                       (dict-remove! master img-sym)]
+                      [(not (eq? img-sym '/))
                        ; turn the string of tag(s) into a list then sort it
                        (define tag-lst (sort (string-split tags ", ") string<?))
                        ; set and save the dictionary
-                       (dict-set! master (image-path) tag-lst)
+                       (dict-set! master img-sym tag-lst)
                        (save-dict! master)])
                 (send tf set-field-background (make-object color% "spring green"))
                 (send (ivy-canvas) focus)]
@@ -265,15 +266,16 @@
           (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
           (send (ivy-tag-tfield) set-field-background
                 (make-object color% "spring green"))
+          (define img-sym (path->symbol (image-path)))
           ; empty tag string means delete the entry
           (cond [(string=? tags "")
                  ; no failure if key doesn't exist
-                 (dict-remove! master (image-path))]
-                [(not (eq? (image-path) '/))
+                 (dict-remove! master img-sym)]
+                [(not (eq? img-sym '/))
                  ; turn the string of tag(s) into a list then sort it
                  (define tag-lst (sort (string-split tags ", ") string<?))
                  ; set and save the dictionary
-                 (dict-set! master (image-path) tag-lst)
+                 (dict-set! master img-sym tag-lst)
                  (save-dict! master)])
           (send (ivy-canvas) focus))]))
 
