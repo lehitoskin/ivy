@@ -44,6 +44,10 @@ anywhere.
   filenames.) The same effect occurs when selecting multiple images from File ->
   Open.
 
+- You may append files to a collection through File -> Append. When using the
+  Append functionality on an empty collection (e.g. when first opening Ivy)
+  only the files selected will be available for viewing.
+
 - To add a tag or list of tags to an image, simply enter them into the tag text
   field, separated by a comma and a space. E.g., `flower, beach, roller
   coaster` and then press the "Set" button or the Enter key.

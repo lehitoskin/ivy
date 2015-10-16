@@ -25,8 +25,13 @@
 ; (absolute-file-path . '(sorted list of tags))
 (define master (make-hash))
 (define ivy-path (cond [(eq? (system-type) 'unix)
-                        (build-path (find-system-path 'home-dir)
-                                    ".config/ivy")]
+                        ; check XDG variable first, then default
+                        ; to ~/.config/ivy
+                        (let ([xdg (getenv "XDG_CONFIG_HOME")])
+                          (if xdg
+                              (build-path xdg "ivy")
+                              (build-path (find-system-path 'home-dir)
+                                          ".config/ivy")))]
                        [(eq? (system-type) 'windows)
                         (normal-case-path
                          (build-path (find-system-path 'home-dir)
