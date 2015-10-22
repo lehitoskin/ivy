@@ -11,6 +11,10 @@
                        [width 800]
                        [height 600]))
 
+(let ([logo-bmp (make-bitmap 50 50)])
+  (send logo-bmp load-file logo)
+  (send ivy-frame set-icon logo-bmp))
+
 (define ivy-menu-bar (new menu-bar%
                           [parent ivy-frame]))
 

@@ -64,8 +64,18 @@
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list (build-path "/"))))
-; path for cached icons
-(define icons-path (build-path ivy-path "icons"))
+; path for cached thumbnails
+(define thumbnails-path (build-path ivy-path "thumbnails"))
+; janky!
+(define logo
+  (if (eq? (system-type) 'unix)
+      (let* ([base "share/icons/hicolor/128x128/apps/ivy-logo-128px.png"]
+             [uls (build-path "/usr/local" base)]
+             [us (build-path "/usr" base)])
+        (cond [(file-exists? uls) uls]
+              [(file-exists? us) us]
+              [else (build-path "img/ivy-logo-128px.png")]))
+      (build-path "img/ivy-logo-128px.png")))
 
 (define (save-dict! dct)
   (with-output-to-file master-file
@@ -143,8 +153,8 @@
   (set! master (hash-copy (read-json json-port)))
   (close-input-port json-port))
 
-(unless (directory-exists? icons-path)
-  (make-directory icons-path))
+(unless (directory-exists? thumbnails-path)
+  (make-directory thumbnails-path))
 
 ; get index of an item in the list
 ; numbering starts from 0
@@ -342,9 +352,9 @@
                #:unless (> (+ (* i x) n) (sub1 len)))
       (list-ref lst (+ (* i x) n)))))
 
-; generates 100x100 icons from a list of strings paths
-; e.g. (generate-icons (map path->string (search-dict master 'or "beach")))
-(define (generate-icons imgs)
+; generates 100x100 thumbnails from a list of strings paths
+; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
+(define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
     (define bmp (make-bitmap 100 100))
@@ -352,7 +362,7 @@
     ; cannot have slashes in the actual name
     ; fraction slash: U+2044
     (define str (string-append (string-replace path "/" "⁄") ".png"))
-    (define bmp-path (build-path icons-path str))
+    (define bmp-path (build-path thumbnails-path str))
     ; use pict to scale the image to 100x100
     (define pct (bitmap bmp))
     (define bmp-small (pict->bitmap (scale-to-fit pct 100 100)))

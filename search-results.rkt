@@ -11,6 +11,10 @@
        [width 650]
        [height 400]))
 
+(let ([logo-bmp (make-bitmap 50 50)])
+  (send logo-bmp load-file logo)
+  (send results-frame set-icon logo-bmp))
+
 (define results-menu-bar (new menu-bar% [parent results-frame]))
 
 (define results-menu-bar-file
@@ -91,12 +95,12 @@
          
          (send notification show #t)
          
-         ; generate the icon in case it does not exist
+         ; generate the thumbnail in case it does not exist
          (for ([img-path imgs-str])
            (define str (string-append (string-replace img-path "/" "⁄") ".png"))
-           (define icon-path (build-path icons-path str))
-           (unless (file-exists? icon-path)
-             (generate-icons (list img-path))))
+           (define thumbnail-path (build-path thumbnails-path str))
+           (unless (file-exists? thumbnail-path)
+             (generate-thumbnails (list img-path))))
          
          (send notification show #f)
          
@@ -112,7 +116,7 @@
                          [x (in-naturals)])
                      (define str (string-append
                                   (string-replace path "/" "⁄") ".png"))
-                     (define pct-path (build-path icons-path str))
+                     (define pct-path (build-path thumbnails-path str))
                      (define pct (bitmap pct-path))
                      (draw-pict pct dc (* 100 x) (* 100 y))))))
          
