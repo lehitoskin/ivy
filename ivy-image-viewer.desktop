@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Ivy Image Viewer
+Type=Application
+Encoding=UTF-8
+Comment=a taggable image browser written in Racket
+Categories=Graphics;2DGraphics;RasterGraphics;Viewer;Accessories;
+# Use the full, absolute path.
+# Icon=/PATH/TO/ICON.png
+# Exec=/PATH/TO/EXECUTABLE
+Terminal=false
