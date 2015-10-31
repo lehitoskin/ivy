@@ -243,10 +243,11 @@
                 (define tags (send tf get-value))
                 (send tf set-label "Edit tag(s) : ")
                 (define img-sym (path->symbol (image-path)))
-                ; empty tag string means delete the entry
                 (cond [(string=? tags "")
+                       ; empty tag string means delete the entry
                        ; no failure if key doesn't exist
-                       (dict-remove! master img-sym)]
+                       (dict-remove! master img-sym)
+                       (save-dict! master)]
                       [(not (eq? img-sym '/))
                        ; turn the string of tag(s) into a list then sort it
                        (define tag-lst (sort (string-split tags ", ") string<?))
