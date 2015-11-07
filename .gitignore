@@ -1,4 +1,5 @@
 # Racket
+ivy
 compiled
 *.bak
 
@@ -6,3 +7,8 @@ compiled
 *.swp
 *.swo
 *~
+
+# OS X build products and intermediates
+*.icns
+ivy.app
+mac.iconset

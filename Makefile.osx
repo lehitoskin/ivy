@@ -1,0 +1,32 @@
+DESTDIR ?= /Applications
+
+RACO ?= raco
+RFLAGS ?= --vv --gui
+
+MAIN = main.rkt
+SOURCES = $(MAIN) base.rkt frame.rkt search-results.rkt
+IMAGES = img/ivy-logo-128px.png img/ivy-logo-256px.png img/ivy-logo-48px.png  img/ivy-logo-64px.png img/ivy-logo-16px.png  img/ivy-logo-32px.png  img/ivy-logo-512px.png
+
+
+all: ivy.app
+
+ivy: ivy.app
+
+ivy.app: $(SOURCES) Starter.icns
+	${RACO} exe $(RFLAGS) -o ivy $(MAIN)
+	cp Starter.icns ivy.app/Contents/Resources/
+
+Starter.icns: mac.iconset
+	iconutil -c icns -o $@ $<
+
+mac.iconset : $(IMAGES)
+	mkdir -p $@
+	@for f in $(IMAGES) ; do  \
+		cp $$f $@/`echo $$f|sed 's/img\/ivy-logo-\([0-9]*\)px.png/icon_\1x\1.png/'` ; \
+	done
+
+install: ivy.app
+	cp -r -p ivy.app $(DESTDIR)/
+
+clean:
+	rm -Rvf compiled ivy.app mac.iconset Starter.icns
