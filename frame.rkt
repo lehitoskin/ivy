@@ -46,13 +46,14 @@
                            ("Any" "*.*"))))
           ; make sure the path is not false
           (when paths
+            (define img-path (first paths))
             (cond [(> (length paths) 1) (pfs paths)]
                   [else
-                   (define-values (base name dir?) (split-path (first paths)))
+                   (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
                    (pfs (path-files))])
-            (image-path (first paths))
-            (load-image (first paths))))]))
+            (image-path img-path)
+            (load-image img-path)))]))
 
 (define ivy-menu-bar-file-append
   (new menu-item%
@@ -84,11 +85,12 @@
               ; empty collection, adding 1 image
               ; like file-open, but only open the single image
               [path-default?
-               (define-values (base name dir?) (split-path (first paths)))
+               (define img-path (first paths))
+               (define-values (base name dir?) (split-path img-path))
                (image-dir base)
                (pfs paths)
-               (image-path (first paths))
-               (load-image (first paths))]
+               (image-path img-path)
+               (load-image img-path)]
               ; collection has images; appending to collection
               [else
                (pfs (append (pfs) paths))
