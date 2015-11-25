@@ -59,7 +59,8 @@
   (new menu-item%
        [parent ivy-menu-bar-file]
        [label "&Append images to collection"]
-       [shortcut #\A]
+       [shortcut #\O]
+       [shortcut-prefix '(ctl shift)]
        [help-string "Append images to existing collection"]
        [callback
         (λ (i e)
@@ -166,7 +167,11 @@
                                   (send type-rbox get-item-label
                                         (send type-rbox get-selection))))
                                (display-tags search-type tags)))]))
+                   (define piggyback (new editor-canvas%
+                                          [parent search-tag-dialog]
+                                          [editor (send search-tfield get-editor)]))
                    (send search-tfield focus)
+                   (send search-tag-dialog delete-child piggyback)
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit
@@ -262,6 +267,13 @@
                 (send tf set-label "Edit tag(s)*: ")
                 ; see color-database<%> for more named colors
                 (send tf set-field-background (make-object color% "gold"))]))]))
+
+(define piggyback
+  (new editor-canvas%
+       [parent ivy-tag-hpanel]
+       [editor (send (ivy-tag-tfield) get-editor)]))
+
+(send ivy-tag-hpanel delete-child piggyback)
 
 (define ivy-tag-button
   (new button%
