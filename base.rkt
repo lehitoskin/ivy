@@ -335,12 +335,16 @@
                 (load-image img)]
                [else
                 (define img (list-ref (pfs) (+ prev-index 1)))
-                (load-image img)]))])))
+                (load-image img)]))]
+      [(home) (load-image (first (pfs)))]
+      [(end) (load-image (last (pfs)))])))
 
 ; is this complicating things? I have no idea, but we should never
 ; underestimate the `cool' factor
 (define load-previous-image (load-image-in-collection 'previous))
 (define load-next-image (load-image-in-collection 'next))
+(define load-first-image (load-image-in-collection 'home))
+(define load-last-image (load-image-in-collection 'end))
 
 ; takes a list lst and a width x and
 ; returns a list of lists of lengths no more than x
@@ -357,8 +361,7 @@
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
-    (define bmp (make-bitmap 100 100))
-    (send bmp load-file path)
+    (define bmp (read-bitmap path))
     ; cannot have slashes in the actual name
     ; fraction slash: U+2044
     (define str (string-append (string-replace path "/" "⁄") ".png"))

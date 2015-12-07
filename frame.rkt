@@ -11,9 +11,8 @@
                        [width 800]
                        [height 600]))
 
-(let ([logo-bmp (make-bitmap 50 50)])
-  (send logo-bmp load-file logo)
-  (send ivy-frame set-icon logo-bmp))
+; set the icon for the frame
+(send ivy-frame set-icon (read-bitmap logo))
 
 (define ivy-menu-bar (new menu-bar%
                           [parent ivy-frame]))
@@ -188,7 +187,7 @@
                             [alignment '(center center)]
                             [stretchable-height #f]))
 
-(define ivy-action-previous
+(define ivy-actions-previous
   (new button%
        [parent actions-hpanel]
        [label (pict->bitmap (arrow 15 pi))]
@@ -323,7 +322,9 @@
          (when image-pict
            (load-image image-pict 'larger))]
         [(left) (load-previous-image)]
-        [(right) (load-next-image)]))))
+        [(right) (load-next-image)]
+        [(home) (load-first-image)]
+        [(end) (load-last-image)]))))
 
 (ivy-canvas
  (new ivy-canvas%

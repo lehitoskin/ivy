@@ -11,7 +11,17 @@ Ivy requires [Racket](http://racket-lang.org/) version 6.0 and up. Beyond that,
 you actually don't *need* to install Ivy, per se. Simply point the Racket
 interpreter to the location of the `main.rkt` file. However, it will be easier
 to use Ivy if the executable is in your PATH. Compiling Ivy is simple. In the
-directory where you saved Ivy, you can just run this command:
+directory where you saved Ivy, you can just run
+
+```
+make
+sudo make install
+```
+
+You may change the DESTDIR variable to install ivy to an arbitrary location -
+one that may not require super user privileges.
+
+Or on Windows:
 
 ``` bash
 raco exe -o ivy main.rkt
@@ -33,7 +43,8 @@ anywhere.
 
 - Once you have loaded an image, you can view all the other images in the same
   folder, cycling through the image files by either clicking on the arrow
-  buttons or hitting the arrow keys.
+  buttons or hitting the arrow keys. Pressing the home or end keys will take you
+  to the first and last images available respectively.
 
 - If you want to view images from disparate locations, Ivy can also create
   a temporary collection, so that you only cycle through the set of images that
@@ -44,8 +55,9 @@ anywhere.
   filenames.) The same effect occurs when selecting multiple images from File ->
   Open.
 
-- You may append files to a collection through File -> Append. When using the
-  Append functionality on an empty collection (e.g. when first opening Ivy)
+- You may append files to a collection through File -> Append, or with the
+  keyboard shortcut <kbd>Ctrl</kbd>-<kbd>Shift</kbd>-<kbd>O</kbd>. When using
+  the Append functionality on an empty collection (e.g. when first opening Ivy)
   only the files selected will be available for viewing.
 
 - To add a tag or list of tags to an image, simply enter them into the tag text

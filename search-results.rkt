@@ -11,9 +11,8 @@
        [width 650]
        [height 400]))
 
-(let ([logo-bmp (make-bitmap 50 50)])
-  (send logo-bmp load-file logo)
-  (send results-frame set-icon logo-bmp))
+; set the icon for the frame
+(send results-frame set-icon (read-bitmap logo))
 
 (define results-menu-bar (new menu-bar% [parent results-frame]))
 
