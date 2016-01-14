@@ -101,6 +101,27 @@
                              (+ (get-index (image-path) (pfs)) 1)
                              (length (pfs))))])))]))
 
+(define ivy-menu-bar-file-collection-new
+  (new menu-item%
+       [parent ivy-menu-bar-file]
+       [label "&New collection"]
+       [shortcut #\N]
+       [help-string "Empties the current collection"]
+       [callback
+        (λ (i e)
+          (image-dir (find-system-path 'home-dir))
+          (pfs empty)
+          (image-path (build-path "/"))
+          (send (ivy-canvas) set-on-paint!
+                (λ ()
+                  (send (ivy-canvas) set-canvas-background
+                        (make-object color% "black"))))
+          (send (ivy-canvas) refresh)
+          (send ivy-frame set-label "Ivy Image Viewer")
+          (send (status-bar-position) set-label "0 / 0")
+          (send (ivy-tag-tfield) set-value "")
+          (send (status-bar-dimensions) set-label "0 x 0"))]))
+
 (define ivy-menu-bar-search-tag
   (new menu-item%
        [parent ivy-menu-bar-file]
