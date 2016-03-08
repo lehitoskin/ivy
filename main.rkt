@@ -5,6 +5,7 @@
 (require racket/class
          racket/cmdline
          racket/list
+         racket/string
          "base.rkt"
          "frame.rkt")
 
@@ -15,6 +16,29 @@
  "Calling Ivy without a path will simply open the GUI."
  "Supplying a path will tell Ivy to load the provided image."
  "Supplying multiple paths will tell Ivy to load them as a collection."
+ #:once-any
+ [("-o" "--search-or")
+  taglist
+  "Search the tags database inclusively with a comma-separated string."
+  (define tags (string-split taglist ", "))
+  (define search-results (sort (map path->string (search-dict master 'or tags)) string<?))
+  (define len (length search-results))
+  (unless (zero? len)
+    (for ([sr (in-list search-results)])
+      (printf "~v~n" sr)))
+  (printf "Found ~a results for tags ~v~n" len tags)
+  (exit)]
+ [("-a" "--search-and")
+  taglist
+  "Search the tags database exclusively with a comma-separated string."
+  (define tags (sort (string-split taglist ", ") string<?))
+  (define search-results (sort (map path->string (search-dict master 'and tags)) string<?))
+  (define len (length search-results))
+  (unless (zero? len)
+    (for ([sr (in-list search-results)])
+      (printf "~v~n" sr)))
+  (printf "Found ~a results for tags ~v~n" len tags)
+  (exit)]
  #:args requested-images
  (unless (empty? requested-images)
    (define requested-paths
@@ -25,9 +49,9 @@
        ; in case the user called ivy in the same directory
        ; as the image
        (define-values (base name dir?) (split-path rp))
-       (cond [(eq? base 'relative)
-              (build-path (current-directory-for-user) name)]
-             [else rp])))
+       (if (eq? base 'relative)
+           (build-path (current-directory-for-user) name)
+           rp)))
    (cond [(> (length requested-paths) 1)
           ; we want to load a collection
           (pfs checked-paths)]

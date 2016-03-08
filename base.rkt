@@ -108,7 +108,7 @@
 
 ; enter a dictionary (master) and tag strings to search for.
 ; returns a list of image paths or empty on failure
-(define (search-dict dct type . items)
+(define (search-dict dct type items)
   (define search-results
     (flatten
      (for/list ([(path tags) (in-dict dct)])
