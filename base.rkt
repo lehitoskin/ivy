@@ -106,8 +106,9 @@
              (keep-duplicates (rest sorted) (cons (first sorted) dups))
              (keep-duplicates (rest sorted) dups))]))
 
-; enter a dictionary (master) and tag strings to search for.
-; returns a list of image paths or empty on failure
+; dct: dictionary (master)
+; type: inclusive or exclusive search (or/c 'and 'or)
+; items: the tags to search for (listof string?)
 (define (search-dict dct type items)
   (define search-results
     (flatten
@@ -116,8 +117,6 @@
          ; go through each tag and search if it matches the list
          ; for that image
          (for/list ([i items])
-           ; list of tags and #f
-           ;(define result (map (λ (i) (member i tags)) items))
            ; list of numbers and #f
            (define result (map (λ (t) (string-contains-ci t i)) tags))
            ; check for false through the result list
@@ -132,13 +131,15 @@
   ; filter out any false
   ; list of symbol-paths only
   (define filtered (filter symbol? search-results))
-  (case type
-    [(or)
-     ; turn the symbols into paths and remove any duplicates
-     (map symbol->path (remove-duplicates filtered))]
-    [(and)
-     ; turn the symbols into paths and keep any duplicates
-     (map symbol->path (keep-duplicates filtered))]))
+  ; searching for a single term with 'and may produce a false negative,
+  ; so use 'or instead
+  (cond [(or (= (length items) 1)
+             (eq? type 'or))
+         ; turn the symbols into paths and remove any duplicates
+         (map symbol->path (remove-duplicates filtered))]
+        [else
+         ; turn the symbols into paths and keep any duplicates
+         (map symbol->path (keep-duplicates filtered))]))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
