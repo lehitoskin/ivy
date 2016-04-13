@@ -109,6 +109,7 @@
 ; dct: dictionary (master)
 ; type: inclusive or exclusive search (or/c 'and 'or)
 ; items: the tags to search for (listof string?)
+; returns: list of path or empty
 (define (search-dict dct type items)
   (define search-results
     (flatten
@@ -140,6 +141,35 @@
         [else
          ; turn the symbols into paths and keep any duplicates
          (map symbol->path (keep-duplicates filtered))]))
+
+; dct: dictionary
+; searched: list of images (listof path?)
+; exclusion: list of tags (listof string?)
+; returns: list of path or empty
+(define (exclude-search dct searched exclusion)
+  ; list of false and paths
+  (define to-remove-messy
+    (flatten
+     ; loop for each image we've searched
+     (for/list ([s (in-list searched)])
+       (define ex
+         (flatten
+          ; loop for each tag we want to exclude
+          (for/list ([e (in-list exclusion)])
+            ; go through each of the tags in the searched images for matches
+            ; with tags we want to exclude
+            ; list of #f and number
+            (map (λ (st) (string-contains-ci st e)) (dict-ref dct (path->symbol s))))))
+       ; replace each instance of a number with the path of the image we want to exclude
+       (map (λ (te) (if (false? te) te s)) ex))))
+  ; remove #f and duplicates
+  (define to-remove (remove-duplicates (filter path? to-remove-messy)))
+  ; finally remove the excluded images from the list of searched images
+  (let loop ([s searched]
+             [r to-remove])
+    (if (empty? r)
+        s
+        (loop (remove (first r) s) (rest r)))))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)

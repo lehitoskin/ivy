@@ -3,7 +3,8 @@
 ; main frame file for ivy, the taggable image viewer
 (require pict
          "base.rkt"
-         "search-results.rkt")
+         "search-results.rkt"
+         "search-dialog.rkt")
 (provide (all-defined-out))
 
 (define ivy-frame (new frame%
@@ -31,18 +32,19 @@
        [help-string "Open a file or files to view."]
        [callback
         (λ (i e)
-          (define paths (get-file-list
-                         "Select an image or images to view."
-                         #f
-                         (image-dir)
-                         #f
-                         #f
-                         null
-                         `(("All images"
-                            ,(string-append
-                              "*."
-                              (string-join supported-extensions ";*.")))
-                           ("Any" "*.*"))))
+          (define paths
+            (get-file-list
+             "Select an image or images to view."
+             #f
+             (image-dir)
+             #f
+             #f
+             null
+             `(("All images"
+                ,(string-append
+                  "*."
+                  (string-join supported-extensions ";*.")))
+               ("Any" "*.*"))))
           ; make sure the path is not false
           (when paths
             (define img-path (first paths))
@@ -63,18 +65,19 @@
        [help-string "Append images to existing collection"]
        [callback
         (λ (i e)
-          (define paths (get-file-list
-                         "Select an image or images to view."
-                         #f
-                         (image-dir)
-                         #f
-                         #f
-                         null
-                         `(("All images"
-                            ,(string-append
-                              "*."
-                              (string-join supported-extensions ";*.")))
-                           ("Any" "*.*"))))
+          (define paths
+            (get-file-list
+             "Select an image or images to view."
+             #f
+             (image-dir)
+             #f
+             #f
+             null
+             `(("All images"
+                ,(string-append
+                  "*."
+                  (string-join supported-extensions ";*.")))
+               ("Any" "*.*"))))
           ; the user did not click cancel
           (when paths
             (define path-default? (equal? (first (pfs)) (build-path "/")))
@@ -127,71 +130,9 @@
        [parent ivy-menu-bar-file]
        [label "&Find Images with Tags"]
        [shortcut #\F]
-       [help-string "Search for images with tags."]
+       [help-string "Search for images with specified tags."]
        [callback (λ (i e)
-                   (define search-tag-dialog
-                     (new dialog%
-                          [label "Ivy - Search Tags"]
-                          [width 400]
-                          [height 100]
-                          [style '(close-button)]))
-                   (define search-tfield
-                     (new text-field%
-                          [parent search-tag-dialog]
-                          [label "Search for tags: "]
-                          [callback
-                           (λ (tf evt)
-                             (when (and
-                                    (eq? (send evt get-event-type) 'text-field-enter)
-                                    (not (string=? (send tf get-value) "")))
-                               (send search-tag-dialog show #f)
-                               (define tags
-                                 (sort (string-split
-                                        (send search-tfield get-value) ", ")
-                                       string<?))
-                               (define search-type
-                                 (string->symbol
-                                  (send type-rbox get-item-label
-                                        (send type-rbox get-selection))))
-                               (display-tags search-type tags)))]))
-                   (define type-rbox
-                     (new radio-box%
-                          [parent search-tag-dialog]
-                          [label "Search type"]
-                          [choices '("or" "and")]))
-                   (define button-hpanel
-                     (new horizontal-panel%
-                          [parent search-tag-dialog]
-                          [alignment '(right center)]
-                          [stretchable-height #f]))
-                   (define cancel-button
-                     (new button%
-                          [parent button-hpanel]
-                          [label "&Cancel"]
-                          [callback (λ (button event)
-                                      (send search-tag-dialog show #f))]))
-                   (define ok-button
-                     (new button%
-                          [parent button-hpanel]
-                          [label "&Ok"]
-                          [callback
-                           (λ (button event)
-                             (unless (string=? (send search-tfield get-value) "")
-                               (send search-tag-dialog show #f)
-                               (define tags
-                                 (sort (string-split
-                                        (send search-tfield get-value) ", ")
-                                       string<?))
-                               (define search-type
-                                 (string->symbol
-                                  (send type-rbox get-item-label
-                                        (send type-rbox get-selection))))
-                               (display-tags search-type tags)))]))
-                   (define piggyback (new editor-canvas%
-                                          [parent search-tag-dialog]
-                                          [editor (send search-tfield get-editor)]))
                    (send search-tfield focus)
-                   (send search-tag-dialog delete-child piggyback)
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit

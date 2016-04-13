@@ -4,10 +4,15 @@
 ; main file for ivy, the taggable image viewer
 (require racket/class
          racket/cmdline
+         racket/dict
          racket/list
          racket/string
          "base.rkt"
          "frame.rkt")
+
+(define tags-to-search (make-parameter empty))
+(define search-type (make-parameter #f))
+(define tags-to-exclude (make-parameter empty))
 
 ; accept command-line path to load image
 (command-line
@@ -20,25 +25,18 @@
  [("-o" "--search-or")
   taglist
   "Search the tags database inclusively with a comma-separated string."
-  (define tags (string-split taglist ", "))
-  (define search-results (sort (map path->string (search-dict master 'or tags)) string<?))
-  (define len (length search-results))
-  (unless (zero? len)
-    (for ([sr (in-list search-results)])
-      (printf "~v~n" sr)))
-  (printf "Found ~a results for tags ~v~n" len tags)
-  (exit)]
+  (search-type 'or)
+  (tags-to-search (string-split taglist ", "))]
  [("-a" "--search-and")
   taglist
   "Search the tags database exclusively with a comma-separated string."
-  (define tags (sort (string-split taglist ", ") string<?))
-  (define search-results (sort (map path->string (search-dict master 'and tags)) string<?))
-  (define len (length search-results))
-  (unless (zero? len)
-    (for ([sr (in-list search-results)])
-      (printf "~v~n" sr)))
-  (printf "Found ~a results for tags ~v~n" len tags)
-  (exit)]
+  (search-type 'and)
+  (tags-to-search (sort (string-split taglist ", ") string<?))]
+ #:once-each
+ [("-x" "--exclude")
+  exclude
+  "Search the tags database with -o/-a, but exclude images with the specified tags."
+  (tags-to-exclude (string-split exclude ", "))]
  #:args requested-images
  (unless (empty? requested-images)
    (define requested-paths
@@ -61,7 +59,40 @@
           (image-dir base)
           (pfs (path-files))])
    (image-path (first checked-paths))
-   (load-image (image-path) 'cmd)))
-
-(send (ivy-canvas) focus)
-(send ivy-frame show #t)
+   (load-image (image-path) 'cmd))
+ ; we aren't search for tags on the cmdline, open frame
+ (cond [(and (empty? (tags-to-search))
+             (empty? (tags-to-exclude)))
+        (send (ivy-canvas) focus)
+        (send ivy-frame show #t)]
+       ; only searching for tags
+       [(and (not (empty? (tags-to-search)))
+             (empty? (tags-to-exclude)))
+        (define search-results (sort (map path->string (search-dict master (search-type) (tags-to-search))) string<?))
+        (define len (length search-results))
+        (unless (zero? len)
+          (for ([sr (in-list search-results)])
+            (printf "~v~n" sr))
+          (printf "Found ~a results for tags ~v~n" len (tags-to-search)))]
+       ; only excluding tags
+       [(and (empty? (tags-to-search))
+             (not (empty? (tags-to-exclude))))
+        (define imgs (dict-keys master))
+        (define final (sort (map path->string (exclude-search master imgs (tags-to-exclude))) string<?))
+        (define len (length final))
+        (unless (zero? len)
+          (for ([sr (in-list final)])
+            (printf "~v~n" sr))
+          (printf "Found ~a results without tags ~v~n" len (tags-to-exclude)))]
+       ; searching for tags and excluding tags
+       [(and (not (empty? (tags-to-search)))
+             (not (empty? (tags-to-exclude))))
+        (define search-results (search-dict master (search-type) (tags-to-search)))
+        (cond [(zero? (length search-results))
+               (printf "Found 0 results for tags ~v~n" (tags-to-search))]
+              [else
+               (define exclude (sort (map path->string (exclude-search master search-results (tags-to-exclude))) string<?))
+               (for ([ex (in-list exclude)])
+                 (printf "~v~n" ex))
+               (printf "Found ~a results for tags ~v, excluding tags ~v~n"
+                       (length exclude) (tags-to-search) (tags-to-exclude))])]))

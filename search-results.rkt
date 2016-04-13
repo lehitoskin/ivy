@@ -65,65 +65,73 @@
                                (make-object color% "black")))]))
 
 ; search for the tags and display everything
-(define (display-tags type tags)
-  ; make sure there aren't any nonexistant files in the dictionary
-  (clean-dict! master)
-  ; do the searching
-  (define imgs (search-dict master type tags))
-  (cond [(empty? imgs)
-         (message-box "Ivy - No Images Found"
-                      "Sorry! No images with those tags have been found."
-                      #f
-                      (list 'ok 'stop))]
-        [else
-         (define imgs-str (sort (map path->string imgs) string<?))
-         (set! searched-images (map string->path imgs-str))
-         (define imgs-grid (grid-list imgs-str 6))
-         
-         ; tell the user we're preparing results preview
-         (define notification
-           (new frame%
-                [label "Ivy - Preparing Search Preview"]
-                [width 200]
-                [height 40]
-                [style '(float)]))
-         
-         (new message%
-              [parent notification]
-              [label "Preparing search result preview, please wait..."])
-         
-         (send notification show #t)
-         
-         ; generate the thumbnail in case it does not exist
-         (for ([img-path imgs-str])
-           (define str (string-append (string-replace img-path "/" "⁄") ".png"))
-           (define thumbnail-path (build-path thumbnails-path str))
-           (unless (file-exists? thumbnail-path)
-             (generate-thumbnails (list img-path))))
-         
-         (send notification show #f)
-         
-         (send results-canvas set-on-paint!
-               (λ ()
-                 (define dc (send results-canvas get-dc))
-                 
-                 (send results-canvas set-canvas-background
-                       (make-object color% "black"))
-                 (for ([img-list imgs-grid]
-                       [y (in-naturals)])
-                   (for ([path img-list]
-                         [x (in-naturals)])
-                     (define str (string-append
-                                  (string-replace path "/" "⁄") ".png"))
-                     (define pct-path (build-path thumbnails-path str))
-                     (define pct (bitmap pct-path))
-                     (draw-pict pct dc (* 100 x) (* 100 y))))))
-         
-         (when (positive? (length imgs-str))
-           (send results-canvas init-auto-scrollbars #f
-                 (* 100 (length imgs-grid)) 0.0 0.0))
-         (if (< (length imgs-grid) 4)
-             (send results-canvas show-scrollbars #f #f)
-             (send results-canvas show-scrollbars #f #t))
-         
-         (send results-frame show #t)]))
+(define display-tags
+  (let ([display-images
+         (λ (imgs)
+           (cond [(empty? imgs)
+                  (message-box "Ivy - No Images Found"
+                               "Sorry! No images with that tag combination have been found."
+                               #f
+                               (list 'ok 'stop))]
+                 [else
+                  (define imgs-str (sort (map path->string imgs) string<?))
+                  (set! searched-images (map string->path imgs-str))
+                  (define imgs-grid (grid-list imgs-str 6))
+                  
+                  ; tell the user we're preparing results preview
+                  (define notification
+                    (new frame%
+                         [label "Ivy - Preparing Search Preview"]
+                         [width 200]
+                         [height 40]
+                         [style '(float)]))
+                  
+                  (new message%
+                       [parent notification]
+                       [label "Preparing search result preview, please wait..."])
+                  
+                  (send notification show #t)
+                  
+                  ; generate the thumbnail in case it does not exist
+                  (for ([img-path imgs-str])
+                    (define str (string-append (string-replace img-path "/" "⁄") ".png"))
+                    (define thumbnail-path (build-path thumbnails-path str))
+                    (unless (file-exists? thumbnail-path)
+                      (generate-thumbnails (list img-path))))
+                  
+                  (send notification show #f)
+                  
+                  (send results-canvas set-on-paint!
+                        (λ ()
+                          (collect-garbage 'incremental)
+                          (define dc (send results-canvas get-dc))
+                          
+                          (send results-canvas set-canvas-background
+                                (make-object color% "black"))
+                          (for ([img-list imgs-grid]
+                                [y (in-naturals)])
+                            (for ([path img-list]
+                                  [x (in-naturals)])
+                              (define str (string-append
+                                           (string-replace path "/" "⁄") ".png"))
+                              (define pct-path (build-path thumbnails-path str))
+                              (define pct (bitmap pct-path))
+                              (draw-pict pct dc (* 100 x) (* 100 y))))))
+                  
+                  (when (positive? (length imgs-str))
+                    (send results-canvas init-auto-scrollbars #f
+                          (* 100 (length imgs-grid)) 0.0 0.0))
+                  (if (< (length imgs-grid) 4)
+                      (send results-canvas show-scrollbars #f #f)
+                      (send results-canvas show-scrollbars #f #t))
+                  
+                  (send results-frame show #t)]))])
+    (case-lambda
+      ; we already have the images, via exclude-search
+      [(imgs)
+       (display-images imgs)]
+      ; we're going to be doing all the searching right now
+      [(type tags)
+       ; do the searching
+       (define imgs (search-dict master type tags))
+       (display-images imgs)])))
