@@ -110,31 +110,27 @@
 ; type: inclusive or exclusive search (or/c 'and 'or)
 ; items: the tags to search for (listof string?)
 ; returns: list of path or empty
-(define (search-dict dct type items)
+(define (search-dict dct type taglist)
   (define search-results
     (flatten
-     (for/list ([(path tags) (in-dict dct)])
-       (define ts
+     (for/list ([(dict-path dict-tags) (in-dict dct)])
+       (define tags-searched
          ; go through each tag and search if it matches the list
          ; for that image
-         (for/list ([i items])
-           ; list of numbers and #f
-           (define result (map (λ (t) (string-contains-ci t i)) tags))
-           ; check for false through the result list
-           ; if not false, return the path for the result
+         (for/list ([tag taglist])
            ; list of symbol-paths and #f
-           (map (λ (l) (if (false? l) l path)) result)))
+           (map (λ (dict-tag) (if (string-contains-ci dict-tag tag) dict-path #f)) dict-tags)))
        ; remove any duplicate string-contains-ci matches
        ; for images that have tags containing more than
        ; one of the same phrase (e.g. images with the tags
        ; "beach" "beach towel" will appear more than once)
-       (map remove-duplicates ts))))
+       (map remove-duplicates tags-searched))))
   ; filter out any false
   ; list of symbol-paths only
   (define filtered (filter symbol? search-results))
   ; searching for a single term with 'and may produce a false negative,
   ; so use 'or instead
-  (cond [(or (= (length items) 1)
+  (cond [(or (= (length taglist) 1)
              (eq? type 'or))
          ; turn the symbols into paths and remove any duplicates
          (map symbol->path (remove-duplicates filtered))]
@@ -146,30 +142,30 @@
 ; searched: list of images (listof path?)
 ; exclusion: list of tags (listof string?)
 ; returns: list of path or empty
-(define (exclude-search dct searched exclusion)
+(define (exclude-search dct searched-imgs exclusion)
   ; list of false and paths
-  (define to-remove-messy
+  (define remove-imgs-messy
     (flatten
      ; loop for each image we've searched
-     (for/list ([s (in-list searched)])
+     (for/list ([searched (in-list searched-imgs)])
        (define ex
          (flatten
           ; loop for each tag we want to exclude
-          (for/list ([e (in-list exclusion)])
+          (for/list ([exclude (in-list exclusion)])
             ; go through each of the tags in the searched images for matches
             ; with tags we want to exclude
             ; list of #f and number
-            (map (λ (st) (string-contains-ci st e)) (dict-ref dct (path->symbol s))))))
+            (map (λ (st) (string-contains-ci st exclude)) (dict-ref dct (path->symbol searched))))))
        ; replace each instance of a number with the path of the image we want to exclude
-       (map (λ (te) (if (false? te) te s)) ex))))
+       (map (λ (te) (if (false? te) te searched)) ex))))
   ; remove #f and duplicates
-  (define to-remove (remove-duplicates (filter path? to-remove-messy)))
+  (define remove-imgs (remove-duplicates (filter path? remove-imgs-messy)))
   ; finally remove the excluded images from the list of searched images
-  (let loop ([s searched]
-             [r to-remove])
-    (if (empty? r)
-        s
-        (loop (remove (first r) s) (rest r)))))
+  (let loop ([searched searched-imgs]
+             [to-remove remove-imgs])
+    (if (empty? to-remove)
+        searched
+        (loop (remove (first to-remove) searched) (rest to-remove)))))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
