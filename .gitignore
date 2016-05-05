@@ -12,3 +12,4 @@ compiled
 *.icns
 ivy.app
 mac.iconset
+.DS_Store
