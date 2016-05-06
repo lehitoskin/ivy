@@ -13,7 +13,8 @@
                        [height 600]))
 
 ; set the icon for the frame
-(send ivy-frame set-icon (read-bitmap logo))
+(unless (eq? (system-type) 'macosx)
+  (send ivy-frame set-icon (read-bitmap logo)))
 
 (define ivy-menu-bar (new menu-bar%
                           [parent ivy-frame]))

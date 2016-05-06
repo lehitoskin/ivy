@@ -12,7 +12,8 @@
        [height 400]))
 
 ; set the icon for the frame
-(send results-frame set-icon (read-bitmap logo))
+(unless (eq? (system-type) 'macosx)
+  (send results-frame set-icon (read-bitmap logo)))
 
 (define results-menu-bar (new menu-bar% [parent results-frame]))
 
