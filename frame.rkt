@@ -161,6 +161,13 @@
        [callback (λ (button event)
                    (load-previous-image))]))
 
+(define ivy-actions-random
+  (new button%
+       [parent ivy-toolbar-hpanel]
+       [label (pict->bitmap (arrowhead 15 (/ pi 2.0)))]
+       [callback (λ (button event)
+                   (load-rand-image))]))
+
 (define ivy-actions-next
   (new button%
        [parent ivy-toolbar-hpanel]
@@ -312,6 +319,7 @@
            (load-image image-pict 'larger))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
+        [(up) (load-rand-image)]
         [(home) (load-first-image)]
         [(end) (load-last-image)]
         [(#\return) (focus-tag-tfield)]))))
