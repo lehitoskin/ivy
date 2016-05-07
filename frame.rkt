@@ -144,22 +144,23 @@
        [help-string "Quit the program."]
        [callback (λ (i e) (exit))]))
 
-; left/right, zoom in/out
-(define actions-hpanel (new horizontal-panel%
+; left/right, zoom in/out,
+; list of tags separated by commas
+; e.g. flower,castle,too many cooks,fuzzy wuzzy wuz a bear,etc
+(define ivy-toolbar-hpanel (new horizontal-panel%
                             [parent ivy-frame]
-                            [alignment '(center center)]
                             [stretchable-height #f]))
 
 (define ivy-actions-previous
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (arrow 15 pi))]
        [callback (λ (button event)
                    (load-previous-image))]))
 
 (define ivy-actions-next
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (arrow 15 0))]
        [callback (λ (button event)
                    (load-next-image))]))
@@ -168,7 +169,7 @@
 ; otherwise the circle is cut off on the right side.
 (define ivy-actions-zoom-in
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    (when image-pict
@@ -176,7 +177,7 @@
 
 (define ivy-actions-zoom-out
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    (when image-pict
@@ -184,27 +185,21 @@
 
 (define ivy-actions-zoom-normal
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
                    (load-image image-bmp-master 'none))]))
 
 (define ivy-actions-zoom-fit
   (new button%
-       [parent actions-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
                    (load-image image-bmp-master))]))
 
-; list of tags separated by commas
-; e.g. flower,castle,too many cooks,fuzzy wuzzy wuz a bear,etc
-(define ivy-tag-hpanel (new horizontal-panel%
-                            [parent ivy-frame]
-                            [stretchable-height #f]))
-
 (ivy-tag-tfield
  (new text-field%
-      [parent ivy-tag-hpanel]
+      [parent ivy-toolbar-hpanel]
       [label "Edit tag(s) : "]
       [callback
        (λ (tf evt)
@@ -232,14 +227,14 @@
 
 (define piggyback
   (new editor-canvas%
-       [parent ivy-tag-hpanel]
+       [parent ivy-toolbar-hpanel]
        [editor (send (ivy-tag-tfield) get-editor)]))
 
-(send ivy-tag-hpanel delete-child piggyback)
+(send ivy-toolbar-hpanel delete-child piggyback)
 
 (define ivy-tag-button
   (new button%
-       [parent ivy-tag-hpanel]
+       [parent ivy-toolbar-hpanel]
        [label "Set"]
        [callback
         (λ (button event)
