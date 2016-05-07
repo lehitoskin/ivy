@@ -13,7 +13,7 @@
                        [height 600]))
 
 ; set the icon for the frame
-(unless (eq? (system-type) 'macosx)
+(unless (macosx?)
   (send ivy-frame set-icon (read-bitmap logo)))
 
 (define ivy-menu-bar (new menu-bar%
@@ -134,15 +134,18 @@
        [help-string "Search for images with specified tags."]
        [callback (λ (i e)
                    (send search-tfield focus)
+                   (send (send search-tfield get-editor) select-all)
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit
-  (new menu-item%
+  (if (macosx?)
+    #f
+    (new menu-item%
        [parent ivy-menu-bar-file]
        [label "&Quit"]
        [shortcut #\Q]
        [help-string "Quit the program."]
-       [callback (λ (i e) (exit))]))
+       [callback (λ (i e) (exit))])))
 
 ; left/right, zoom in/out,
 ; list of tags separated by commas
@@ -214,7 +217,7 @@
                        (save-dict! master)]
                       [(not (eq? img-sym '/))
                        ; turn the string of tag(s) into a list then sort it
-                       (define tag-lst (sort (string-split tags ", ") string<?))
+                       (define tag-lst (remove-duplicates (sort (string-split tags ", ") string<?)))
                        ; set and save the dictionary
                        (dict-set! master img-sym tag-lst)
                        (save-dict! master)])
@@ -256,6 +259,9 @@
                  (save-dict! master)])
           (send (ivy-canvas) focus))]))
 
+(define (focus-tag-tfield)
+  (send (ivy-tag-tfield) focus))
+
 (define ivy-canvas%
   (class canvas%
     (super-new)
@@ -283,7 +289,8 @@
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
-        [(end) (load-last-image)]))))
+        [(end) (load-last-image)]
+        [(#\return) (focus-tag-tfield)]))))
 
 (ivy-canvas
  (new ivy-canvas%

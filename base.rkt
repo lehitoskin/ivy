@@ -21,6 +21,9 @@
 (define (symbol->path p)
   (string->path (symbol->string p)))
 
+(define (macosx?)
+  (eq? (system-type) 'macosx))
+
 ; master dictionary
 ; (absolute-file-path . '(sorted list of tags))
 (define master (make-hash))
@@ -36,7 +39,7 @@
                         (normal-case-path
                          (build-path (find-system-path 'home-dir)
                                      "appdata/local/ivy"))]
-                       [(eq? (system-type) 'macosx)
+                       [(macosx?)
                         (build-path (find-system-path 'home-dir)
                                     "Library/Application Support/ivy")]))
 (define master-file (build-path ivy-path "catalog.json"))
