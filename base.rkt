@@ -487,46 +487,25 @@
         (lambda (editor kev)
           (send editor move-position 'end)))
   
-  (send km add-function "menu"
-        (λ (editor kev)
-          (let ([evt (send kev get-event-type)]
-                [ecanvas (send editor get-canvas)])
-            (cond [(eq? evt 'right-up)
-                   ; open the right-click menu
-                   (let ([x-mouse (send kev get-x)]
-                         [y-mouse (send kev get-y)]
-                         [top-frame (send ecanvas get-top-level-window)])
-                     
-                     (define popup
-                       (new popup-menu% [title "Right Click Menu"]))
-                     
-                     (define copy-item
-                       (new menu-item%
-                            [label "Copy"]
-                            [parent popup]
-                            [help-string "Copy this selection"]
-                            [callback (λ (l e)
-                                        (send editor copy))]))
-                     
-                     (define cut-item
-                       (new menu-item%
-                            [label "Cut"]
-                            [parent popup]
-                            [help-string "Cut this selection"]
-                            [callback (λ (l e)
-                                        (send editor cut))]))
-                     
-                     (define paste-item
-                       (new menu-item%
-                            [label "Paste"]
-                            [parent popup]
-                            [help-string "Paste from the clipboard"]
-                            [callback (λ (l e)
-                                        (send editor paste))]))
-                     
-                     (send top-frame popup-menu popup
-                           (+ x-mouse 100)
-                           y-mouse))]))))
+  ; from gui-lib/mred/private/editor.rkt
+  (send km add-function "mouse-popup-menu"
+        (lambda (edit event)
+          (when (send event button-up?)
+            (let ([a (send edit get-admin)])
+              (when a
+                (let ([m (make-object popup-menu%)])
+                  (append-editor-operation-menu-items m)
+                  ;; Remove shortcut indicators (because they might not be correct)
+                  (for-each
+                   (lambda (i)
+                     (when (is-a? i selectable-menu-item<%>)
+                       (send i set-shortcut #f)))
+                   (send m get-items))
+                  (let-values ([(x y) (send edit
+                                            dc-location-to-editor-location
+                                            (send event get-x)
+                                            (send event get-y))])
+                    (send a popup-menu m (+ x 5) (+ y 5)))))))))
   km)
 
 (define (set-default-editor-bindings km)
@@ -550,7 +529,7 @@
   (send km map-function ":s:right" "mark-char")
   (send km map-function ":home" "beginning-of-buffer")
   (send km map-function ":end" "end-of-buffer")
-  (send km map-function ":rightbuttonseq" "menu")
+  (send km map-function ":rightbuttonseq" "mouse-popup-menu")
   (send km map-function ":middlebutton" "insert-primary")
   (send km map-function ":s:insert" "insert-primary"))
 
