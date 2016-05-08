@@ -51,7 +51,7 @@
 (define image-pict #f)
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions '("png" "jpg" "jpeg" "bmp" "gif"))
+(define supported-extensions '("png" "jpg" "jpe" "jpeg" "bmp" "gif"))
 ; all image files contained within image-dir
 (define (path-files)
   (define dir-lst (directory-list (image-dir) #:build? #t))
@@ -256,7 +256,6 @@
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
   (define sbp (status-bar-position))
-  (send tag-tfield set-label "Edit tag(s) : ")
   (send tag-tfield set-field-background (make-object color% "white"))
   (cond
     ; need to load the path into a bitmap first
