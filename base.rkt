@@ -247,7 +247,7 @@
 (define ivy-tag-tfield (make-parameter #f))
 (define status-bar-dimensions (make-parameter #f))
 (define status-bar-position (make-parameter #f))
-(define incoming-tags (make-parameter #f))
+(define incoming-tags (make-parameter ""))
 
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
