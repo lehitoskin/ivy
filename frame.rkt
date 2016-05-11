@@ -139,20 +139,20 @@
 
 (define ivy-menu-bar-file-quit
   (if (macosx?)
-    #f
-    (new menu-item%
-       [parent ivy-menu-bar-file]
-       [label "&Quit"]
-       [shortcut #\Q]
-       [help-string "Quit the program."]
-       [callback (λ (i e) (exit))])))
+      #f
+      (new menu-item%
+           [parent ivy-menu-bar-file]
+           [label "&Quit"]
+           [shortcut #\Q]
+           [help-string "Quit the program."]
+           [callback (λ (i e) (exit))])))
 
 ; left/right, zoom in/out,
 ; list of tags separated by commas
 ; e.g. flower,castle,too many cooks,fuzzy wuzzy wuz a bear,etc
 (define ivy-toolbar-hpanel (new horizontal-panel%
-                            [parent ivy-frame]
-                            [stretchable-height #f]))
+                                [parent ivy-frame]
+                                [stretchable-height #f]))
 
 (define ivy-actions-previous
   (new button%
@@ -200,40 +200,50 @@
        [callback (λ (button event)
                    (load-image image-bmp-master))]))
 
+(define ivy-tfield%
+  (class text-field%
+    (super-new)
+    
+    (define editor (send this get-editor))
+    
+    (define/override (on-subwindow-char receiver event)
+      (define type (send event get-key-code))
+      (case type
+        [(escape) (send (ivy-canvas) focus)]
+        [else
+         (send editor on-char event)]))))
+
 (ivy-tag-tfield
- (new text-field%
+ (new ivy-tfield%
       [parent ivy-toolbar-hpanel]
-      [label "Edit tag(s) : "]
+      [label "Tags: "]
+      [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (cond [(eq? (send evt get-event-type) 'text-field-enter)
-                (define tags (send tf get-value))
-                (send tf set-label "Edit tag(s) : ")
-                (define img-sym (path->symbol (image-path)))
-                (cond [(string=? tags "")
-                       ; empty tag string means delete the entry
-                       ; no failure if key doesn't exist
-                       (dict-remove! master img-sym)
-                       (save-dict! master)]
-                      [(not (eq? img-sym '/))
-                       ; turn the string of tag(s) into a list then sort it
-                       (define tag-lst (remove-duplicates (sort (string-split tags ", ") string<?)))
-                       ; set and save the dictionary
-                       (dict-set! master img-sym tag-lst)
-                       (save-dict! master)])
-                (send tf set-field-background (make-object color% "spring green"))
-                (send (ivy-canvas) focus)]
-               [else
-                (send tf set-label "Edit tag(s)*: ")
-                ; see color-database<%> for more named colors
-                (send tf set-field-background (make-object color% "gold"))]))]))
-
-(define piggyback
-  (new editor-canvas%
-       [parent ivy-toolbar-hpanel]
-       [editor (send (ivy-tag-tfield) get-editor)]))
-
-(send ivy-toolbar-hpanel delete-child piggyback)
+         (unless (eq? (path->symbol (image-path)) '/)
+           (define-values (base name-sym must-be-dir?) (split-path (image-path)))
+           (define name-str (path->string name-sym))
+           (cond [(eq? (send evt get-event-type) 'text-field-enter)
+                  (define tags (send tf get-value))
+                  (send ivy-frame set-label name-str)
+                  (define img-sym (path->symbol (image-path)))
+                  (cond [(string=? tags "")
+                         ; empty tag string means delete the entry
+                         ; no failure if key doesn't exist
+                         (dict-remove! master img-sym)
+                         (save-dict! master)]
+                        [else
+                         ; turn the string of tag(s) into a list then sort it
+                         (define tag-lst (remove-duplicates (sort (string-split tags ", ") string<?)))
+                         ; set and save the dictionary
+                         (dict-set! master img-sym tag-lst)
+                         (save-dict! master)])
+                  (send tf set-field-background (make-object color% "spring green"))
+                  (send (ivy-canvas) focus)]
+                 [else
+                  (send ivy-frame set-label (string-append "* " name-str))
+                  ; see color-database<%> for more named colors
+                  (send tf set-field-background (make-object color% "gold"))])))]))
 
 (define ivy-tag-button
   (new button%
@@ -241,23 +251,23 @@
        [label "Set"]
        [callback
         (λ (button event)
-          (define tags (send (ivy-tag-tfield) get-value))
-          (send (ivy-tag-tfield) set-label "Edit tag(s) : ")
-          (send (ivy-tag-tfield) set-field-background
-                (make-object color% "spring green"))
           (define img-sym (path->symbol (image-path)))
-          ; empty tag string means delete the entry
-          (cond [(string=? tags "")
-                 ; no failure if key doesn't exist
-                 (dict-remove! master img-sym)
-                 (save-dict! master)]
-                [(not (eq? img-sym '/))
-                 ; turn the string of tag(s) into a list then sort it
-                 (define tag-lst (sort (string-split tags ", ") string<?))
-                 ; set and save the dictionary
-                 (dict-set! master img-sym tag-lst)
-                 (save-dict! master)])
-          (send (ivy-canvas) focus))]))
+          (unless (eq? img-sym '/)
+            (define tags (send (ivy-tag-tfield) get-value))
+            (send (ivy-tag-tfield) set-field-background
+                  (make-object color% "spring green"))
+            ; empty tag string means delete the entry
+            (cond [(string=? tags "")
+                   ; no failure if key doesn't exist
+                   (dict-remove! master img-sym)
+                   (save-dict! master)]
+                  [else
+                   ; turn the string of tag(s) into a list then sort it
+                   (define tag-lst (sort (string-split tags ", ") string<?))
+                   ; set and save the dictionary
+                   (dict-set! master img-sym tag-lst)
+                   (save-dict! master)])
+            (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)
   (send (ivy-tag-tfield) focus))
