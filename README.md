@@ -31,6 +31,9 @@ This creates an executable binary (called `ivy`), which you can then move to
 any directory in your PATH. You should then be able to call `ivy` from
 anywhere.
 
+OS X note: `make` will generate an .app bundle, and `make install` by default will
+place it in `/Applications/`.
+
 
 ## Usage
 
@@ -62,10 +65,14 @@ anywhere.
 
 - To add a tag or list of tags to an image, simply enter them into the tag text
   field, separated by a comma and a space. E.g., `flower, beach, roller
-  coaster` and then press the "Set" button or the Enter key.
+  coaster` and then press the "Set" button or the <kbd>Enter</kbd> key.
+
+- If you are currently editing tags and wish to revert any unsaved changes, simply
+  hit the <kbd>Esc</kbd> key. Hitting <kbd>Esc</kbd> when there's no pending changes
+  to be saved will unfocus the tag text field.
 
 - To remove any set tags, simply delete the contents in the tag text field,
-  press the "Set" button or Enter key, and the entry for that image will be
+  press the "Set" button or <kbd>Enter</kbd> key, and the entry for that image will be
   deleted.
 
 Ivy cannot yet display animation in gifs due to a limitation of the GUI
