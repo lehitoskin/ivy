@@ -200,6 +200,16 @@
        [callback (λ (button event)
                    (load-image image-bmp-master))]))
 
+(define (on-escape-key tfield)
+  (define current-tags (send tfield get-value))
+
+  (cond [(string=? current-tags (incoming-tags))
+         (send (ivy-canvas) focus)]
+        [else (send tfield set-value (incoming-tags))
+         (send tfield set-field-background (make-object color% "white"))
+         (define-values (base name-sym must-be-dir?) (split-path (image-path)))
+         (send ivy-frame set-label (path->string name-sym))]))
+
 (define ivy-tfield%
   (class text-field%
     (super-new)
@@ -209,7 +219,7 @@
     (define/override (on-subwindow-char receiver event)
       (define type (send event get-key-code))
       (case type
-        [(escape) (send (ivy-canvas) focus)]
+        [(escape) (on-escape-key this)]
         [else
          (send editor on-char event)]))))
 

@@ -247,6 +247,7 @@
 (define ivy-tag-tfield (make-parameter #f))
 (define status-bar-dimensions (make-parameter #f))
 (define status-bar-position (make-parameter #f))
+(define incoming-tags (make-parameter #f))
 
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
@@ -277,14 +278,14 @@
                   (format "~a / ~a"
                           (+ (get-index img (pfs)) 1)
                           (length (pfs))))
-            ; if we've set tags for this file before...
+
+			; pick what string to display for tags...
             (cond [(hash-has-key? master img-sym)
-                   (define tag
-                     (string-join (hash-ref master img-sym) ", "))
-                   ; ...put them in the tfield
-                   (send tag-tfield set-value tag)]
-                  ; ...otherwise clear the tfield
-                  [else (send tag-tfield set-value "")])]
+                   (incoming-tags
+                     (string-join (hash-ref master img-sym) ", "))]
+                  [else (incoming-tags "")])
+             ; ...put them in the tfield
+             (send tag-tfield set-value (incoming-tags))]
            [else (printf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
