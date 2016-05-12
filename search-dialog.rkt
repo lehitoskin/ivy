@@ -32,6 +32,7 @@
         (sort (string-split (send exclude-tfield get-value) ", ") string<?)))
   (cond [(empty? imgs)
          (display-nil-results-alert)
+         (send (send search-tfield get-editor) select-all)
          (send search-tag-dialog show #t)]
         [else
          (if exclude-tags
