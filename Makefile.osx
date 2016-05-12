@@ -27,7 +27,7 @@ mac.iconset : $(IMAGES)
 
 install: ivy.app
 	cp -r -p ivy.app $(DESTDIR)/
-	ln -s $(DESTDIR)/ivy.app/Contents/MacOS/ivy /usr/local/bin/ivy
+	ln -sf $(DESTDIR)/ivy.app/Contents/MacOS/ivy /usr/local/bin/ivy
 
 clean:
 	rm -Rvf compiled ivy.app mac.iconset Starter.icns

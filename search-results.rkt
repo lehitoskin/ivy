@@ -1,7 +1,7 @@
 #lang racket/gui
 ; search-results.rkt
 (require pict "base.rkt")
-(provide results-frame display-tags)
+(provide results-frame display-tags display-nil-results-alert)
 
 (define searched-images empty)
 
@@ -65,15 +65,18 @@
                          (send canvas set-canvas-background
                                (make-object color% "black")))]))
 
+(define (display-nil-results-alert)
+  (message-box "Ivy - No Images Found"
+               "Sorry! No images with that tag combination have been found."
+               #f
+               (list 'ok 'stop)))
+
 ; search for the tags and display everything
 (define display-tags
   (let ([display-images
          (λ (imgs)
            (cond [(empty? imgs)
-                  (message-box "Ivy - No Images Found"
-                               "Sorry! No images with that tag combination have been found."
-                               #f
-                               (list 'ok 'stop))]
+                  (display-nil-results-alert)]
                  [else
                   (define imgs-str (sort (map path->string imgs) string<?))
                   (set! searched-images (map string->path imgs-str))

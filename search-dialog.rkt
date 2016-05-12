@@ -4,6 +4,7 @@
          racket/gui/base
          racket/class
          racket/string
+         racket/list
          "base.rkt"
          "search-results.rkt")
 (provide search-tag-dialog
@@ -29,9 +30,13 @@
     (if (string=? (send exclude-tfield get-value) "")
         #f
         (sort (string-split (send exclude-tfield get-value) ", ") string<?)))
-  (if exclude-tags
-      (display-tags (exclude-search master imgs exclude-tags))
-      (display-tags search-type tags)))
+  (cond [(empty? imgs)
+         (display-nil-results-alert)
+         (send search-tag-dialog show #t)]
+        [else
+         (if exclude-tags
+             (display-tags (exclude-search master imgs exclude-tags))
+             (display-tags search-type tags))]))
 
 (define search-tag-dialog
   (new dialog%
