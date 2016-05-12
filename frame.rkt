@@ -230,13 +230,13 @@
       [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (unless (eq? (path->symbol (image-path)) '/)
-           (define-values (base name-sym must-be-dir?) (split-path (image-path)))
-           (define name-str (path->string name-sym))
+         (define img-sym (path->symbol (image-path)))
+         (unless (eq? img-sym '/)
+           (define-values (base name-path must-be-dir?) (split-path (image-path)))
+           (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
                   (define tags (send tf get-value))
                   (send ivy-frame set-label name-str)
-                  (define img-sym (path->symbol (image-path)))
                   (cond [(string=? tags "")
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
@@ -263,6 +263,8 @@
         (λ (button event)
           (define img-sym (path->symbol (image-path)))
           (unless (eq? img-sym '/)
+            (define-values (base name-path must-be-dir?) (split-path (image-path)))
+            (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
             (send (ivy-tag-tfield) set-field-background
                   (make-object color% "spring green"))
