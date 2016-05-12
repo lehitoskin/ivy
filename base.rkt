@@ -462,6 +462,10 @@
           (define to (send editor get-start-position))
           (send editor delete from to)))
   
+  (send km add-function "forward-kill-buffer"
+        (lambda (editor kev)
+          (send editor kill)))
+  
   (send km add-function "mark-char-backward"
         (lambda (editor kev)
           (let ([cur (send editor get-start-position)])
@@ -471,6 +475,22 @@
         (lambda (editor kev)
           (let ([cur (send editor get-start-position)])
             (send editor move-position 'right #t 'simple))))
+  
+  (send km add-function "mark-word-backward"
+        (lambda (editor kev)
+          (let ([cur (send editor get-start-position)])
+            (send editor move-position 'left #t 'word))))
+  
+  (send km add-function "mark-word"
+        (lambda (editor kev)
+          (let ([cur (send editor get-start-position)])
+            (send editor move-position 'right #t 'word))))
+  
+  (send km add-function "mark-whole-word"
+        (lambda (editor kev)
+          (let ([cur (send editor get-start-position)])
+            (send editor move-position 'left #f 'word)
+            (send editor move-position 'right #t 'word))))
   
   (send km add-function "forward-char"
         (lambda (editor kev)
@@ -510,29 +530,63 @@
   km)
 
 (define (set-default-editor-bindings km)
-  (send km map-function ":c:c" "copy")
-  (send km map-function ":c:с" "copy") ;; russian cyrillic
-  (send km map-function ":c:v" "insert-clipboard")
-  (send km map-function ":c:м" "insert-clipboard") ;; russian cyrillic
-  (send km map-function ":c:x" "cut")
-  (send km map-function ":c:ч" "cut") ;; russian cyrillic
-  (send km map-function ":c:a" "select-all")
-  (send km map-function ":c:ф" "select-all") ;; russian cyrillic
-  (send km map-function ":backspace" "delete-backward-char")
-  (send km map-function ":delete" "delete-forward-char")
-  (send km map-function ":left" "backward-char")
-  (send km map-function ":right" "forward-char")
-  (send km map-function ":c:left" "backward-word")
-  (send km map-function ":c:right" "forward-word")
-  (send km map-function ":c:backspace" "backward-kill-word")
-  (send km map-function ":c:delete" "forward-kill-word")
-  (send km map-function ":s:left" "mark-char-backward")
-  (send km map-function ":s:right" "mark-char")
-  (send km map-function ":home" "beginning-of-buffer")
-  (send km map-function ":end" "end-of-buffer")
-  (send km map-function ":rightbuttonseq" "mouse-popup-menu")
-  (send km map-function ":middlebutton" "insert-primary")
-  (send km map-function ":s:insert" "insert-primary"))
+  (cond [(macosx?)
+         (send km map-function ":d:c" "copy")
+         (send km map-function ":d:с" "copy") ;; russian cyrillic
+         (send km map-function ":d:v" "insert-clipboard")
+         (send km map-function ":d:м" "insert-clipboard") ;; russian cyrillic
+         (send km map-function ":d:x" "cut")
+         (send km map-function ":d:ч" "cut") ;; russian cyrillic
+         (send km map-function ":d:a" "select-all")
+         (send km map-function ":d:ф" "select-all") ;; russian cyrillic
+         (send km map-function ":backspace" "delete-backward-char")
+         (send km map-function ":delete" "delete-forward-char")
+         (send km map-function ":left" "backward-char")
+         (send km map-function ":right" "forward-char")
+         (send km map-function ":a:left" "backward-word")
+         (send km map-function ":a:right" "forward-word")
+         (send km map-function ":a:backspace" "backward-kill-word")
+         (send km map-function ":a:delete" "forward-kill-word")
+         (send km map-function ":c:k" "forward-kill-buffer")
+         (send km map-function ":s:left" "mark-char-backward")
+         (send km map-function ":s:right" "mark-char")
+         (send km map-function ":a:s:left" "mark-word-backward")
+         (send km map-function ":a:s:right" "mark-word")
+         (send km map-function ":home" "beginning-of-buffer")
+         (send km map-function ":d:left" "beginning-of-buffer")
+         (send km map-function ":c:a" "beginning-of-buffer")
+         (send km map-function ":end" "end-of-buffer")
+         (send km map-function ":d:right" "end-of-buffer")
+         (send km map-function ":c:e" "end-of-buffer")
+         (send km map-function ":rightbuttonseq" "mouse-popup-menu")
+         (send km map-function ":leftbuttondouble" "mark-whole-word")]
+        [else
+         (send km map-function ":c:c" "copy")
+         (send km map-function ":c:с" "copy") ;; russian cyrillic
+         (send km map-function ":c:v" "insert-clipboard")
+         (send km map-function ":c:м" "insert-clipboard") ;; russian cyrillic
+         (send km map-function ":c:x" "cut")
+         (send km map-function ":c:ч" "cut") ;; russian cyrillic
+         (send km map-function ":c:a" "select-all")
+         (send km map-function ":c:ф" "select-all") ;; russian cyrillic
+         (send km map-function ":backspace" "delete-backward-char")
+         (send km map-function ":delete" "delete-forward-char")
+         (send km map-function ":left" "backward-char")
+         (send km map-function ":right" "forward-char")
+         (send km map-function ":c:left" "backward-word")
+         (send km map-function ":c:right" "forward-word")
+         (send km map-function ":c:backspace" "backward-kill-word")
+         (send km map-function ":c:delete" "forward-kill-word")
+         (send km map-function ":s:left" "mark-char-backward")
+         (send km map-function ":s:right" "mark-char")
+         (send km map-function ":c:s:left" "mark-word-backward")
+         (send km map-function ":c:s:right" "mark-word")
+         (send km map-function ":home" "beginning-of-buffer")
+         (send km map-function ":end" "end-of-buffer")
+         (send km map-function ":rightbuttonseq" "mouse-popup-menu")
+         (send km map-function ":middlebutton" "insert-primary")
+         (send km map-function ":leftbuttondouble" "mark-whole-word")
+         (send km map-function ":s:insert" "insert-primary")]))
 
 (current-text-keymap-initializer
  (λ (keymap)
