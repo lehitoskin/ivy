@@ -31,6 +31,31 @@
                                  [parent ivy-menu-bar]
                                  [label "&Window"]))
 
+(define (toggle-fullscreen canvas frame)
+  ; new frame without any buttons or menus
+  (define fullscreen-frame
+    (new frame%
+         [label "Ivy - Fullscreen"]
+         [style '(fullscreen-button)]
+         [width 800]
+         [height 600]))
+  
+  (cond [(send (send canvas get-parent) is-fullscreened?)
+         ; get the fullscreen-frame and close it
+         (define old-frame (send canvas get-parent))
+         (send old-frame show #f)
+         ; place the canvas back onto ivy-frame
+         (send canvas reparent frame)
+         (send status-bar-hpanel reparent frame)
+         ; focus the canvas
+         (send canvas focus)]
+        [else
+         ; place the canvas into the new frame
+         (send canvas reparent fullscreen-frame)
+         (send fullscreen-frame show #t)
+         (send fullscreen-frame fullscreen #t)
+         (send canvas focus)]))
+
 ;; File menu items ;;
 
 ; opening a single image will have the current directory
@@ -195,6 +220,13 @@
        [help-string "Display a Random Image."]
        [callback (λ (i e) (load-rand-image))]))
 
+(define ivy-menu-bar-view-fullscreen
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Fullscreen"]
+       [help-string "Enter fullscreen mode."]
+       [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
+
 ;; Window menu items ;;
 
 (define ivy-menu-bar-window-minimize
@@ -262,13 +294,13 @@
 
 (define (on-escape-key tfield)
   (define current-tags (send tfield get-value))
-
+  
   (cond [(string=? current-tags (incoming-tags))
          (send (ivy-canvas) focus)]
         [else (send tfield set-value (incoming-tags))
-         (send tfield set-field-background (make-object color% "white"))
-         (define-values (base name-sym must-be-dir?) (split-path (image-path)))
-         (send ivy-frame set-label (path->string name-sym))]))
+              (send tfield set-field-background (make-object color% "white"))
+              (define-values (base name-sym must-be-dir?) (split-path (image-path)))
+              (send ivy-frame set-label (path->string name-sym))]))
 
 (define ivy-tfield%
   (class text-field%
@@ -305,7 +337,7 @@
                         [else
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (remove-duplicates (sort (for/list ([tag (string-split tags ",")])
-                                                                            (string-trim tag))
+                                                                    (string-trim tag))
                                                                   string<?)))
                          ; set and save the dictionary
                          (dict-set! master img-sym tag-lst)
@@ -370,6 +402,7 @@
         [(wheel-up)
          (when image-pict
            (load-image image-pict 'larger))]
+        [(f11) (toggle-fullscreen this ivy-frame)]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
