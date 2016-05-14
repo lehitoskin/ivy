@@ -366,6 +366,7 @@
                [else
                 (define img (list-ref (pfs) (+ prev-index 1)))
                 (load-image img)]))]
+      [(rand) (load-image (list-ref (pfs) (- (random 1 (+ (length (pfs)) 1)) 1)))]
       [(home) (load-image (first (pfs)))]
       [(end) (load-image (last (pfs)))])))
 
@@ -373,6 +374,7 @@
 ; underestimate the `cool' factor
 (define load-previous-image (load-image-in-collection 'previous))
 (define load-next-image (load-image-in-collection 'next))
+(define load-rand-image (load-image-in-collection 'rand))
 (define load-first-image (load-image-in-collection 'home))
 (define load-last-image (load-image-in-collection 'end))
 

@@ -23,6 +23,16 @@
                                [parent ivy-menu-bar]
                                [label "&File"]))
 
+(define ivy-menu-bar-view (new menu%
+                               [parent ivy-menu-bar]
+                               [label "&View"]))
+
+(define ivy-menu-bar-window (new menu%
+                                 [parent ivy-menu-bar]
+                                 [label "&Window"]))
+
+;; File menu items ;;
+
 ; opening a single image will have the current directory
 ; contents be the collection
 (define ivy-menu-bar-file-open
@@ -146,6 +156,56 @@
            [shortcut #\Q]
            [help-string "Quit the program."]
            [callback (λ (i e) (exit))])))
+
+;; View menu items ;;
+
+(define ivy-menu-bar-view-prev
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Previous Image"]
+       [help-string "Display the Previous Image."]
+       [callback (λ (i e) (load-previous-image))]))
+
+(define ivy-menu-bar-view-next
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Next Image"]
+       [help-string "Display the Next Image."]
+       [callback (λ (i e) (load-next-image))]))
+
+(define ivy-menu-bar-view-first
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "First Image"]
+       [help-string "Display the First Image."]
+       [callback (λ (i e) (load-first-image))]))
+
+(define ivy-menu-bar-view-last
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Last Image"]
+       [help-string "Display the Last Image."]
+       [callback (λ (i e) (load-last-image))]))
+
+(define ivy-menu-bar-view-rand
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "&Random Image"]
+       [shortcut #\R]
+       [help-string "Display a Random Image."]
+       [callback (λ (i e) (load-rand-image))]))
+
+;; Window menu items ;;
+
+(define ivy-menu-bar-window-minimize
+  (new menu-item%
+       [parent ivy-menu-bar-window]
+       [label "&Minimize"]
+       [shortcut #\M]
+       [help-string "Minimize the Window."]
+       [callback (λ (i e) (send ivy-frame iconize #t))]))
+
+;; main window layout ;;
 
 ; left/right, zoom in/out,
 ; list of tags separated by commas
