@@ -9,7 +9,6 @@
 
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
-                       [style '(fullscreen-button)]
                        [width 800]
                        [height 600]))
 
@@ -225,7 +224,6 @@
   (new menu-item%
        [parent ivy-menu-bar-view]
        [label "Fullscreen"]
-       [shortcut 'f11]
        [help-string "Enter fullscreen mode."]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
 
@@ -296,13 +294,13 @@
 
 (define (on-escape-key tfield)
   (define current-tags (send tfield get-value))
-
+  
   (cond [(string=? current-tags (incoming-tags))
          (send (ivy-canvas) focus)]
         [else (send tfield set-value (incoming-tags))
-         (send tfield set-field-background (make-object color% "white"))
-         (define-values (base name-sym must-be-dir?) (split-path (image-path)))
-         (send ivy-frame set-label (path->string name-sym))]))
+              (send tfield set-field-background (make-object color% "white"))
+              (define-values (base name-sym must-be-dir?) (split-path (image-path)))
+              (send ivy-frame set-label (path->string name-sym))]))
 
 (define ivy-tfield%
   (class text-field%
@@ -339,7 +337,7 @@
                         [else
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (remove-duplicates (sort (for/list ([tag (string-split tags ",")])
-                                                                            (string-trim tag))
+                                                                    (string-trim tag))
                                                                   string<?)))
                          ; set and save the dictionary
                          (dict-set! master img-sym tag-lst)
