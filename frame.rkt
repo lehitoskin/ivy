@@ -9,6 +9,7 @@
 
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
+                       [style '(fullscreen-button)]
                        [width 800]
                        [height 600]))
 
@@ -30,6 +31,31 @@
 (define ivy-menu-bar-window (new menu%
                                  [parent ivy-menu-bar]
                                  [label "&Window"]))
+
+(define (toggle-fullscreen canvas frame)
+  ; new frame without any buttons or menus
+  (define fullscreen-frame
+    (new frame%
+         [label "Ivy - Fullscreen"]
+         [style '(fullscreen-button)]
+         [width 800]
+         [height 600]))
+  
+  (cond [(send (send canvas get-parent) is-fullscreened?)
+         ; get the fullscreen-frame and close it
+         (define old-frame (send canvas get-parent))
+         (send old-frame show #f)
+         ; place the canvas back onto ivy-frame
+         (send canvas reparent frame)
+         (send status-bar-hpanel reparent frame)
+         ; focus the canvas
+         (send canvas focus)]
+        [else
+         ; place the canvas into the new frame
+         (send canvas reparent fullscreen-frame)
+         (send fullscreen-frame show #t)
+         (send fullscreen-frame fullscreen #t)
+         (send canvas focus)]))
 
 ;; File menu items ;;
 
@@ -194,6 +220,14 @@
        [shortcut #\R]
        [help-string "Display a Random Image."]
        [callback (λ (i e) (load-rand-image))]))
+
+(define ivy-menu-bar-view-fullscreen
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Fullscreen"]
+       [shortcut 'f11]
+       [help-string "Enter fullscreen mode."]
+       [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
 
 ;; Window menu items ;;
 
@@ -370,6 +404,7 @@
         [(wheel-up)
          (when image-pict
            (load-image image-pict 'larger))]
+        [(f11) (toggle-fullscreen this ivy-frame)]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
