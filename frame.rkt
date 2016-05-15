@@ -9,6 +9,7 @@
 
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
+                       [style '(fullscreen-button)]
                        [width 800]
                        [height 600]))
 
