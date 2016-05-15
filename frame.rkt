@@ -23,6 +23,10 @@
                                [parent ivy-menu-bar]
                                [label "&File"]))
 
+(define ivy-menu-bar-navigation (new menu%
+                                     [parent ivy-menu-bar]
+                                     [label "&Navigation"]))
+
 (define ivy-menu-bar-view (new menu%
                                [parent ivy-menu-bar]
                                [label "&View"]))
@@ -208,43 +212,45 @@
            [help-string "Quit the program."]
            [callback (λ (i e) (exit))])))
 
-;; View menu items ;;
+;; Navigation menu items ;;
 
-(define ivy-menu-bar-view-prev
+(define ivy-menu-bar-navigation-prev
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Previous Image"]
        [help-string "Display the Previous Image."]
        [callback (λ (i e) (load-previous-image))]))
 
-(define ivy-menu-bar-view-next
+(define ivy-menu-bar-navigation-next
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Next Image"]
        [help-string "Display the Next Image."]
        [callback (λ (i e) (load-next-image))]))
 
-(define ivy-menu-bar-view-first
+(define ivy-menu-bar-navigation-first
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "First Image"]
        [help-string "Display the First Image."]
        [callback (λ (i e) (load-first-image))]))
 
-(define ivy-menu-bar-view-last
+(define ivy-menu-bar-navigation-last
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Last Image"]
        [help-string "Display the Last Image."]
        [callback (λ (i e) (load-last-image))]))
 
-(define ivy-menu-bar-view-rand
+(define ivy-menu-bar-navigation-rand
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "&Random Image"]
        [shortcut #\R]
        [help-string "Display a Random Image."]
        [callback (λ (i e) (load-rand-image))]))
+
+;; View menu items ;;
 
 (define ivy-menu-bar-view-fullscreen
   (new menu-item%
