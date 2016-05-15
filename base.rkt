@@ -252,12 +252,12 @@
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
 ; the position message
+; scale: (or/c 'default 'cmd 'larger 'smaller 'none
 (define (load-image img [scale 'default])
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
   (define sbp (status-bar-position))
-  (send tag-tfield set-field-background (make-object color% "white"))
   (cond
     ; need to load the path into a bitmap first
     [(path? img)
@@ -348,6 +348,7 @@
 ; mmm... curry
 (define ((load-image-in-collection direction))
   (unless (or (false? image-pict) (eq? (path->symbol (image-path)) '/))
+    (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
       [(previous)

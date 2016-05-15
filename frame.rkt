@@ -332,11 +332,10 @@
 
 (define (on-escape-key tfield)
   (define current-tags (send tfield get-value))
-  
+  (send tfield set-field-background (make-object color% "white"))
   (cond [(string=? current-tags (incoming-tags))
          (send (ivy-canvas) focus)]
         [else (send tfield set-value (incoming-tags))
-              (send tfield set-field-background (make-object color% "white"))
               (define-values (base name-sym must-be-dir?) (split-path (image-path)))
               (send ivy-frame set-label (path->string name-sym))]))
 
