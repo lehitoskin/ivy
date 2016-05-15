@@ -32,9 +32,11 @@
                                [parent ivy-menu-bar]
                                [label "&View"]))
 
-(define ivy-menu-bar-window (new menu%
-                                 [parent ivy-menu-bar]
-                                 [label "&Window"]))
+(define ivy-menu-bar-window
+  (when (macosx?)
+    (new menu%
+         [parent ivy-menu-bar]
+         [label "&Window"])))
 
 ;; Fullscreen handling ;;
 
@@ -70,7 +72,7 @@
 
 ; polling timer callback; only way to know the user is fullscreen if they don't
 ; use our ui callback, e.g. fullscreen button on mac; only be relevant on OS X?
-(cond [(macosx?)
+(when (macosx?)
        (define was-fullscreen? (make-parameter #f))
        (define ivy-fullscreen-poller 
          (new timer%
@@ -85,7 +87,7 @@
          (application-quit-handler
           (λ ()
             (send ivy-fullscreen-poller stop)
-            (default-handler))))])
+            (default-handler)))))
 
 ;; File menu items ;;
 
@@ -128,7 +130,7 @@
        [parent ivy-menu-bar-file]
        [label "&Append images to collection"]
        [shortcut #\O]
-       [shortcut-prefix '(ctl shift)]
+       [shortcut-prefix (if (macosx?) '(cmd shift) '(ctl shift))]
        [help-string "Append images to existing collection"]
        [callback
         (λ (i e)
@@ -268,12 +270,13 @@
 ;; Window menu items ;;
 
 (define ivy-menu-bar-window-minimize
-  (new menu-item%
-       [parent ivy-menu-bar-window]
-       [label "&Minimize"]
-       [shortcut #\M]
-       [help-string "Minimize the Window."]
-       [callback (λ (i e) (send ivy-frame iconize #t))]))
+  (when (macosx?)
+    (new menu-item%
+         [parent ivy-menu-bar-window]
+         [label "&Minimize"]
+         [shortcut #\M]
+         [help-string "Minimize the Window."]
+         [callback (λ (i e) (send ivy-frame iconize #t))])))
 
 ;; main window layout ;;
 
