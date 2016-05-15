@@ -278,14 +278,14 @@
                   (format "~a / ~a"
                           (+ (get-index img (pfs)) 1)
                           (length (pfs))))
-
-			; pick what string to display for tags...
+            
+            ; pick what string to display for tags...
             (cond [(hash-has-key? master img-sym)
                    (incoming-tags
-                     (string-join (hash-ref master img-sym) ", "))]
+                    (string-join (hash-ref master img-sym) ", "))]
                   [else (incoming-tags "")])
-             ; ...put them in the tfield
-             (send tag-tfield set-value (incoming-tags))]
+            ; ...put them in the tfield
+            (send tag-tfield set-value (incoming-tags))]
            [else (printf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded

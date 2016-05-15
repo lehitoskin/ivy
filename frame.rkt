@@ -40,23 +40,23 @@
 
 ; awww yeah... so oldskool...
 (define (remove-children parent kids)
-        (cond [(> (length kids) 0)
-               (send parent delete-child (car kids))
-               (remove-children parent (cdr kids))]))
+  (when (> (length kids) 0)
+    (send parent delete-child (car kids))
+    (remove-children parent (cdr kids))))
 
 ; just check out those tail recursions...
 (define (add-children parent kids)
-        (cond [(> (length kids) 0)
-               (send parent add-child (car kids))
-               (add-children parent (cdr kids))]))
+  (when (> (length kids) 0)
+    (send parent add-child (car kids))
+    (add-children parent (cdr kids))))
 
 (define (toggle-fullscreen canvas frame)
   (define was-fullscreen?  (send frame is-fullscreened?))
   (define going-to-be-fullscreen? (not was-fullscreen?))
   ;(eprintf "(toggle-fullscreen ...) going-to-be-fullscreen? == ~v~n" going-to-be-fullscreen?)
   (send frame fullscreen going-to-be-fullscreen?)
-  (cond [(not (macosx?))
-         (on-fullscreen-event going-to-be-fullscreen?)]))
+  (unless (macosx?)
+    (on-fullscreen-event going-to-be-fullscreen?)))
 
 (define (on-fullscreen-event is-fullscreen?)
   ;(eprintf "(on-fucllscreen-event ~v)~n" is-fullscreen?)
@@ -70,7 +70,7 @@
 
 ; polling timer callback; only way to know the user is fullscreen if they don't
 ; use our ui callback, e.g. fullscreen button on mac; only be relevant on OS X?
-(cond [macosx?
+(cond [(macosx?)
        (define was-fullscreen? (make-parameter #f))
        (define ivy-fullscreen-poller 
          (new timer%
@@ -82,10 +82,10 @@
                                         (on-fullscreen-event is-fullscreen?)
                                         (was-fullscreen? is-fullscreen?)]))]))
        (let [(default-handler (application-quit-handler))]
-            (application-quit-handler
-              (λ ()
-                (send ivy-fullscreen-poller stop)
-                (default-handler))))])
+         (application-quit-handler
+          (λ ()
+            (send ivy-fullscreen-poller stop)
+            (default-handler))))])
 
 ;; File menu items ;;
 
