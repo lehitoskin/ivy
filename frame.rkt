@@ -373,8 +373,9 @@
                          (save-dict! master)]
                         [else
                          ; turn the string of tag(s) into a list then sort it
-                         (define tag-lst (remove-duplicates (sort (for/list ([tag (string-split tags ",")])
-                                                                    (string-trim tag))
+                         (define tag-lst (remove-duplicates (sort (filter (λ (tag) (not (string=? tag "")))
+                                                                          (for/list ([tag (string-split tags ",")])
+                                                                            (string-trim tag)))
                                                                   string<?)))
                          ; set and save the dictionary
                          (dict-set! master img-sym tag-lst)
