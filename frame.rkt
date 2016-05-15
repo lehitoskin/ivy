@@ -9,6 +9,7 @@
 
 (define ivy-frame (new frame%
                        [label "Ivy Image Viewer"]
+                       [style '(fullscreen-button)]
                        [width 800]
                        [height 600]))
 
@@ -23,6 +24,10 @@
                                [parent ivy-menu-bar]
                                [label "&File"]))
 
+(define ivy-menu-bar-navigation (new menu%
+                                     [parent ivy-menu-bar]
+                                     [label "&Navigation"]))
+
 (define ivy-menu-bar-view (new menu%
                                [parent ivy-menu-bar]
                                [label "&View"]))
@@ -31,30 +36,56 @@
                                  [parent ivy-menu-bar]
                                  [label "&Window"]))
 
+;; Fullscreen handling ;;
+
+; awww yeah... so oldskool...
+(define (remove-children parent kids)
+        (cond [(> (length kids) 0)
+               (send parent delete-child (car kids))
+               (remove-children parent (cdr kids))]))
+
+; just check out those tail recursions...
+(define (add-children parent kids)
+        (cond [(> (length kids) 0)
+               (send parent add-child (car kids))
+               (add-children parent (cdr kids))]))
+
 (define (toggle-fullscreen canvas frame)
-  ; new frame without any buttons or menus
-  (define fullscreen-frame
-    (new frame%
-         [label "Ivy - Fullscreen"]
-         [style '(fullscreen-button)]
-         [width 800]
-         [height 600]))
-  
-  (cond [(send (send canvas get-parent) is-fullscreened?)
-         ; get the fullscreen-frame and close it
-         (define old-frame (send canvas get-parent))
-         (send old-frame show #f)
-         ; place the canvas back onto ivy-frame
-         (send canvas reparent frame)
-         (send status-bar-hpanel reparent frame)
-         ; focus the canvas
-         (send canvas focus)]
+  (define was-fullscreen?  (send frame is-fullscreened?))
+  (define going-to-be-fullscreen? (not was-fullscreen?))
+  ;(eprintf "(toggle-fullscreen ...) going-to-be-fullscreen? == ~v~n" going-to-be-fullscreen?)
+  (send frame fullscreen going-to-be-fullscreen?)
+  (cond [(not (macosx?))
+         (on-fullscreen-event going-to-be-fullscreen?)]))
+
+(define (on-fullscreen-event is-fullscreen?)
+  ;(eprintf "(on-fucllscreen-event ~v)~n" is-fullscreen?)
+  (cond [is-fullscreen?
+         (remove-children ivy-frame (list ivy-toolbar-hpanel status-bar-hpanel))]
         [else
-         ; place the canvas into the new frame
-         (send canvas reparent fullscreen-frame)
-         (send fullscreen-frame show #t)
-         (send fullscreen-frame fullscreen #t)
-         (send canvas focus)]))
+         (send ivy-frame delete-child (ivy-canvas))
+         (add-children ivy-frame (list ivy-toolbar-hpanel (ivy-canvas) status-bar-hpanel))])
+  (send ivy-frame reflow-container)
+  (send (ivy-canvas) focus))
+
+; polling timer callback; only way to know the user is fullscreen if they don't
+; use our ui callback, e.g. fullscreen button on mac; only be relevant on OS X?
+(cond [macosx?
+       (define was-fullscreen? (make-parameter #f))
+       (define ivy-fullscreen-poller 
+         (new timer%
+              [interval 100]
+              [notify-callback (λ ()
+                                 (define is-fullscreen? (send ivy-frame is-fullscreened?))
+                                 (cond [(not (eq? (was-fullscreen?) is-fullscreen?))
+                                        ;(eprintf "(notify-callback)~n")
+                                        (on-fullscreen-event is-fullscreen?)
+                                        (was-fullscreen? is-fullscreen?)]))]))
+       (let [(default-handler (application-quit-handler))]
+            (application-quit-handler
+              (λ ()
+                (send ivy-fullscreen-poller stop)
+                (default-handler))))])
 
 ;; File menu items ;;
 
@@ -182,43 +213,45 @@
            [help-string "Quit the program."]
            [callback (λ (i e) (exit))])))
 
-;; View menu items ;;
+;; Navigation menu items ;;
 
-(define ivy-menu-bar-view-prev
+(define ivy-menu-bar-navigation-prev
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Previous Image"]
        [help-string "Display the Previous Image."]
        [callback (λ (i e) (load-previous-image))]))
 
-(define ivy-menu-bar-view-next
+(define ivy-menu-bar-navigation-next
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Next Image"]
        [help-string "Display the Next Image."]
        [callback (λ (i e) (load-next-image))]))
 
-(define ivy-menu-bar-view-first
+(define ivy-menu-bar-navigation-first
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "First Image"]
        [help-string "Display the First Image."]
        [callback (λ (i e) (load-first-image))]))
 
-(define ivy-menu-bar-view-last
+(define ivy-menu-bar-navigation-last
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "Last Image"]
        [help-string "Display the Last Image."]
        [callback (λ (i e) (load-last-image))]))
 
-(define ivy-menu-bar-view-rand
+(define ivy-menu-bar-navigation-rand
   (new menu-item%
-       [parent ivy-menu-bar-view]
+       [parent ivy-menu-bar-navigation]
        [label "&Random Image"]
        [shortcut #\R]
        [help-string "Display a Random Image."]
        [callback (λ (i e) (load-rand-image))]))
+
+;; View menu items ;;
 
 (define ivy-menu-bar-view-fullscreen
   (new menu-item%
@@ -226,6 +259,11 @@
        [label "Fullscreen"]
        [help-string "Enter fullscreen mode."]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
+(cond [(macosx?)
+       (send ivy-menu-bar-view-fullscreen set-shortcut #\F)
+       (send ivy-menu-bar-view-fullscreen set-shortcut-prefix '(ctl cmd))]
+      [else
+       (send ivy-menu-bar-view-fullscreen set-shortcut 'f11)])
 
 ;; Window menu items ;;
 
@@ -402,7 +440,8 @@
         [(wheel-up)
          (when image-pict
            (load-image image-pict 'larger))]
-        [(f11) (toggle-fullscreen this ivy-frame)]
+        [(f11) (cond [(not (macosx?))
+                      (toggle-fullscreen this ivy-frame)])]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
@@ -414,6 +453,7 @@
       [parent ivy-frame]
       [label "Ivy Image Canvas"]
       [style '(hscroll vscroll)]
+      [stretchable-height #t]
       [paint-callback (λ (canvas dc)
                         (send canvas set-canvas-background
                               (make-object color% "black")))]))
