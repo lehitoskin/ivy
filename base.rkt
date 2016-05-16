@@ -1,16 +1,16 @@
 #lang racket/base
 ; base.rkt
 ; base file for ivy, the taggable image viewer
-(require json
+(require file/convertible
+         json
          pict
-         racket/gui/base
-         racket/dict
          racket/bool
-         racket/list
          racket/class
-         racket/string
+         racket/dict
+         racket/gui/base
+         racket/list
          racket/path
-         file/convertible
+         racket/string
          (only-in srfi/13
                   string-contains-ci))
 (provide (all-defined-out))
@@ -240,6 +240,7 @@
     ; only used by zoom-out, definitely a pict
     [(smaller)
      (scale-to-fit img (* img-width 0.8) (* img-height 0.8))]
+    [(same) img]
     [(none) (bitmap img)]))
 
 ; janky!
@@ -295,7 +296,7 @@
         (λ ()
           (define dc (send canvas get-dc))
           
-          (when (or (path? img) (eq? scale 'default))
+          (when (and (path? img) (eq? scale 'default))
             ; have the canvas re-scale the image so when the canvas is
             ; resized, it'll also be the proper size
             (set! image-pict (scale-image image-bmp-master 'default)))
@@ -341,7 +342,10 @@
   
   (let* ([width (inexact->exact (round (pict-width image-pict)))]
          [height (inexact->exact (round (pict-height image-pict)))])
-    (send canvas init-auto-scrollbars width height 0.0 0.0))
+    (send canvas init-auto-scrollbars
+          (if (< width 1) 1 width)
+          (if (< height 1) 1 height)
+          0.0 0.0))
   (send canvas refresh))
 
 ; curried procedure to abstract loading an image in a collection
@@ -394,20 +398,23 @@
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
-    (define bmp (read-bitmap path))
-    ; cannot have slashes in the actual name
-    ; fraction slash: U+2044
-    (define str (string-append (string-replace path "/" "⁄") ".png"))
-    (define bmp-path (build-path thumbnails-path str))
+    (define thumb-bmp (read-bitmap path))
+    (define thumb-name
+      (string-append
+       (if (eq? (system-type) 'windows)
+           (string-replace (string-replace path "\\" "_")
+                           "c:" "c")
+           (string-replace path "/" "_"))))
+    (define thumb-path (build-path thumbnails-path thumb-name))
     ; use pict to scale the image to 100x100
-    (define pct (bitmap bmp))
-    (define bmp-small (pict->bitmap (scale-to-fit pct 100 100)))
-    (define bmp-port-out (open-output-file bmp-path
-                                           #:mode 'binary
-                                           #:exists 'truncate/replace))
-    (printf "Writing bytes to ~a~n" bmp-path)
-    (write-bytes (convert bmp-small 'png-bytes) bmp-port-out)
-    (close-output-port bmp-port-out)))
+    (define thumb-pct (bitmap thumb-bmp))
+    (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 100 100)))
+    (define thumb-port-out (open-output-file thumb-path
+                                             #:mode 'binary
+                                             #:exists 'truncate/replace))
+    (printf "Writing bytes to ~a~n" thumb-path)
+    (write-bytes (convert thumb-small 'png-bytes) thumb-port-out)
+    (close-output-port thumb-port-out)))
 
 ; implement common keyboard shortcuts
 (define (init-editor-keymap km)

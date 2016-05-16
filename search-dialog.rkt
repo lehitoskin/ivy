@@ -1,10 +1,10 @@
 #lang racket/base
 ; search-dialog.rkt
-(require racket/dict
+(require racket/class
+         racket/dict
          racket/gui/base
-         racket/class
-         racket/string
          racket/list
+         racket/string
          "base.rkt"
          "search-results.rkt")
 (provide search-tag-dialog
@@ -37,7 +37,7 @@
         [else
          (if exclude-tags
              (display-tags (exclude-search master imgs exclude-tags))
-             (display-tags search-type tags))]))
+             (display-tags imgs))]))
 
 (define search-tag-dialog
   (new dialog%
