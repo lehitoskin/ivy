@@ -1,6 +1,13 @@
-#lang racket/gui
+#lang racket/base
 ; search-results.rkt
-(require pict "base.rkt")
+(require file/md5
+         pict
+         racket/class
+         racket/file
+         racket/list
+         racket/gui/base
+         racket/string
+         "base.rkt")
 (provide results-frame display-tags display-nil-results-alert)
 
 (define searched-images empty)
@@ -71,71 +78,73 @@
                #f
                (list 'ok 'stop)))
 
+; tell the user we're preparing results preview
+(define prep-notification
+  (new frame%
+       [label "Ivy - Preparing Search Preview"]
+       [width 200]
+       [height 40]
+       [style '(float)]))
+
+(define prep-msg
+  (new message%
+       [parent prep-notification]
+       [label "Preparing search result preview, please wait..."]))
+
 ; search for the tags and display everything
-(define display-tags
-  (let ([display-images
-         (λ (imgs)
-           (cond [(empty? imgs)
-                  (display-nil-results-alert)]
-                 [else
-                  (define imgs-str (sort (map path->string imgs) string<?))
-                  (set! searched-images (map string->path imgs-str))
-                  (define imgs-grid (grid-list imgs-str 6))
-                  
-                  ; tell the user we're preparing results preview
-                  (define notification
-                    (new frame%
-                         [label "Ivy - Preparing Search Preview"]
-                         [width 200]
-                         [height 40]
-                         [style '(float)]))
-                  
-                  (new message%
-                       [parent notification]
-                       [label "Preparing search result preview, please wait..."])
-                  
-                  (send notification show #t)
-                  
-                  ; generate the thumbnail in case it does not exist
-                  (for ([img-path imgs-str])
-                    (define str (string-append (string-replace img-path "/" "⁄") ".png"))
-                    (define thumbnail-path (build-path thumbnails-path str))
-                    (unless (file-exists? thumbnail-path)
-                      (generate-thumbnails (list img-path))))
-                  
-                  (send notification show #f)
-                  
-                  (send results-canvas set-on-paint!
-                        (λ ()
-                          (collect-garbage 'incremental)
-                          (define dc (send results-canvas get-dc))
-                          
-                          (send results-canvas set-canvas-background
-                                (make-object color% "black"))
-                          (for ([img-list imgs-grid]
-                                [y (in-naturals)])
-                            (for ([path img-list]
-                                  [x (in-naturals)])
-                              (define str (string-append
-                                           (string-replace path "/" "⁄") ".png"))
-                              (define pct-path (build-path thumbnails-path str))
-                              (define pct (bitmap pct-path))
-                              (draw-pict pct dc (* 100 x) (* 100 y))))))
-                  
-                  (when (positive? (length imgs-str))
-                    (send results-canvas init-auto-scrollbars #f
-                          (* 100 (length imgs-grid)) 0.0 0.0))
-                  (if (< (length imgs-grid) 4)
-                      (send results-canvas show-scrollbars #f #f)
-                      (send results-canvas show-scrollbars #f #t))
-                  
-                  (send results-frame show #t)]))])
-    (case-lambda
-      ; we already have the images, via exclude-search
-      [(imgs)
-       (display-images imgs)]
-      ; we're going to be doing all the searching right now
-      [(type tags)
-       ; do the searching
-       (define imgs (search-dict master type tags))
-       (display-images imgs)])))
+(define (display-tags imgs)
+  (cond [(empty? imgs)
+         (display-nil-results-alert)]
+        [else
+         (send prep-notification show #t)
+         
+         (define imgs-str (sort (map path->string imgs) string<?))
+         (set! searched-images (map string->path imgs-str))
+         (define imgs-grid (grid-list imgs-str 6))
+         
+         ; generate the thumbnail in case it does not exist
+         (generate-thumbnails
+          (filter path-string?
+                  (for/list ([path-str (in-list imgs-str)])
+                    (define thumb-name
+                      (string-append
+                       (if (eq? (system-type) 'windows)
+                           (string-replace (string-replace path-str "\\" "_")
+                                           "c:" "c")
+                           (string-replace path-str "/" "_"))))
+                    (define thumb-path (build-path thumbnails-path thumb-name))
+                    (if (file-exists? thumb-path)
+                        #f
+                        path-str))))
+         
+         (send results-canvas set-on-paint!
+               (λ ()
+                 (collect-garbage 'incremental)
+                 (define dc (send results-canvas get-dc))
+                 
+                 (send results-canvas set-canvas-background
+                       (make-object color% "black"))
+                 (for ([img-list (in-list imgs-grid)]
+                       [y (in-naturals)])
+                   (for ([path-str (in-list img-list)]
+                         [x (in-naturals)])
+                     (define thumb-name
+                       (string-append
+                        (if (eq? (system-type) 'windows)
+                            (string-replace (string-replace path-str "\\" "_")
+                                            "c:" "c")
+                            (string-replace path-str "/" "_"))))
+                     (define thumb-path (build-path thumbnails-path thumb-name))
+                     (define thumb-pct (bitmap thumb-path))
+                     (draw-pict thumb-pct dc (* 100 x) (* 100 y))))))
+         
+         (when (positive? (length imgs-str))
+           (send results-canvas init-auto-scrollbars #f
+                 (* 100 (length imgs-grid)) 0.0 0.0))
+         (if (< (length imgs-grid) 4)
+             (send results-canvas show-scrollbars #f #f)
+             (send results-canvas show-scrollbars #f #t))
+         
+         (send prep-notification show #f)
+         
+         (send results-frame show #t)]))

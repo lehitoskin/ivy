@@ -37,7 +37,7 @@
         [else
          (if exclude-tags
              (display-tags (exclude-search master imgs exclude-tags))
-             (display-tags search-type tags))]))
+             (display-tags imgs))]))
 
 (define search-tag-dialog
   (new dialog%

@@ -1,9 +1,14 @@
-#lang racket/gui
+#lang racket/base
 ; frame.rkt
 ; main frame file for ivy, the taggable image viewer
 (require pict
+         racket/class
+         racket/dict
+         racket/gui/base
+         racket/list
+         racket/math
+         racket/string
          "base.rkt"
-         "search-results.rkt"
          "search-dialog.rkt")
 (provide (all-defined-out))
 
@@ -263,6 +268,22 @@
        [shortcut (if (macosx?) #\F #f)]
        [shortcut-prefix (if (macosx?) '(ctl cmd) (get-default-shortcut-prefix))]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
+
+(define ivy-menu-bar-view-rotate-left
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Rotate left"]
+       [help-string "Rotate the image left."]
+       [callback (λ (i e)
+                   (load-image (rotate image-pict (/ pi 2))))]))
+
+(define ivy-menu-bar-view-rotate-right
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Rotate right"]
+       [help-string "Rotate the image right."]
+       [callback (λ (i e)
+                   (load-image (rotate image-pict (- (/ pi 2)))))]))
 
 ;; Window menu items ;;
 
