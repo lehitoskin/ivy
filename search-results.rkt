@@ -1,7 +1,6 @@
 #lang racket/base
 ; search-results.rkt
-(require file/md5
-         pict
+(require pict
          racket/class
          racket/file
          racket/list
@@ -110,7 +109,7 @@
                       (string-append
                        (if (eq? (system-type) 'windows)
                            (string-replace (string-replace path-str "\\" "_")
-                                           "c:" "c")
+                                           "C:" "C")
                            (string-replace path-str "/" "_"))))
                     (define thumb-path (build-path thumbnails-path thumb-name))
                     (if (file-exists? thumb-path)

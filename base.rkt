@@ -7,7 +7,6 @@
          racket/bool
          racket/class
          racket/dict
-         racket/file
          racket/gui/base
          racket/list
          racket/path
@@ -241,6 +240,7 @@
     ; only used by zoom-out, definitely a pict
     [(smaller)
      (scale-to-fit img (* img-width 0.8) (* img-height 0.8))]
+    [(same) img]
     [(none) (bitmap img)]))
 
 ; janky!
@@ -296,7 +296,7 @@
         (λ ()
           (define dc (send canvas get-dc))
           
-          (when (or (path? img) (eq? scale 'default))
+          (when (and (path? img) (eq? scale 'default))
             ; have the canvas re-scale the image so when the canvas is
             ; resized, it'll also be the proper size
             (set! image-pict (scale-image image-bmp-master 'default)))
@@ -342,7 +342,10 @@
   
   (let* ([width (inexact->exact (round (pict-width image-pict)))]
          [height (inexact->exact (round (pict-height image-pict)))])
-    (send canvas init-auto-scrollbars width height 0.0 0.0))
+    (send canvas init-auto-scrollbars
+          (if (< width 1) 1 width)
+          (if (< height 1) 1 height)
+          0.0 0.0))
   (send canvas refresh))
 
 ; curried procedure to abstract loading an image in a collection

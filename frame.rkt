@@ -1,7 +1,8 @@
 #lang racket/base
 ; frame.rkt
 ; main frame file for ivy, the taggable image viewer
-(require pict
+(require images/flomap
+         pict
          racket/class
          racket/dict
          racket/gui/base
@@ -78,21 +79,21 @@
 ; polling timer callback; only way to know the user is fullscreen if they don't
 ; use our ui callback, e.g. fullscreen button on mac; only be relevant on OS X?
 (when (macosx?)
-       (define was-fullscreen? (make-parameter #f))
-       (define ivy-fullscreen-poller 
-         (new timer%
-              [interval 100]
-              [notify-callback (λ ()
-                                 (define is-fullscreen? (send ivy-frame is-fullscreened?))
-                                 (cond [(not (eq? (was-fullscreen?) is-fullscreen?))
-                                        ;(eprintf "(notify-callback)~n")
-                                        (on-fullscreen-event is-fullscreen?)
-                                        (was-fullscreen? is-fullscreen?)]))]))
-       (let [(default-handler (application-quit-handler))]
-         (application-quit-handler
-          (λ ()
-            (send ivy-fullscreen-poller stop)
-            (default-handler)))))
+  (define was-fullscreen? (make-parameter #f))
+  (define ivy-fullscreen-poller
+    (new timer%
+         [interval 100]
+         [notify-callback (λ ()
+                            (define is-fullscreen? (send ivy-frame is-fullscreened?))
+                            (cond [(not (eq? (was-fullscreen?) is-fullscreen?))
+                                   ;(eprintf "(notify-callback)~n")
+                                   (on-fullscreen-event is-fullscreen?)
+                                   (was-fullscreen? is-fullscreen?)]))]))
+  (let [(default-handler (application-quit-handler))]
+    (application-quit-handler
+     (λ ()
+       (send ivy-fullscreen-poller stop)
+       (default-handler)))))
 
 ;; File menu items ;;
 
@@ -275,7 +276,7 @@
        [label "Rotate left"]
        [help-string "Rotate the image left."]
        [callback (λ (i e)
-                   (load-image (rotate image-pict (/ pi 2))))]))
+                   (load-image (rotate image-pict (/ pi 2)) 'same))]))
 
 (define ivy-menu-bar-view-rotate-right
   (new menu-item%
@@ -283,7 +284,27 @@
        [label "Rotate right"]
        [help-string "Rotate the image right."]
        [callback (λ (i e)
-                   (load-image (rotate image-pict (- (/ pi 2)))))]))
+                   (load-image (rotate image-pict (- (/ pi 2))) 'same))]))
+
+(define ivy-menu-bar-view-flip-horizontal
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Flip horizontal"]
+       [help-string "Flip the image horizontally."]
+       [callback (λ (i e)
+                   (define flo
+                     (flomap-flip-horizontal (bitmap->flomap (bitmap image-pict))))
+                   (load-image (flomap->bitmap flo) 'same))]))
+
+(define ivy-menu-bar-view-flip-vertical
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Flip vertical"]
+       [help-string "Flip the image vertically."]
+       [callback (λ (i e)
+                   (define flo
+                     (flomap-flip-vertical (bitmap->flomap (bitmap image-pict))))
+                   (load-image (flomap->bitmap flo) 'same))]))
 
 ;; Window menu items ;;
 
