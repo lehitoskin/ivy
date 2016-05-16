@@ -260,12 +260,9 @@
        [parent ivy-menu-bar-view]
        [label "Fullscreen"]
        [help-string "Enter fullscreen mode."]
+       [shortcut (if (macosx?) #\F #f)]
+       [shortcut-prefix (if (macosx?) '(ctl cmd) (get-default-shortcut-prefix))]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
-(cond [(macosx?)
-       (send ivy-menu-bar-view-fullscreen set-shortcut #\F)
-       (send ivy-menu-bar-view-fullscreen set-shortcut-prefix '(ctl cmd))]
-      [else
-       (send ivy-menu-bar-view-fullscreen set-shortcut 'f11)])
 
 ;; Window menu items ;;
 
