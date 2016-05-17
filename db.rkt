@@ -132,34 +132,39 @@
 
 ; nukes the image from the database in both tables
 ; adds it back to both tables
-; taglist assumed to be sorted
-(define (db-set! #:db-conn [db-conn sqlc] img taglist)
-  (define img-obj
-    (if (db-has-key? #:db-conn db-conn "image" img)
-        (make-data-object db-conn image% img)
-        (new image% [path img])))
+; tag-lst assumed to be sorted
+(define (db-set! #:db-conn [db-conn sqlc] img tag-lst)
+  ; scour db of references to img
+  (when (db-has-key? #:db-conn db-conn "images" img)
+    (define loaded (make-data-object db-conn image% img))
+    (db-remove! #:db-conn db-conn img))
+  (define img-obj (new image% [path img]))
   ; nuke it from both tables
   (when (eq? (data-object-state img-obj) 'loaded)
     (db-remove! #:db-conn db-conn img))
-  ; add taglist to img
-  (set-column! img-obj "taglist" (string-join taglist ","))
+  ; add tag-lst to img
+  (set-column! taglist img-obj (string-join tag-lst ","))
   ; save img to image table
-  (save-data-object db-conn image% img)
-  ; loop over taglist and add them to tags table
-  (for ([tag (in-list taglist)])
-    (when (db-has-key? #:db-conn db-conn "tags" tag)
-      (define tag-obj (make-data-object db-conn tag% tag))
-      (send tag-obj add-img img))))
+  (save-data-object db-conn img-obj)
+  ; loop over tag-lst and add them to tags table
+  (for ([tag (in-list tag-lst)])
+    (define tag-obj
+      (if (db-has-key? #:db-conn db-conn "tags" tag)
+          (make-data-object db-conn tag% tag)
+          (new tag% [label tag])))
+    (send tag-obj add-img img)
+    ; save the modified tag entry onto the db
+    (save-data-object db-conn tag-obj)))
 
 ; remove img from images and all references from tags
 (define (db-remove! #:db-conn [db-conn sqlc] img)
   (define img-obj (make-data-object db-conn image% img))
-  (define taglist (send img-obj get-tags))
-  (for ([tag (in-list taglist)])
+  (define tag-lst (send img-obj get-tags))
+  (for ([tag (in-list tag-lst)])
     (when (db-has-key? #:db-conn db-conn "tags" tag)
       (define tag-obj (make-data-object db-conn tag% tag))
       (send tag-obj del-img img)
-      (when (empty? (send tag-obj get-imagelist))
+      (when (empty? (send tag-obj get-images))
         (delete-data-object db-conn tag-obj))))
   (delete-data-object db-conn img-obj))
 
@@ -182,12 +187,12 @@
              (keep-duplicates (rest sorted) dups))]))
 
 ; search tags table in db for exact matches
-(define (search-db-exact #:db-conn [db-conn sqlc] type taglist)
-  (cond [(zero? (length taglist)) empty]
+(define (search-db-exact #:db-conn [db-conn sqlc] type tag-lst)
+  (cond [(zero? (length tag-lst)) empty]
         [else
          (define results
            ; loop over the tags we're searching through
-           (for/list ([tag (in-list taglist)])
+           (for/list ([tag (in-list tag-lst)])
              ; if the db contains the tag...
              (cond [(db-has-key? #:db-conn db-conn "tags" tag)
                     ; get that tag's list of images
@@ -200,19 +205,19 @@
            [(or) (map string->path (remove-duplicates filtered))]
            ; turn all the strings in paths, keep only duplicate items
            [(and)
-            (if (= (length taglist) 1)
+            (if (= (length tag-lst) 1)
                 (map string->path (remove-duplicates filtered))
                 (map string->path (keep-duplicates filtered)))])]))
 
-(define (search-db-inexact #:db-conn [db-conn sqlc] type taglist)
-  (cond [(zero? (length taglist)) empty]
+(define (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
+  (cond [(zero? (length tag-lst)) empty]
         [else
          (define search-results
            ; loop over the images in the database
            (for/list ([img-pair (in-table-pairs #:db-conn db-conn "images")])
              (define tags-searched
                ; loop over the tags supplied
-               (for/list ([tag (in-list taglist)])
+               (for/list ([tag (in-list tag-lst)])
                  ; list of path-strings and #f
                  (map (λ (img-tag) (if (string-contains-ci img-tag tag) (first img-pair) #f)) (rest img-pair))))
              ; remove any duplicate string-contains-ci matches
@@ -223,7 +228,7 @@
          ; filter out any #f
          ; list of path-string only
          (define filtered (sort (filter path-string? (flatten search-results)) string<?))
-         (cond [(or (= (length taglist) 1)
+         (cond [(or (= (length tag-lst) 1)
                     (eq? type 'or))
                 ; turn the path-strings into paths and remove any duplicates
                 (map string->path (remove-duplicates filtered))]
