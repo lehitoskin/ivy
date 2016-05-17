@@ -1,11 +1,11 @@
 #lang racket/base
 ; search-dialog.rkt
 (require racket/class
-         racket/dict
          racket/gui/base
          racket/list
+         racket/stream
          racket/string
-         "base.rkt"
+         "db.rkt"
          "search-results.rkt")
 (provide search-tag-dialog
          search-tfield)
@@ -21,11 +21,12 @@
      (send type-rbox get-item-label
            (send type-rbox get-selection))))
   ; make sure there aren't any nonexistant files in the dictionary
-  (clean-dict! master)
+  (clean-db!)
   (define imgs
     (if tags
-        (search-dict master search-type tags)
-        (dict-keys master)))
+        (search-db-inexact search-type tags)
+        ; table-column: (or/c (listof (listof string?)) empty?)
+        (flatten (table-column "images" "Path"))))
   (define exclude-tags
     (if (string=? (send exclude-tfield get-value) "")
         #f
@@ -36,7 +37,7 @@
          (send search-tag-dialog show #t)]
         [else
          (if exclude-tags
-             (display-tags (exclude-search master imgs exclude-tags))
+             (display-tags (exclude-search-inexact imgs exclude-tags))
              (display-tags imgs))]))
 
 (define search-tag-dialog

@@ -10,6 +10,8 @@
          racket/math
          racket/string
          "base.rkt"
+         "db.rkt"
+         "files.rkt"
          "search-dialog.rkt")
 (provide (all-defined-out))
 
@@ -219,7 +221,7 @@
            [label "&Quit"]
            [shortcut #\Q]
            [help-string "Quit the program."]
-           [callback (λ (i e) (exit))])))
+           [callback (λ (i e) (disconnect sqlc) (exit))])))
 
 ;; Navigation menu items ;;
 
@@ -401,8 +403,8 @@
       [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (define img-sym (path->symbol (image-path)))
-         (unless (eq? img-sym '/)
+         (define img-str (path->string (image-path)))
+         (unless (string=? img-str "/")
            (define-values (base name-path must-be-dir?) (split-path (image-path)))
            (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
@@ -411,8 +413,7 @@
                   (cond [(string=? tags "")
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
-                         (dict-remove! master img-sym)
-                         (save-dict! master)]
+                         (db-remove! img-str)]
                         [else
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (remove-duplicates (sort (filter (λ (tag) (not (string=? tag "")))
@@ -420,8 +421,7 @@
                                                                             (string-trim tag)))
                                                                   string<?)))
                          ; set and save the dictionary
-                         (dict-set! master img-sym tag-lst)
-                         (save-dict! master)])
+                         (db-set! img-str tag-lst)])
                   (send tf set-field-background (make-object color% "spring green"))
                   (send (ivy-canvas) focus)]
                  [else
@@ -435,8 +435,8 @@
        [label "Set"]
        [callback
         (λ (button event)
-          (define img-sym (path->symbol (image-path)))
-          (unless (eq? img-sym '/)
+          (define img-str (path->string (image-path)))
+          (unless (string=? img-str "/")
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
             (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
@@ -445,14 +445,12 @@
             ; empty tag string means delete the entry
             (cond [(string=? tags "")
                    ; no failure if key doesn't exist
-                   (dict-remove! master img-sym)
-                   (save-dict! master)]
+                   (db-remove! img-str)]
                   [else
                    ; turn the string of tag(s) into a list then sort it
                    (define tag-lst (sort (string-split tags ", ") string<?))
                    ; set and save the dictionary
-                   (dict-set! master img-sym tag-lst)
-                   (save-dict! master)])
+                   (db-set! img-str tag-lst)])
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)

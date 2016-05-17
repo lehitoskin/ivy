@@ -12,7 +12,9 @@
          racket/path
          racket/string
          (only-in srfi/13
-                  string-contains-ci))
+                  string-contains-ci)
+         "db.rkt"
+         "files.rkt")
 (provide (all-defined-out))
 
 (define (path->symbol p)
@@ -24,25 +26,6 @@
 (define (macosx?)
   (eq? (system-type) 'macosx))
 
-; master dictionary
-; (absolute-file-path . '(sorted list of tags))
-(define master (make-hash))
-(define ivy-path (cond [(eq? (system-type) 'unix)
-                        ; check XDG variable first, then default
-                        ; to ~/.config/ivy
-                        (let ([xdg (getenv "XDG_CONFIG_HOME")])
-                          (if xdg
-                              (build-path xdg "ivy")
-                              (build-path (find-system-path 'home-dir)
-                                          ".config/ivy")))]
-                       [(eq? (system-type) 'windows)
-                        (normal-case-path
-                         (build-path (find-system-path 'home-dir)
-                                     "appdata/local/ivy"))]
-                       [(macosx?)
-                        (build-path (find-system-path 'home-dir)
-                                    "Library/Application Support/ivy")]))
-(define master-file (build-path ivy-path "catalog.json"))
 ; path of the currently displayed image
 (define image-path (make-parameter (build-path "/")))
 ; master bitmap of loaded image-path
@@ -67,121 +50,10 @@
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list (build-path "/"))))
-; path for cached thumbnails
-(define thumbnails-path (build-path ivy-path "thumbnails"))
-; janky!
-(define logo
-  (if (eq? (system-type) 'unix)
-      (let* ([base "share/icons/hicolor/128x128/apps/ivy-logo-128px.png"]
-             [uls (build-path "/usr/local" base)]
-             [us (build-path "/usr" base)])
-        (cond [(file-exists? uls) uls]
-              [(file-exists? us) us]
-              [else (build-path "img/ivy-logo-128px.png")]))
-      (build-path "img/ivy-logo-128px.png")))
-
-(define (save-dict! dct)
-  (with-output-to-file master-file
-    (λ () (write-json dct))
-    #:exists 'truncate/replace
-    #:mode 'text))
-
-; removes entries for files that no longer exist
-(define (clean-dict! dct)
-  (define old-dct (dict-copy dct))
-  (for ([sym (in-dict-keys old-dct)])
-    (define path (symbol->path sym))
-    (unless (file-exists? path)
-      (printf "Removing ~s from dictionary.~n" path)
-      (dict-remove! dct sym)))
-  (save-dict! dct))
-
-; saves only the entries in the list that are duplicates.
-; if there are more than two identical entries, they are
-; counted more than once, so a final sort and remove-duplicates
-; (how ironic) is possibly necessary.
-(define (keep-duplicates lst [dups empty])
-  (define sorted (sort lst equal?))
-  (define len (length sorted))
-  (cond [(< len 2) (remove-duplicates dups)]
-        [(>= len 2)
-         (if (equal? (first sorted) (second sorted))
-             (keep-duplicates (rest sorted) (cons (first sorted) dups))
-             (keep-duplicates (rest sorted) dups))]))
-
-; dct: dictionary (master)
-; type: inclusive or exclusive search (or/c 'and 'or)
-; items: the tags to search for (listof string?)
-; returns: list of path or empty
-(define (search-dict dct type taglist)
-  (define search-results
-    (flatten
-     (for/list ([(dict-path dict-tags) (in-dict dct)])
-       (define tags-searched
-         ; go through each tag and search if it matches the list
-         ; for that image
-         (for/list ([tag taglist])
-           ; list of symbol-paths and #f
-           (map (λ (dict-tag) (if (string-contains-ci dict-tag tag) dict-path #f)) dict-tags)))
-       ; remove any duplicate string-contains-ci matches
-       ; for images that have tags containing more than
-       ; one of the same phrase (e.g. images with the tags
-       ; "beach" "beach towel" will appear more than once)
-       (map remove-duplicates tags-searched))))
-  ; filter out any false
-  ; list of symbol-paths only
-  (define filtered (filter symbol? search-results))
-  ; searching for a single term with 'and may produce a false negative,
-  ; so use 'or instead
-  (cond [(or (= (length taglist) 1)
-             (eq? type 'or))
-         ; turn the symbols into paths and remove any duplicates
-         (map symbol->path (remove-duplicates filtered))]
-        [else
-         ; turn the symbols into paths and keep any duplicates
-         (map symbol->path (keep-duplicates filtered))]))
-
-; dct: dictionary
-; searched: list of images (listof path?)
-; exclusion: list of tags (listof string?)
-; returns: list of path or empty
-(define (exclude-search dct searched-imgs exclusion)
-  ; list of false and paths
-  (define remove-imgs-messy
-    (flatten
-     ; loop for each image we've searched
-     (for/list ([searched (in-list searched-imgs)])
-       (define ex
-         (flatten
-          ; loop for each tag we want to exclude
-          (for/list ([exclude (in-list exclusion)])
-            ; go through each of the tags in the searched images for matches
-            ; with tags we want to exclude
-            ; list of #f and number
-            (map (λ (st) (string-contains-ci st exclude)) (dict-ref dct (path->symbol searched))))))
-       ; replace each instance of a number with the path of the image we want to exclude
-       (map (λ (te) (if (false? te) te searched)) ex))))
-  ; remove #f and duplicates
-  (define remove-imgs (remove-duplicates (filter path? remove-imgs-messy)))
-  ; finally remove the excluded images from the list of searched images
-  (let loop ([searched searched-imgs]
-             [to-remove remove-imgs])
-    (if (empty? to-remove)
-        searched
-        (loop (remove (first to-remove) searched) (rest to-remove)))))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
   (make-directory ivy-path))
-
-; load the dictionary file
-; this could get very big!
-(when (file-exists? master-file)
-  (define json-port (open-input-file master-file))
-  ; Racket v6.2.1 read-json returns immutable hash.
-  ; we need to operate with a mutable one
-  (set! master (hash-copy (read-json json-port)))
-  (close-input-port json-port))
 
 (unless (directory-exists? thumbnails-path)
   (make-directory thumbnails-path))
@@ -265,7 +137,7 @@
      (define-values (base name must-be-dir?) (split-path img))
      (image-dir base)
      (image-path img)
-     (define img-sym (path->symbol img))
+     (define img-str (path->string img))
      ; make sure the bitmap loaded correctly
      (define load-success (send image-bmp-master load-file img))
      (cond [load-success
@@ -281,9 +153,10 @@
                           (length (pfs))))
             
             ; pick what string to display for tags...
-            (cond [(hash-has-key? master img-sym)
-                   (incoming-tags
-                    (string-join (hash-ref master img-sym) ", "))]
+            (cond [(db-has-key? "images" img-str)
+                   (define img-obj (make-data-object sqlc image% img-str))
+                   (define tags (send img-obj get-tags))
+                   (incoming-tags (string-join tags ", "))]
                   [else (incoming-tags "")])
             ; ...put them in the tfield
             (send tag-tfield set-value (incoming-tags))]

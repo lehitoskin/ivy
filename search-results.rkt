@@ -2,11 +2,11 @@
 ; search-results.rkt
 (require pict
          racket/class
-         racket/file
          racket/list
          racket/gui/base
          racket/string
-         "base.rkt")
+         "base.rkt"
+         "files.rkt")
 (provide results-frame display-tags display-nil-results-alert)
 
 (define searched-images empty)
