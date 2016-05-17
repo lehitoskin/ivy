@@ -5,6 +5,7 @@
          racket/list
          racket/stream
          racket/string
+         "base.rkt"
          "db.rkt"
          "search-results.rkt")
 (provide search-tag-dialog
@@ -12,10 +13,7 @@
 
 (define (ok-callback)
   (send search-tag-dialog show #f)
-  (define tags
-    (if (string=? (send search-tfield get-value) "")
-        #f
-        (sort (string-split (send search-tfield get-value) ", ") string<?)))
+  (define tags (tfield->list search-tfield))
   (define search-type
     (string->symbol
      (send type-rbox get-item-label
@@ -23,22 +21,19 @@
   ; make sure there aren't any nonexistant files in the dictionary
   (clean-db!)
   (define imgs
-    (if tags
-        (search-db-inexact search-type tags)
+    (if (empty? tags)
         ; table-column: (or/c (listof (listof string?)) empty?)
-        (flatten (table-column "images" "Path"))))
-  (define exclude-tags
-    (if (string=? (send exclude-tfield get-value) "")
-        #f
-        (sort (string-split (send exclude-tfield get-value) ", ") string<?)))
+        (flatten (table-column "images" "Path"))
+        (search-db-inexact search-type tags)))
+  (define exclude-tags (tfield->list exclude-tfield))
   (cond [(empty? imgs)
          (display-nil-results-alert)
          (send (send search-tfield get-editor) select-all)
          (send search-tag-dialog show #t)]
         [else
-         (if exclude-tags
-             (display-tags (exclude-search-inexact imgs exclude-tags))
-             (display-tags imgs))]))
+         (if (empty? exclude-tags)
+             (display-tags imgs)
+             (display-tags (exclude-search-inexact imgs exclude-tags)))]))
 
 (define search-tag-dialog
   (new dialog%
@@ -50,19 +45,13 @@
 (define search-tfield
   (new text-field%
        [parent search-tag-dialog]
-       [label "Search for tags: "]
+       [label "Search tags:  "]
        [callback
         (λ (tf evt)
           (when (and
                  (eq? (send evt get-event-type) 'text-field-enter)
                  (not (string=? (send tf get-value) "")))
             (ok-callback)))]))
-
-(define type-rbox
-  (new radio-box%
-       [parent search-tag-dialog]
-       [label "Search type"]
-       [choices '("or" "and")]))
 
 (define exclude-tfield
   (new text-field%
@@ -74,6 +63,35 @@
                  (eq? (send evt get-event-type) 'text-field-enter)
                  (not (string=? (send tf get-value) "")))
             (ok-callback)))]))
+
+(define modifier-hpanel
+  (new horizontal-panel%
+       [parent search-tag-dialog]
+       [alignment '(center center)]
+       [stretchable-height #f]))
+
+(define checkbox-pane
+  (new pane%
+       [parent modifier-hpanel]
+       [alignment '(right center)]))
+
+(define exact-checkbox
+  (new check-box%
+       [parent checkbox-pane]
+       [label "Exact"]
+       [value #f]))
+
+(define type-pane
+  (new pane%
+       [parent modifier-hpanel]
+       [alignment '(center center)]))
+
+(define type-rbox
+  (new radio-box%
+       [parent type-pane]
+       [label "Search type"]
+       [choices '("or" "and")]
+       [style '(horizontal)]))
 
 (define button-hpanel
   (new horizontal-panel%

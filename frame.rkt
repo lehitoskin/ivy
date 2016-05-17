@@ -416,10 +416,7 @@
                          (db-remove! img-str)]
                         [else
                          ; turn the string of tag(s) into a list then sort it
-                         (define tag-lst (remove-duplicates (sort (filter (λ (tag) (not (string=? tag "")))
-                                                                          (for/list ([tag (string-split tags ",")])
-                                                                            (string-trim tag)))
-                                                                  string<?)))
+                         (define tag-lst (tfield->list tf))
                          ; set and save the dictionary
                          (db-set! img-str tag-lst)])
                   (send tf set-field-background (make-object color% "spring green"))

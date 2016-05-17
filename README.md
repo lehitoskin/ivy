@@ -7,8 +7,9 @@ tracked solely by the application.
 
 ## Installation
 
-Ivy requires [Racket](http://racket-lang.org/) version 6.0 and up. Beyond that,
-you actually don't *need* to install Ivy, per se. Simply point the Racket
+Ivy requires [Racket](http://racket-lang.org/) version 6.0 and up as well as the
+[racquel](https://github.com/brown131/racquel) Racket package. Beyond that, you
+actually don't *need* to install Ivy, per se. Simply point the Racket
 interpreter to the location of the `main.rkt` file. However, it will be easier
 to use Ivy if the executable is in your PATH. Compiling Ivy is simple. In the
 directory where you saved Ivy, you can just run
@@ -36,6 +37,9 @@ place it in `/Applications/`.
 
 
 ## Usage
+
+OS X note: All <kbd>Ctrl</kbd>- keyboard shortcuts are available as
+<kbd>Cmd</kbd>-.
 
 - Calling `ivy` by itself will start Ivy with the image-viewing area blank. You
   can then load images from the menu (File -> Open), or with the keyboard

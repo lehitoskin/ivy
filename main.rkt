@@ -14,6 +14,7 @@
 (define tags-to-search (make-parameter empty))
 (define search-type (make-parameter #f))
 (define tags-to-exclude (make-parameter empty))
+(define exact? (make-parameter #f))
 
 ; accept command-line path to load image
 (command-line
@@ -34,6 +35,9 @@
   (search-type 'and)
   (tags-to-search (sort (string-split taglist ", ") string<?))]
  #:once-each
+ [("-e" "--exact-search")
+  "Search the tags database for exact matches."
+  (exact? #t)]
  [("-x" "--exclude")
   exclude
   "Search the tags database with -o/-a, but exclude images with the specified tags."
@@ -69,31 +73,46 @@
        ; only searching for tags
        [(and (not (empty? (tags-to-search)))
              (empty? (tags-to-exclude)))
-        (define search-results (sort (map path->string (search-db-inexact (search-type) (tags-to-search))) string<?))
-        (define len (length search-results))
+        (define search-results
+          (if (exact?)
+              (search-db-exact (search-type) (tags-to-search))
+              (search-db-inexact (search-type) (tags-to-search))))
+        (define search-sorted (sort (map path->string search-results) string<?))
+        (define len (length search-sorted))
         (unless (zero? len)
-          (for ([sr (in-list search-results)])
+          (for ([sr (in-list search-sorted)])
             (printf "~v~n" sr))
           (printf "Found ~a results for tags ~v~n" len (tags-to-search)))]
        ; only excluding tags
        [(and (empty? (tags-to-search))
              (not (empty? (tags-to-exclude))))
         (define imgs (table-column "images" "Path"))
-        (define final (sort (map path->string (exclude-search-inexact imgs (tags-to-exclude))) string<?))
-        (define len (length final))
+        (define excluded
+          (if (exact?)
+              (exclude-search-exact imgs (tags-to-exclude))
+              (exclude-search-inexact imgs (tags-to-exclude))))
+        (define final-sorted (sort (map path->string excluded) string<?))
+        (define len (length final-sorted))
         (unless (zero? len)
-          (for ([sr (in-list final)])
+          (for ([sr (in-list final-sorted)])
             (printf "~v~n" sr))
           (printf "Found ~a results without tags ~v~n" len (tags-to-exclude)))]
        ; searching for tags and excluding tags
        [(and (not (empty? (tags-to-search)))
              (not (empty? (tags-to-exclude))))
-        (define search-results (search-db-inexact (search-type) (tags-to-search)))
+        (define search-results
+          (if (exact?)
+              (search-db-exact (search-type) (tags-to-search))
+              (search-db-inexact (search-type) (tags-to-search))))
         (cond [(zero? (length search-results))
                (printf "Found 0 results for tags ~v~n" (tags-to-search))]
               [else
-               (define exclude (sort (map path->string (exclude-search-inexact search-results (tags-to-exclude))) string<?))
-               (for ([ex (in-list exclude)])
+               (define exclude
+                 (if (exact?)
+                     (exclude-search-exact search-results (tags-to-exclude))
+                     (exclude-search-inexact search-results (tags-to-exclude))))
+               (define exclude-sorted (sort (map path->string exclude) string<?))
+               (for ([ex (in-list exclude-sorted)])
                  (printf "~v~n" ex))
                (printf "Found ~a results for tags ~v, excluding tags ~v~n"
-                       (length exclude) (tags-to-search) (tags-to-exclude))])]))
+                       (length exclude-sorted) (tags-to-search) (tags-to-exclude))])]))

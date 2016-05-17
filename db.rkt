@@ -6,6 +6,7 @@
          racket/bool
          racket/class
          racket/contract
+         racket/format
          racket/list
          racket/string
          racquel
@@ -97,8 +98,8 @@
      (map (λ (tag) (list (get-column label tag)
                          (get-column imagelist tag))
             (select-data-objects db-conn tag%)))]))
-  ;(define result (query db-conn (format "select * from ~a;" table)))
-  ;(map vector->list (rows-result-rows result)))
+;(define result (query db-conn (format "select * from ~a;" table)))
+;(map vector->list (rows-result-rows result)))
 
 ; table: (or/c "images" "tags")
 ; -> sequence?
@@ -190,24 +191,22 @@
 (define (search-db-exact #:db-conn [db-conn sqlc] type tag-lst)
   (cond [(zero? (length tag-lst)) empty]
         [else
+         ; sql query will complain if a tag as spaces, but no quotes around it
+         (define lst-quotes (map ~v tag-lst))
          (define results
            ; loop over the tags we're searching through
-           (for/list ([tag (in-list tag-lst)])
-             ; if the db contains the tag...
-             (cond [(db-has-key? #:db-conn db-conn "tags" tag)
-                    ; get that tag's list of images
-                    (define tag-obj (make-data-object db-conn tag% tag))
-                    (send tag-obj get-images)]
-                   [else #f])))
-         (define filtered (sort (filter string? (flatten results)) string<?))
+           (map (λ (tag-obj)
+                  (send tag-obj get-images))
+                (select-data-objects db-conn tag% (where (in label lst-quotes)))))
+         (define sorted (sort (flatten results) string<?))
          (case type
            ; turn all the strings into paths, remove duplicate items
-           [(or) (map string->path (remove-duplicates filtered))]
+           [(or) (map string->path (remove-duplicates sorted))]
            ; turn all the strings in paths, keep only duplicate items
            [(and)
-            (if (= (length tag-lst) 1)
-                (map string->path (remove-duplicates filtered))
-                (map string->path (keep-duplicates filtered)))])]))
+            (if (= (length lst-quotes) 1)
+                (map string->path (remove-duplicates sorted))
+                (map string->path (keep-duplicates sorted)))])]))
 
 (define (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
   (cond [(zero? (length tag-lst)) empty]
@@ -219,7 +218,13 @@
                ; loop over the tags supplied
                (for/list ([tag (in-list tag-lst)])
                  ; list of path-strings and #f
-                 (map (λ (img-tag) (if (string-contains-ci img-tag tag) (first img-pair) #f)) (rest img-pair))))
+                 (map (λ (img-tag)
+                        ; if the string is inside that particular tag
+                        (if (string-contains-ci img-tag tag)
+                            ; grab its path
+                            (first img-pair)
+                            #f))
+                      (rest img-pair))))
              ; remove any duplicate string-contains-ci matches
              ; for images that have tags containing more than
              ; one of the same phrase (e.g. images with the tags

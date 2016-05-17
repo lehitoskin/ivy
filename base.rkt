@@ -58,6 +58,16 @@
 (unless (directory-exists? thumbnails-path)
   (make-directory thumbnails-path))
 
+(define (tfield->list tf)
+  (define val (send tf get-value))
+  (cond [(string=? val "") empty]
+        [else
+         (define tags
+           (filter (λ (tag) (not (string=? tag "")))
+                   (for/list ([tag (string-split val ",")])
+                     (string-trim tag))))
+         (remove-duplicates (sort tags string<?))]))
+
 ; get index of an item in the list
 ; numbering starts from 0
 (define (get-index item lst)
