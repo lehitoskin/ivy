@@ -293,8 +293,8 @@
        [help-string "Flip the image horizontally."]
        [callback (λ (i e)
                    (define flo
-                     (flomap-flip-horizontal (bitmap->flomap (bitmap image-pict))))
-                   (load-image (flomap->bitmap flo) 'same))]))
+                     (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
+                   (load-image (bitmap (flomap->bitmap flo)) 'same))]))
 
 (define ivy-menu-bar-view-flip-vertical
   (new menu-item%
@@ -303,8 +303,8 @@
        [help-string "Flip the image vertically."]
        [callback (λ (i e)
                    (define flo
-                     (flomap-flip-vertical (bitmap->flomap (bitmap image-pict))))
-                   (load-image (flomap->bitmap flo) 'same))]))
+                     (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
+                   (load-image (bitmap (flomap->bitmap flo)) 'same))]))
 
 ;; Window menu items ;;
 
