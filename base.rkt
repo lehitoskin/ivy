@@ -171,8 +171,10 @@
                    (incoming-tags (string-join tags ", "))]
                   [else (incoming-tags "")])
             ; ...put them in the tfield
-            (send tag-tfield set-value (incoming-tags))]
-           [else (printf "Error loading file ~a~n" img)])]
+            (send tag-tfield set-value (incoming-tags))
+            ; ensure the text-field displays the changes we just made
+            (send tag-tfield refresh)]
+           [else (eprintf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
      ;(set! image-pict (scale-image (if (pict? img) img (bitmap img)) scale))])
@@ -225,13 +227,21 @@
              (draw-pict image-pict dc
                         (- canvas-center-x img-center-x)
                         (- canvas-center-y img-center-y))])))
-  
-  (let* ([width (inexact->exact (round (pict-width image-pict)))]
-         [height (inexact->exact (round (pict-height image-pict)))])
-    (send canvas init-auto-scrollbars
-          (if (< width 1) 1 width)
-          (if (< height 1) 1 height)
-          0.0 0.0))
+
+  ; tell the scrollbars to adjust for the size of the image
+  (let* ([pict-width (inexact->exact (round (pict-width image-pict)))]
+         [pict-height (inexact->exact (round (pict-height image-pict)))])
+    ; will complain if width/height is less than 1
+    (define width (if (< pict-width 1) 1 pict-width))
+    (define height (if (< pict-height 1) 1 pict-height))
+    
+    (case scale
+      [(smaller larger)
+       ; set the scrollbars to the center of the image when zooming in/out
+       (send canvas init-auto-scrollbars width height 0.5 0.5)]
+      [else
+       ; otherwise just set it to the top left corner
+       (send canvas init-auto-scrollbars width height 0.0 0.0)]))
   (send canvas refresh))
 
 ; curried procedure to abstract loading an image in a collection

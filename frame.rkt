@@ -173,7 +173,8 @@
                (load-image img-path)]
               ; collection has images; appending to collection
               [else
-               (pfs (append (pfs) paths))
+               ; no duplicate paths allowed!
+               (pfs (remove-duplicates (append (pfs) paths)))
                ; change label because it usually isn't called until
                ; (load-image) is called and we want to see the changes now
                (send (status-bar-position) set-label
@@ -468,6 +469,29 @@
     (define/public (set-on-paint! thunk)
       (set! do-on-paint thunk))
     
+    (define/override (on-drop-file pathname)
+      ; append the image to the current collection
+      (define path-default? (equal? (first (pfs)) (build-path "/")))
+      (cond
+        ; empty collection, adding 1 image
+        ; like file-open, but only open the single image
+        [path-default?
+         (define-values (base name dir?) (split-path pathname))
+         (image-dir base)
+         (pfs (list pathname))
+         (image-path pathname)
+         (load-image pathname)]
+        ; collection has images; appending to collection
+        [else
+         ; no duplicate paths allowed!
+         (pfs (remove-duplicates (append (pfs) (list pathname))))
+         ; change label because it usually isn't called until
+         ; (load-image) is called and we want to see the changes now
+         (send (status-bar-position) set-label
+               (format "~a / ~a"
+                       (+ (get-index (image-path) (pfs)) 1)
+                       (length (pfs))))]))
+    
     (define/override (on-char key)
       (define type (send key get-key-code))
       (case type
@@ -494,6 +518,7 @@
       [paint-callback (λ (canvas dc)
                         (send canvas set-canvas-background
                               (make-object color% "black")))]))
+(send (ivy-canvas) accept-drop-files #t)
 
 (define status-bar-hpanel
   (new horizontal-panel%
