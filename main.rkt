@@ -14,8 +14,6 @@
 (define tags-to-search (make-parameter empty))
 (define search-type (make-parameter #f))
 (define tags-to-exclude (make-parameter empty))
-(define exact? (make-parameter #f))
-
 ; accept command-line path to load image
 (command-line
  #:program "Ivy"
@@ -37,7 +35,7 @@
  #:once-each
  [("-e" "--exact-search")
   "Search the tags database for exact matches."
-  (exact? #t)]
+  (exact-search? #t)]
  [("-x" "--exclude")
   exclude
   "Search the tags database with -o/-a, but exclude images with the specified tags."
@@ -74,7 +72,7 @@
        [(and (not (empty? (tags-to-search)))
              (empty? (tags-to-exclude)))
         (define search-results
-          (if (exact?)
+          (if (exact-search?)
               (search-db-exact (search-type) (tags-to-search))
               (search-db-inexact (search-type) (tags-to-search))))
         (define search-sorted (sort (map path->string search-results) string<?))
@@ -88,7 +86,7 @@
              (not (empty? (tags-to-exclude))))
         (define imgs (table-column "images" "Path"))
         (define excluded
-          (if (exact?)
+          (if (exact-search?)
               (exclude-search-exact imgs (tags-to-exclude))
               (exclude-search-inexact imgs (tags-to-exclude))))
         (define final-sorted (sort (map path->string excluded) string<?))
@@ -101,14 +99,14 @@
        [(and (not (empty? (tags-to-search)))
              (not (empty? (tags-to-exclude))))
         (define search-results
-          (if (exact?)
+          (if (exact-search?)
               (search-db-exact (search-type) (tags-to-search))
               (search-db-inexact (search-type) (tags-to-search))))
         (cond [(zero? (length search-results))
                (printf "Found 0 results for tags ~v~n" (tags-to-search))]
               [else
                (define exclude
-                 (if (exact?)
+                 (if (exact-search?)
                      (exclude-search-exact search-results (tags-to-exclude))
                      (exclude-search-inexact search-results (tags-to-exclude))))
                (define exclude-sorted (sort (map path->string exclude) string<?))

@@ -24,7 +24,9 @@
     (if (empty? tags)
         ; table-column: (or/c (listof (listof string?)) empty?)
         (flatten (table-column "images" "Path"))
-        (search-db-inexact search-type tags)))
+        (if (exact-search?)
+            (search-db-exact search-type tags)
+            (search-db-inexact search-type tags))))
   (define exclude-tags (tfield->list exclude-tfield))
   (cond [(empty? imgs)
          (display-nil-results-alert)
@@ -33,7 +35,9 @@
         [else
          (if (empty? exclude-tags)
              (display-tags imgs)
-             (display-tags (exclude-search-inexact imgs exclude-tags)))]))
+             (if (exact-search?)
+                 (display-tags (exclude-search-exact imgs exclude-tags))
+                 (display-tags (exclude-search-inexact imgs exclude-tags))))]))
 
 (define search-tag-dialog
   (new dialog%
@@ -79,7 +83,9 @@
   (new check-box%
        [parent checkbox-pane]
        [label "Exact"]
-       [value #f]))
+       [value #f]
+       [callback (λ (button event)
+                   (exact-search? (send button get-value)))]))
 
 (define type-pane
   (new pane%

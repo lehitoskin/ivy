@@ -35,6 +35,8 @@
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '("png" "jpg" "jpe" "jpeg" "bmp" "gif"))
+(define exact-search? (make-parameter #f))
+
 ; all image files contained within image-dir
 (define (path-files)
   (define dir-lst (directory-list (image-dir) #:build? #t))

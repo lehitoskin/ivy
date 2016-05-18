@@ -140,22 +140,23 @@
     (define loaded (make-data-object db-conn image% img))
     (db-remove! #:db-conn db-conn img))
   (define img-obj (new image% [path img]))
-  ; nuke it from both tables
-  (when (eq? (data-object-state img-obj) 'loaded)
-    (db-remove! #:db-conn db-conn img))
   ; add tag-lst to img
   (set-column! taglist img-obj (string-join tag-lst ","))
   ; save img to image table
   (save-data-object db-conn img-obj)
   ; loop over tag-lst and add them to tags table
-  (for ([tag (in-list tag-lst)])
-    (define tag-obj
-      (if (db-has-key? #:db-conn db-conn "tags" tag)
-          (make-data-object db-conn tag% tag)
-          (new tag% [label tag])))
-    (send tag-obj add-img img)
-    ; save the modified tag entry onto the db
-    (save-data-object db-conn tag-obj)))
+  ; slow!
+  ; put it in a thread because there will be no more db operations after this
+  (thread
+   (λ ()
+     (for ([tag (in-list tag-lst)])
+       (define tag-obj
+         (if (db-has-key? #:db-conn db-conn "tags" tag)
+             (make-data-object db-conn tag% tag)
+             (new tag% [label tag])))
+       (send tag-obj add-img img)
+       ; save the modified tag entry onto the db
+       (save-data-object db-conn tag-obj)))))
 
 ; remove img from images and all references from tags
 (define (db-remove! #:db-conn [db-conn sqlc] img)
