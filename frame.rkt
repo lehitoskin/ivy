@@ -191,7 +191,7 @@
        [callback
         (λ (i e)
           (image-dir (find-system-path 'home-dir))
-          (pfs empty)
+          (pfs (list (build-path "/")))
           (image-path (build-path "/"))
           (send (ivy-canvas) set-on-paint!
                 (λ ()
