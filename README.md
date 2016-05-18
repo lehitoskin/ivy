@@ -65,7 +65,9 @@ OS X note: All <kbd>Ctrl</kbd>- keyboard shortcuts are available as
 - You may append files to a collection through File -> Append, or with the
   keyboard shortcut <kbd>Ctrl</kbd>-<kbd>Shift</kbd>-<kbd>O</kbd>. When using
   the Append functionality on an empty collection (e.g. when first opening Ivy)
-  only the files selected will be available for viewing.
+  only the files selected will be available for viewing. Appending files is also
+  accomplished by the drag-and-drop feature: simply drag and drop images onto
+  the canvas and they will be appeneded to the collection.
 
 - To add a tag or list of tags to an image, simply enter them into the tag text
   field, separated by a comma and a space. E.g., `flower, beach, roller
