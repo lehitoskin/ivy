@@ -290,6 +290,7 @@
            [else (printf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
+     ;(set! image-pict (scale-image (if (pict? img) img (bitmap img)) scale))])
      (set! image-pict (scale-image img scale))])
   
   (send canvas set-on-paint!
