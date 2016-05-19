@@ -131,7 +131,7 @@
                        (string-append
                         (if (eq? (system-type) 'windows)
                             (string-replace (string-replace path-str "\\" "_")
-                                            "c:" "c")
+                                            "C:" "C")
                             (string-replace path-str "/" "_"))))
                      (define thumb-path (build-path thumbnails-path thumb-name))
                      (define thumb-pct (bitmap thumb-path))

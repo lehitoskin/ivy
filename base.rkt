@@ -292,7 +292,7 @@
       (string-append
        (if (eq? (system-type) 'windows)
            (string-replace (string-replace path "\\" "_")
-                           "c:" "c")
+                           "C:" "C")
            (string-replace path "/" "_"))))
     (define thumb-path (build-path thumbnails-path thumb-name))
     ; use pict to scale the image to 100x100
