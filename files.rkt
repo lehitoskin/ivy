@@ -35,3 +35,10 @@
               [(file-exists? us) us]
               [else (build-path "img/ivy-logo-128px.png")]))
       (build-path "img/ivy-logo-128px.png")))
+
+; create the config directory
+(unless (directory-exists? ivy-path)
+  (make-directory ivy-path))
+
+(unless (directory-exists? thumbnails-path)
+  (make-directory thumbnails-path))

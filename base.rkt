@@ -53,13 +53,6 @@
 ; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list (build-path "/"))))
 
-; create the config directory
-(unless (directory-exists? ivy-path)
-  (make-directory ivy-path))
-
-(unless (directory-exists? thumbnails-path)
-  (make-directory thumbnails-path))
-
 (define (tfield->list tf)
   (define val (send tf get-value))
   (cond [(string=? val "") empty]
