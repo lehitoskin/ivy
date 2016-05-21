@@ -170,13 +170,10 @@
            [else (eprintf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
-     ;(set! image-pict (scale-image (if (pict? img) img (bitmap img)) scale))])
      (set! image-pict (scale-image img scale))])
   
   (send canvas set-on-paint!
-        (λ ()
-          (define dc (send canvas get-dc))
-          
+        (λ (canvas dc)
           (when (and (path? img) (eq? scale 'default))
             ; have the canvas re-scale the image so when the canvas is
             ; resized, it'll also be the proper size

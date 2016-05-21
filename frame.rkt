@@ -194,8 +194,8 @@
           (pfs (list (build-path "/")))
           (image-path (build-path "/"))
           (send (ivy-canvas) set-on-paint!
-                (λ ()
-                  (send (ivy-canvas) set-canvas-background
+                (λ (canvas dc)
+                  (send canvas set-canvas-background
                         (make-object color% "black"))))
           (send (ivy-canvas) refresh)
           (send ivy-frame set-label "Ivy Image Viewer")
@@ -465,9 +465,10 @@
     
     (define/override (on-paint)
       (do-on-paint))
-    
+
+    ; thunk: ((is-a?/c canvas%) (is-a?/c dc<%>) . -> . any)
     (define/public (set-on-paint! thunk)
-      (set! do-on-paint thunk))
+      (set! paint-callback thunk))
     
     (define/override (on-drop-file pathname)
       ; append the image to the current collection
