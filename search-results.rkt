@@ -28,16 +28,30 @@
        [parent results-menu-bar]
        [label "&File"]))
 
-(define file-make-virt-dir
+(define file-open-collection
   (new menu-item%
        [parent results-menu-bar-file]
-       [label "Create virtual directory"]
-       [shortcut #\I]
+       [label "&Open as Collection"]
+       [shortcut #\O]
        [help-string "Create a collection containing the search results."]
        [callback (λ (button event)
                    (unless (empty? searched-images)
                      (pfs searched-images)
-                     (load-image (first searched-images))))]))
+                     (load-image (first searched-images))
+                     (send results-frame show #f)))]))
+
+(define file-add-to-collection
+  (new menu-item%
+       [parent results-menu-bar-file]
+       [label "Append results to c&ollection"]
+       [shortcut #\O]
+       [shortcut-prefix (if (macosx?) '(cmd shift) '(ctl shift))]
+       [help-string "Append search results to existing collection"]
+       [callback (λ (button event)
+                   (unless (empty? searched-images)
+                     (pfs (append (pfs) searched-images))
+                     (load-image (first searched-images))
+                     (send results-frame show #f)))]))
 
 (define file-close
   (new menu-item%
