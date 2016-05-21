@@ -136,7 +136,7 @@
 (define ivy-menu-bar-file-append
   (new menu-item%
        [parent ivy-menu-bar-file]
-       [label "&Append images to collection"]
+       [label "Append images to c&ollection"]
        [shortcut #\O]
        [shortcut-prefix (if (macosx?) '(cmd shift) '(ctl shift))]
        [help-string "Append images to existing collection"]
