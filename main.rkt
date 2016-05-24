@@ -157,6 +157,11 @@
   (show-frame? #f)
   ; make sure the paths are absolute
   (define old-path (path->string (relative->absolute source)))
+  ; if source does not exist, error and exit
+  (unless (file-exists? old-path)
+    (raise-argument-error 'move-image "Existing file source" old-path)
+    (disconnect sqlc)
+    (exit))
   (define absolute-dest (relative->absolute dest))
   (define new-path
     (let-values ([(base new-name must-be-dir?) (split-path absolute-dest)])
