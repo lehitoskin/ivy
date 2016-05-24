@@ -6,7 +6,9 @@
          racket/class
          racket/cmdline
          racket/dict
+         racket/format
          racket/list
+         racket/path
          racket/string
          "base.rkt"
          "db.rkt"
@@ -17,7 +19,11 @@
 (define search-type (make-parameter #f))
 (define tags-to-exclude (make-parameter empty))
 (define null-flag (make-parameter #f))
-(define verbose-search (make-parameter #f))
+(define verbose? (make-parameter #f))
+
+; make sure the path provided is a proper absolute path
+(define (relative->absolute path)
+  (simple-form-path (expand-user-path path)))
 
 ; accept command-line path to load image
 (command-line
@@ -75,14 +81,27 @@
   (show-frame? #f)
   (null-flag #t)]
  [("-v" "--verbose")
-  "Display search results summary after the list of results."
+  "Display verbose information for certain operations."
   (show-frame? #f)
-  (verbose-search #t)]
+  (verbose? #t)]
  #:multi
+ [("-L" "--list-tags")
+  img
+  "Lists the tags for the image."
+  (show-frame? #f)
+  (define absolute-path (path->string (relative->absolute img)))
+  (when (db-has-key? "images" absolute-path)
+    (define img-obj (make-data-object sqlc image% absolute-path))
+    (define taglist (send img-obj get-tags))
+    (for ([tag (in-list taglist)])
+      (if (null-flag)
+          (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
+          (printf "~a~n" tag))))]
  [("-A" "--add-tags")
   taglist img
   "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image"
   (show-frame? #f)
+  (define absolute-path (path->string (relative->absolute img)))
   (define tags-to-add
     (cond [(string=? taglist "") empty]
           [else
@@ -93,15 +112,17 @@
            (remove-duplicates (sort tags string<?))]))
   (unless (empty? tags-to-add)
     (define img-obj
-      (if (db-has-key? "images" img)
-          (make-data-object sqlc image% img)
-          (new image% [path img])))
-    (printf "Adding tags ~v to ~v~n" tags-to-add img)
+      (if (db-has-key? "images" absolute-path)
+          (make-data-object sqlc image% absolute-path)
+          (new image% [path absolute-path])))
+    (when (verbose?)
+      (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
     (add-tags! img-obj tags-to-add))]
  [("-D" "--delete-tags")
   taglist img
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image"
   (show-frame? #f)
+  (define absolute-path (path->string (relative->absolute img)))
   (define tags-to-remove
     (cond [(string=? taglist "") empty]
           [else
@@ -111,10 +132,54 @@
                        (string-trim tag))))
            (remove-duplicates (sort tags string<?))]))
   (when (and (not (empty? tags-to-remove))
-             (db-has-key? "images" img))
-    (define img-obj (make-data-object sqlc image% img))
-    (printf "Removing tags ~v from ~v~n" tags-to-remove img)
+             (db-has-key? "images" absolute-path))
+    (define img-obj (make-data-object sqlc image% absolute-path))
+    (when (verbose?)
+      (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
     (remove-tags! sqlc img-obj tags-to-remove))]
+ [("-T" "--set-tags")
+  taglist img
+  "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image"
+  (show-frame? #f)
+  (define absolute-path (path->string (relative->absolute img)))
+  (define tags-to-set
+    (cond [(string=? taglist "") empty]
+          [else
+           (define tags
+             (filter (λ (tag) (not (string=? tag "")))
+                     (for/list ([tag (string-split taglist ",")])
+                       (string-trim tag))))
+           (remove-duplicates (sort tags string<?))]))
+  (unless (empty? tags-to-set)
+    (when (verbose?)
+      (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
+    (db-set! #:threaded? #f absolute-path tags-to-set))]
+ [("-M" "--move-image")
+  source dest
+  "Moves the source file to the destination, updating the database."
+  (show-frame? #f)
+  ; make sure the paths are absolute
+  (define old-path (path->string (relative->absolute source)))
+  (define absolute-dest (relative->absolute dest))
+  (define new-path
+    (let-values ([(base new-name must-be-dir?) (split-path absolute-dest)])
+      (define file-name (file-name-from-path old-path))
+      (cond
+        ; dest is a directory ending in /
+        [must-be-dir? (build-path base new-name file-name)]
+        ; dest is a directory that does not end in /
+        [(directory-exists? (build-path base new-name)) (build-path base new-name file-name)]
+        ; dest is a file path
+        [else (path->string absolute-dest)])))
+  (when (db-has-key? "images" old-path)
+    (define old-img-obj (make-data-object sqlc image% old-path))
+    (define tags (send old-img-obj get-tags))
+    (db-set! #:threaded? #f new-path tags)
+    ; copy the file over, overwrite dest if exists
+    (when (verbose?)
+      (printf "Moving ~a to ~a~n" old-path new-path))
+    (rename-file-or-directory old-path new-path #t)
+    (clean-db!))]
  #:args requested-images
  (unless (empty? requested-images)
    (define requested-paths
@@ -128,15 +193,16 @@
        (if (eq? base 'relative)
            (build-path (current-directory-for-user) name)
            rp)))
-   (cond [(> (length requested-paths) 1)
+   (define absolute-paths (map relative->absolute requested-images))
+   (cond [(> (length absolute-paths) 1)
           ; we want to load a collection
-          (pfs checked-paths)]
+          (pfs absolute-paths)]
          [else
           ; we want to load the image from the directory
-          (define-values (base name dir?) (split-path (first checked-paths)))
+          (define-values (base name dir?) (split-path (first absolute-paths)))
           (image-dir base)
           (pfs (path-files))])
-   (image-path (first checked-paths))
+   (image-path (first absolute-paths))
    (load-image (image-path) 'cmd))
  
  (cond
@@ -157,8 +223,8 @@
       (for ([sr (in-list search-sorted)])
         (if (null-flag)
             (printf "~a" (bytes-append (string->bytes/utf-8 sr) #"\0"))
-            (printf "~v~n" sr)))
-      (when (verbose-search)
+            (printf "~a~n" sr)))
+      (when (verbose?)
         (printf "Found ~a results for tags ~v~n" len (tags-to-search))))]
    ; only excluding tags (resulting output may be very big!)
    [(and (empty? (tags-to-search))
@@ -174,8 +240,8 @@
       (for ([sr (in-list final-sorted)])
         (if (null-flag)
             (printf "~a" (bytes-append (string->bytes/utf-8 sr) #"\0"))
-            (printf "~v~n" sr)))
-      (when (verbose-search)
+            (printf "~a~n" sr)))
+      (when (verbose?)
         (printf "Found ~a results without tags ~v~n" len (tags-to-exclude))))]
    ; searching for tags and excluding tags
    [(and (not (empty? (tags-to-search)))
@@ -185,7 +251,7 @@
           (search-db-exact (search-type) (tags-to-search))
           (search-db-inexact (search-type) (tags-to-search))))
     (cond [(zero? (length search-results))
-           (when (verbose-search)
+           (when (verbose?)
              (printf "Found 0 results for tags ~v~n" (tags-to-search)))]
           [else
            (define exclude
@@ -196,7 +262,7 @@
            (for ([ex (in-list exclude-sorted)])
              (if (null-flag)
                  (printf "~a" (bytes-append (string->bytes/utf-8 ex) #"\0"))
-                 (printf "~v~n" ex)))
-           (when (verbose-search)
+                 (printf "~a~n" ex)))
+           (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
                      (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]))

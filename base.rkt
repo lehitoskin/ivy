@@ -102,7 +102,7 @@
     [(cmd)
      ; canvas is very small before everything is completely loaded
      (set! max-width 800)
-     (set! max-height 501)
+     (set! max-height 528)
      (cond [(and (> img-width max-width)
                  (> img-height max-height))
             (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
