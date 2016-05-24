@@ -2,11 +2,8 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require racket/bool
-         racket/class
+(require racket/class
          racket/cmdline
-         racket/dict
-         racket/format
          racket/list
          racket/path
          racket/string
@@ -166,9 +163,10 @@
       (define file-name (file-name-from-path old-path))
       (cond
         ; dest is a directory ending in /
-        [must-be-dir? (build-path base new-name file-name)]
+        [must-be-dir? (path->string (build-path base new-name file-name))]
         ; dest is a directory that does not end in /
-        [(directory-exists? (build-path base new-name)) (build-path base new-name file-name)]
+        [(directory-exists? (build-path base new-name))
+         (path->string (build-path base new-name file-name))]
         ; dest is a file path
         [else (path->string absolute-dest)])))
   (when (db-has-key? "images" old-path)
@@ -178,7 +176,7 @@
     ; copy the file over, overwrite dest if exists
     (when (verbose?)
       (printf "Moving ~a to ~a~n" old-path new-path))
-    (rename-file-or-directory old-path new-path #t)
+    (rename-file-or-directory old-path new-path #f)
     (clean-db!))]
  #:args requested-images
  (unless (empty? requested-images)
