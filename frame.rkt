@@ -414,7 +414,7 @@
                   (cond [(string=? tags "")
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
-                         (db-remove! img-str)]
+                         (db-purge! img-str)]
                         [else
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (tfield->list tf))
@@ -443,7 +443,7 @@
             ; empty tag string means delete the entry
             (cond [(string=? tags "")
                    ; no failure if key doesn't exist
-                   (db-remove! img-str)]
+                   (db-purge! img-str)]
                   [else
                    ; turn the string of tag(s) into a list then sort it
                    (define tag-lst (sort (string-split tags ", ") string<?))

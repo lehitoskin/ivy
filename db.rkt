@@ -98,8 +98,6 @@
      (map (λ (tag) (list (get-column label tag)
                          (get-column imagelist tag))
             (select-data-objects db-conn tag%)))]))
-;(define result (query db-conn (format "select * from ~a;" table)))
-;(map vector->list (rows-result-rows result)))
 
 ; table: (or/c "images" "tags")
 ; -> sequence?
@@ -131,49 +129,87 @@
       [("tags") (select-data-objects db-conn tag% (where (= label ?)) key)]))
   (not (empty? objs)))
 
+; add tags to image, add image to tags
+; if the image or tags are new, insert them into the database
+(define/contract (add-tags! #:db-conn [db-conn sqlc] img tag-lst)
+  (->* ([or/c path-string? data-object?]
+        [listof string?])
+       (#:db-conn connection?)
+       void?)
+  ; if the path already exists, grab it
+  ; otherwise make a new data-object
+  (define img-obj
+    (cond [(data-object? img) img]
+          [(db-has-key? #:db-conn db-conn "images" img)
+           (make-data-object db-conn image% img)]
+          [else (new image% [path img])]))
+  (for ([tag (in-list tag-lst)])
+    ; add each tag to the image% object
+    (send img-obj add-tag tag)
+    (define tag-obj
+      (if (db-has-key? #:db-conn db-conn "tags" tag)
+          (make-data-object db-conn tag% tag)
+          (new tag% [label tag])))
+    ; add the image to each tag% object
+    (send tag-obj add-img img)
+    (save-data-object db-conn tag-obj))
+  (save-data-object db-conn img-obj))
+
+; removes tags from the image, if it is in the database (keep going if it is not)
+; removes the image from each tag
+; if the image has no more tags, remove from database
+; if the tag has no more images, remove from database
+(define/contract (remove-tags! #:db-conn [db-conn sqlc] img tag-lst)
+  (->* ([or/c path-string? data-object?]
+        [listof string?])
+       (#:db-conn connection?)
+       void?)
+  (define img-obj
+    (cond [(data-object? img) img]
+          [(db-has-key? #:db-conn db-conn "images" img)
+           (make-data-object db-conn image% img)]
+          [else #f]))
+  (for ([tag (in-list tag-lst)])
+    ; remove the tag from the image
+    (when img-obj
+      (send img-obj del-tag tag))
+    ; do nothing for this loop if tag isn't in the database
+    (when (db-has-key? #:db-conn db-conn "tags" tag)
+      (define tag-obj (make-data-object db-conn tag% tag))
+      ; remove the image from the tag
+      (send tag-obj del-img img)
+      (if (empty? (send tag-obj get-images))
+          (delete-data-object db-conn tag-obj)
+          (save-data-object db-conn tag-obj))))
+  (when img-obj
+    (if (empty? (send img-obj get-tags))
+        (delete-data-object db-conn img-obj)
+        (save-data-object db-conn img-obj))))
+
+; remove img from images and all references from tags
+(define (db-purge! #:db-conn [db-conn sqlc] img)
+  (when (db-has-key? #:db-conn db-conn "images" img)
+    (define img-obj (make-data-object db-conn image% img))
+    ; grab all current tags for removal
+    (define tag-lst (send img-obj get-tags))
+    (remove-tags! #:db-conn db-conn img-obj tag-lst)))
+
 ; nukes the image from the database in both tables
 ; adds it back to both tables
 ; tag-lst assumed to be sorted
-(define (db-set! #:db-conn [db-conn sqlc] img tag-lst)
-  ; scour db of references to img
-  (when (db-has-key? #:db-conn db-conn "images" img)
-    (define loaded (make-data-object db-conn image% img))
-    (db-remove! #:db-conn db-conn img))
-  (define img-obj (new image% [path img]))
-  ; add tag-lst to img
-  (set-column! taglist img-obj (string-join tag-lst ","))
-  ; save img to image table
-  (save-data-object db-conn img-obj)
-  ; loop over tag-lst and add them to tags table
-  ; slow!
-  ; put it in a thread because there will be no more db operations after this
-  (thread
-   (λ ()
-     (for ([tag (in-list tag-lst)])
-       (define tag-obj
-         (if (db-has-key? #:db-conn db-conn "tags" tag)
-             (make-data-object db-conn tag% tag)
-             (new tag% [label tag])))
-       (send tag-obj add-img img)
-       ; save the modified tag entry onto the db
-       (save-data-object db-conn tag-obj)))))
+(define (db-set! #:db-conn [db-conn sqlc] #:threaded? [threaded? #t] img tag-lst)
+  (db-purge! #:db-conn db-conn img)
+  (if threaded?
+      (thread (λ ()
+                (add-tags! #:db-conn db-conn img tag-lst)))
+      (add-tags! #:db-conn db-conn img tag-lst)))
 
-; remove img from images and all references from tags
-(define (db-remove! #:db-conn [db-conn sqlc] img)
-  (define img-obj (make-data-object db-conn image% img))
-  (define tag-lst (send img-obj get-tags))
-  (for ([tag (in-list tag-lst)])
-    (when (db-has-key? #:db-conn db-conn "tags" tag)
-      (define tag-obj (make-data-object db-conn tag% tag))
-      (send tag-obj del-img img)
-      (when (empty? (send tag-obj get-images))
-        (delete-data-object db-conn tag-obj))))
-  (delete-data-object db-conn img-obj))
-
+; go through each image entry and check if it is a file that still exists
+; and then purge from the database if it does not
 (define (clean-db! #:db-conn [db-conn sqlc])
   ; grab all the entries in images
   (for ([key (in-table-column "images" "Path")])
-    (unless (file-exists? (first key)) (db-remove! (first key)))))
+    (unless (file-exists? (first key)) (db-purge! (first key)))))
 
 ; saves only the entries in the list that are duplicates.
 ; if there are more than two identical entries, they are
