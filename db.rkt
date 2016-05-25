@@ -225,6 +225,7 @@
              (keep-duplicates (rest sorted) dups))]))
 
 ; search tags table in db for exact matches
+; returns a list of paths or empty
 (define (search-db-exact #:db-conn [db-conn sqlc] type tag-lst)
   (cond [(zero? (length tag-lst)) empty]
         [else
@@ -245,6 +246,7 @@
                 (map string->path (remove-duplicates sorted))
                 (map string->path (keep-duplicates sorted)))])]))
 
+; returns a list of paths or empty
 (define (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
   (cond [(zero? (length tag-lst)) empty]
         [else
@@ -278,20 +280,24 @@
                 ; turn the path-strings into paths and keep any duplicates
                 (map string->path (keep-duplicates filtered))])]))
 
+; returns a list of paths or empty
 (define (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
   (cond [(or (empty? searched-imgs) (empty? exclusion-tags)) searched-imgs]
         [else
-         (define searched-str (map path->string searched-imgs))
+         (define searched-str (if (path? (first searched-imgs))
+                                  (map path->string searched-imgs)
+                                  searched-imgs))
          (define to-exclude
            (remove-duplicates
             (flatten
              (for/list ([exclusion (in-list exclusion-tags)])
-               (cond [(db-has-key? #:db-conn "tags" exclusion)
+               (cond [(db-has-key? #:db-conn db-conn "tags" exclusion)
                       (define tag-obj (make-data-object db-conn tag% exclusion))
                       (send tag-obj get-images)]
                      [else #f])))))
          (map string->path (remove* (filter string? to-exclude) searched-str))]))
 
+; returns a list of paths or empty
 (define (exclude-search-inexact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
   (cond [(or (empty? searched-imgs) (empty? exclusion-tags)) searched-imgs]
         [else
