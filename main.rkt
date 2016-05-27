@@ -268,4 +268,8 @@
                  (printf "~a~n" ex)))
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
-                     (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]))
+                     (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])])
+ ; exit explicitly
+ (unless (show-frame?)
+   (disconnect sqlc)
+   (exit)))
