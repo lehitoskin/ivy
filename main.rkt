@@ -140,7 +140,7 @@
     (define img-obj (make-data-object sqlc image% absolute-path))
     (when (verbose?)
       (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
-    (remove-img/tags! sqlc img-obj tags-to-remove))]
+    (remove-img/tags! img-obj tags-to-remove))]
  [("-T" "--set-tags")
   taglist img
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image"

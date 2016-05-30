@@ -157,14 +157,14 @@
   (->* ([or/c 'images 'tags] string?) (#:db-conn connection?) boolean?)
   (define objs
     (case table
-      [('images) (select-data-objects db-conn image% (where (= path ?)) key)]
-      [('tags) (select-data-objects db-conn tag% (where (= label ?)) key)]))
+      [(images) (select-data-objects db-conn image% (where (= path ?)) key)]
+      [(tags) (select-data-objects db-conn tag% (where (= label ?)) key)]))
   (not (empty? objs)))
 
 ; add tags to image, add image to tags
 ; if the image or tags are new, insert them into the database
 (define/contract (add-tags! #:db-conn [db-conn sqlc] img tag-lst)
-  (->* ([or/c path-string? data-object?]
+  (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?)
        void?)
@@ -190,7 +190,7 @@
 ; remove the tags from the img entry
 ; if img has no tags, remove from db
 (define/contract (remove-tags! #:db-conn [db-conn sqlc] img tag-lst)
-  (->* ([or/c path-string? data-object?]
+  (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?)
        void?)
@@ -205,12 +205,13 @@
     ; if the image has no tags, remove from database
     (if (empty? (send img-obj get-tags))
         (delete-data-object db-conn img-obj)
+        ; save the changes made
         (save-data-object db-conn img-obj))))
 
 ; tail-recursive remove img from the tag entries
 ; if the tag has no imgs, remove from db
 (define/contract (remove-image! #:db-conn [db-conn sqlc] img tag-lst)
-  (->* ([or/c path-string? data-object?]
+  (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?)
        void?)
@@ -224,7 +225,7 @@
          (remove-image! #:db-conn db-conn img (rest tag-lst))]))
 
 (define/contract (remove-img/tags! #:db-conn [db-conn sqlc] img tag-lst)
-  (->* ([or/c path-string? data-object?]
+  (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?)
        void?)
@@ -233,11 +234,12 @@
 
 ; remove img from images and all references from tags
 (define/contract (db-purge! #:db-conn [db-conn sqlc] img)
-  (->* ([or/c path-string? data-object?])
+  (->* (path-string?)
        (#:db-conn connection?)
        void?)
-  (when (db-has-key? #:db-conn db-conn 'images img)
-    (define img-obj (make-data-object db-conn image% img))
+  (define img-str (if (path? img) (path->string img) img))
+  (when (db-has-key? #:db-conn db-conn 'images img-str)
+    (define img-obj (make-data-object db-conn image% img-str))
     ; grab all current tags for removal
     (define tag-lst (send img-obj get-tags))
     (remove-img/tags! #:db-conn db-conn img-obj tag-lst)))
@@ -246,12 +248,13 @@
 ; adds it back to both tables
 ; tag-lst assumed to be sorted
 (define/contract (db-set! #:db-conn [db-conn sqlc] #:threaded? [threaded? #t] img tag-lst)
-  (->* ([or/c path-string? data-object?]
+  (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?
         #:threaded? boolean?)
        (or/c void? thread?))
   (db-purge! #:db-conn db-conn img)
+  (add-tags! #:db-conn db-conn img tag-lst)
   (if threaded?
       (thread (λ ()
                 (add-tags! #:db-conn db-conn img tag-lst)))
@@ -386,6 +389,6 @@
               ; replace each instance of an umber with the path of the image we want to exclude
               (map (λ (te) (if (false? te) te searched)) ex))))
          ; remove #f and duplicates
-         (define remove-imgs (remove-duplicates (filter path-string? remove-imgs-messy)))
+         (define remove-imgs (remove-duplicates (filter path? remove-imgs-messy)))
          ; finally remove the excluded images from the list of searched images
          (remove* remove-imgs searched-imgs)]))
