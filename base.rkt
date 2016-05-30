@@ -158,7 +158,7 @@
                           (length (pfs))))
             
             ; pick what string to display for tags...
-            (cond [(db-has-key? "images" img-str)
+            (cond [(db-has-key? 'images img-str)
                    (define img-obj (make-data-object sqlc image% img-str))
                    (define tags (send img-obj get-tags))
                    (incoming-tags (string-join tags ", "))]

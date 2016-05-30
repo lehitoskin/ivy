@@ -22,8 +22,8 @@
   (clean-db!)
   (define imgs
     (if (empty? tags)
-        ; table-column: (or/c (listof (listof string?)) empty?)
-        (flatten (table-column "images" "Path"))
+        ; table-column: (or/c (listof path?) empty?)
+        (table-column 'images 'Path)
         (if (exact-search?)
             (search-db-exact search-type tags)
             (search-db-inexact search-type tags))))

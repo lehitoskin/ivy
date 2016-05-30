@@ -11,6 +11,8 @@
          "db.rkt"
          "frame.rkt")
 
+(define ivy-version 1.0)
+
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
 (define search-type (make-parameter #f))
@@ -30,6 +32,11 @@
  "Supplying a path will tell Ivy to load the provided image."
  "Supplying multiple paths will tell Ivy to load them as a collection."
  #:once-any
+ [("-V" "--version")
+  "Display Ivy version."
+  (printf "Ivy ~a~n" ivy-version)
+  (disconnect sqlc)
+  (exit)]
  [("-o" "--search-or")
   taglist
   "Search the tags database inclusively with a comma-separated string."
@@ -87,7 +94,7 @@
   "Lists the tags for the image."
   (show-frame? #f)
   (define absolute-path (path->string (relative->absolute img)))
-  (when (db-has-key? "images" absolute-path)
+  (when (db-has-key? 'images absolute-path)
     (define img-obj (make-data-object sqlc image% absolute-path))
     (define taglist (send img-obj get-tags))
     (for ([tag (in-list taglist)])
@@ -109,7 +116,7 @@
            (remove-duplicates (sort tags string<?))]))
   (unless (empty? tags-to-add)
     (define img-obj
-      (if (db-has-key? "images" absolute-path)
+      (if (db-has-key? 'images absolute-path)
           (make-data-object sqlc image% absolute-path)
           (new image% [path absolute-path])))
     (when (verbose?)
@@ -129,11 +136,11 @@
                        (string-trim tag))))
            (remove-duplicates (sort tags string<?))]))
   (when (and (not (empty? tags-to-remove))
-             (db-has-key? "images" absolute-path))
+             (db-has-key? 'images absolute-path))
     (define img-obj (make-data-object sqlc image% absolute-path))
     (when (verbose?)
       (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
-    (remove-tags! sqlc img-obj tags-to-remove))]
+    (remove-img/tags! sqlc img-obj tags-to-remove))]
  [("-T" "--set-tags")
   taglist img
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image"
@@ -174,7 +181,7 @@
          (path->string (build-path base new-name file-name))]
         ; dest is a file path
         [else (path->string absolute-dest)])))
-  (when (db-has-key? "images" old-path)
+  (when (db-has-key? 'images old-path)
     (define old-img-obj (make-data-object sqlc image% old-path))
     (define tags (send old-img-obj get-tags))
     (db-set! #:threaded? #f new-path tags)
@@ -229,10 +236,10 @@
             (printf "~a~n" sr)))
       (when (verbose?)
         (printf "Found ~a results for tags ~v~n" len (tags-to-search))))]
-   ; only excluding tags (resulting output may be very big!)
+   ; only excluding tags (resulting output may be very long!)
    [(and (empty? (tags-to-search))
          (not (empty? (tags-to-exclude))))
-    (define imgs (table-column "images" "Path"))
+    (define imgs (table-column 'images 'Path))
     (define excluded
       (if (exact-search?)
           (exclude-search-exact imgs (tags-to-exclude))

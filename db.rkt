@@ -13,7 +13,11 @@
          (only-in srfi/13
                   string-contains-ci)
          "files.rkt")
-(provide (all-defined-out) disconnect make-data-object get-column)
+(provide (all-defined-out)
+         disconnect
+         make-data-object
+         get-column
+         keep-duplicates)
 
 (define sqlc
   (sqlite3-connect
@@ -39,15 +43,24 @@
                 (define imgs (get-column imagelist this))
                 (string-split imgs ","))
               
-              ; img is the image's path
+              ; img is the image's path-string
+              ; passing an image% object is a-okay
               (define/public (add-img img)
-                (define path (if (string? img) img (get-column path img)))
+                (define path
+                  (cond [(path? img) (path->string img)]
+                        [(string? img) img]
+                        [else (get-column path img)]))
                 (define il (string-split (get-column imagelist this) ","))
                 (unless (member path il)
                   (set! imagelist (string-join (sort (append il (list path)) string<?) ","))))
               
+              ; img is the image's path-string
+              ; passing an image% object is a-okay
               (define/public (del-img img)
-                (define path (if (string? img) img (get-column path img)))
+                (define path
+                  (cond [(path? img) (path->string img)]
+                        [(string? img) img]
+                        [else (get-column path img)]))
                 (define il (get-images))
                 (when (member path il)
                   (set! imagelist (string-join (sort (remove path il) string<?) ","))))))
@@ -67,17 +80,34 @@
                 (string-split tags ","))
               
               ; tag is the tag's label
+              ; passing a tag% object is a-okay
               (define/public (add-tag tag)
                 (define label (if (string? tag) tag (get-column label tag)))
                 (define tl (string-split (get-column taglist this) ","))
                 (unless (member label tl)
                   (set! taglist (string-join (sort (append tl (list label)) string<?) ","))))
               
+              ; passing a tag% object is a-okay
               (define/public (del-tag tag)
-                (define label (if (string? tag) tag (get-column label tag)))
-                (define tl (get-tags))
-                (when (member label tl)
-                  (set! taglist (string-join (sort (remove label tl) string<?) ","))))))
+                (cond
+                  ; pass a whole list of tags to remove at once
+                  [(list? tag)
+                   (define labels
+                     (for/list ([t (in-list tag)])
+                       (if (string? t)
+                           t
+                           (get-column label t))))
+                   (define old-tags (get-tags))
+                   (set! taglist (string-join (sort (remove* labels old-tags) string<?) ","))]
+                  ; pass a single tag to remove
+                  [else
+                   (define label
+                     (if (string? tag)
+                         tag
+                         (get-column label tag)))
+                   (define old-tags (get-tags))
+                   (when (member label old-tags)
+                     (set! taglist (string-join (sort (remove label old-tags) string<?) ",")))]))))
 
 
 ; query:
@@ -86,47 +116,49 @@
 ; rows: (listof vector?)
 
 (define/contract (table-pairs #:db-conn [db-conn sqlc] table)
-  (->* ([or/c "images" "tags"])
+  (->* ([or/c 'images 'tags])
        (#:db-conn connection?)
-       (or/c (listof (listof string?)) empty?))
+       (or/c (listof (list/c path? (listof string?)))
+             (listof (list/c string? (listof path?)))
+             empty?))
   (case table
-    [("images")
-     (map (λ (img) (list (get-column path img)
-                         (get-column taglist img)))
-          (select-data-objects db-conn image%))]
-    [("tags")
-     (map (λ (tag) (list (get-column label tag)
-                         (get-column imagelist tag))
-            (select-data-objects db-conn tag%)))]))
+    [(images)
+     (for/list ([img (select-data-objects db-conn image%)])
+       (list (string->path (get-column path img))
+             (send img get-tags)))]
+    [(tags)
+     (for/list ([tag (select-data-objects db-conn tag%)])
+       (list (get-column label tag)
+             (map string->path (send tag get-images))))]))
 
-; table: (or/c "images" "tags")
+; table: (or/c 'images 'tags)
 ; -> sequence?
 (define/contract (in-table-pairs #:db-conn [db-conn sqlc] table)
-  (->* ([or/c "images" "tags"]) (#:db-conn connection?) sequence?)
+  (->* ([or/c 'images 'tags]) (#:db-conn connection?) sequence?)
   (in-list (table-pairs #:db-conn db-conn table)))
 
-; table: (or/c "images" "tags")
+; table: (or/c 'images 'tags)
 (define/contract (table-column #:db-conn [db-conn sqlc] table col)
-  (->* ([or/c "images" "tags"]
-        [or/c "Path" "Tag_List" "Tag_Label" "Image_List"])
+  (->* ([or/c 'images 'tags]
+        [or/c 'Path 'Tag_List 'Tag_Label 'Image_List])
        (#:db-conn connection?)
-       (or/c (listof (listof string?)) empty?))
-  (define result (query db-conn (format "select ~a from ~a;" col table)))
-  (map vector->list (rows-result-rows result)))
+       (or/c (listof path?) empty?))
+  (define result (rows-result-rows (query db-conn (format "select ~a from ~a;" col table))))
+  (map string->path (flatten (map vector->list result))))
 
 (define/contract (in-table-column #:db-conn [db-conn sqlc] table col)
-  (->* ([or/c "images" "tags"]
-        [or/c "Path" "Tag_List" "Tag_Label" "Image_List"])
+  (->* ([or/c 'images 'tags]
+        [or/c 'Path 'Tag_List 'Tag_Label 'Image_List])
        (#:db-conn connection?)
        sequence?)
   (in-list (table-column #:db-conn db-conn table col)))
 
 (define/contract (db-has-key? #:db-conn [db-conn sqlc] table key)
-  (->* ([or/c "images" "tags"] string?) (#:db-conn connection?) boolean?)
+  (->* ([or/c 'images 'tags] string?) (#:db-conn connection?) boolean?)
   (define objs
     (case table
-      [("images") (select-data-objects db-conn image% (where (= path ?)) key)]
-      [("tags") (select-data-objects db-conn tag% (where (= label ?)) key)]))
+      [('images) (select-data-objects db-conn image% (where (= path ?)) key)]
+      [('tags) (select-data-objects db-conn tag% (where (= label ?)) key)]))
   (not (empty? objs)))
 
 ; add tags to image, add image to tags
@@ -140,14 +172,14 @@
   ; otherwise make a new data-object
   (define img-obj
     (cond [(data-object? img) img]
-          [(db-has-key? #:db-conn db-conn "images" img)
+          [(db-has-key? #:db-conn db-conn 'images img)
            (make-data-object db-conn image% img)]
           [else (new image% [path img])]))
   (for ([tag (in-list tag-lst)])
     ; add each tag to the image% object
     (send img-obj add-tag tag)
     (define tag-obj
-      (if (db-has-key? #:db-conn db-conn "tags" tag)
+      (if (db-has-key? #:db-conn db-conn 'tags tag)
           (make-data-object db-conn tag% tag)
           (new tag% [label tag])))
     ; add the image to each tag% object
@@ -155,10 +187,8 @@
     (save-data-object db-conn tag-obj))
   (save-data-object db-conn img-obj))
 
-; removes tags from the image, if it is in the database (keep going if it is not)
-; removes the image from each tag
-; if the image has no more tags, remove from database
-; if the tag has no more images, remove from database
+; remove the tags from the img entry
+; if img has no tags, remove from db
 (define/contract (remove-tags! #:db-conn [db-conn sqlc] img tag-lst)
   (->* ([or/c path-string? data-object?]
         [listof string?])
@@ -166,38 +196,61 @@
        void?)
   (define img-obj
     (cond [(data-object? img) img]
-          [(db-has-key? #:db-conn db-conn "images" img)
+          [(db-has-key? #:db-conn db-conn 'images img)
            (make-data-object db-conn image% img)]
           [else #f]))
-  (for ([tag (in-list tag-lst)])
-    ; remove the tag from the image
-    (when img-obj
-      (send img-obj del-tag tag))
-    ; do nothing for this loop if tag isn't in the database
-    (when (db-has-key? #:db-conn db-conn "tags" tag)
-      (define tag-obj (make-data-object db-conn tag% tag))
-      ; remove the image from the tag
-      (send tag-obj del-img img)
-      (if (empty? (send tag-obj get-images))
-          (delete-data-object db-conn tag-obj)
-          (save-data-object db-conn tag-obj))))
   (when img-obj
+    ; remove the tags from the image
+    (send img-obj del-tag tag-lst)
+    ; if the image has no tags, remove from database
     (if (empty? (send img-obj get-tags))
         (delete-data-object db-conn img-obj)
         (save-data-object db-conn img-obj))))
 
+; tail-recursive remove img from the tag entries
+; if the tag has no imgs, remove from db
+(define/contract (remove-image! #:db-conn [db-conn sqlc] img tag-lst)
+  (->* ([or/c path-string? data-object?]
+        [listof string?])
+       (#:db-conn connection?)
+       void?)
+  (cond [(empty? tag-lst) (void)]
+        [(db-has-key? #:db-conn db-conn 'tags (first tag-lst))
+         (define tag-obj (make-data-object db-conn tag% (first tag-lst)))
+         (send tag-obj del-img img)
+         (if (empty? (send tag-obj get-images))
+             (delete-data-object db-conn tag-obj)
+             (save-data-object db-conn tag-obj))
+         (remove-image! #:db-conn db-conn img (rest tag-lst))]))
+
+(define/contract (remove-img/tags! #:db-conn [db-conn sqlc] img tag-lst)
+  (->* ([or/c path-string? data-object?]
+        [listof string?])
+       (#:db-conn connection?)
+       void?)
+  (remove-tags! #:db-conn db-conn img tag-lst)
+  (remove-image! #:db-conn db-conn img tag-lst))
+
 ; remove img from images and all references from tags
-(define (db-purge! #:db-conn [db-conn sqlc] img)
-  (when (db-has-key? #:db-conn db-conn "images" img)
+(define/contract (db-purge! #:db-conn [db-conn sqlc] img)
+  (->* ([or/c path-string? data-object?])
+       (#:db-conn connection?)
+       void?)
+  (when (db-has-key? #:db-conn db-conn 'images img)
     (define img-obj (make-data-object db-conn image% img))
     ; grab all current tags for removal
     (define tag-lst (send img-obj get-tags))
-    (remove-tags! #:db-conn db-conn img-obj tag-lst)))
+    (remove-img/tags! #:db-conn db-conn img-obj tag-lst)))
 
 ; nukes the image from the database in both tables
 ; adds it back to both tables
 ; tag-lst assumed to be sorted
-(define (db-set! #:db-conn [db-conn sqlc] #:threaded? [threaded? #t] img tag-lst)
+(define/contract (db-set! #:db-conn [db-conn sqlc] #:threaded? [threaded? #t] img tag-lst)
+  (->* ([or/c path-string? data-object?]
+        [listof string?])
+       (#:db-conn connection?
+        #:threaded? boolean?)
+       (or/c void? thread?))
   (db-purge! #:db-conn db-conn img)
   (if threaded?
       (thread (λ ()
@@ -208,8 +261,8 @@
 ; and then purge from the database if it does not
 (define (clean-db! #:db-conn [db-conn sqlc])
   ; grab all the entries in images
-  (for ([key (in-table-column "images" "Path")])
-    (unless (file-exists? (first key)) (db-purge! (first key)))))
+  (for ([key (in-table-column 'images 'Path)])
+    (unless (file-exists? key) (db-purge! #:db-conn db-conn key))))
 
 ; saves only the entries in the list that are duplicates.
 ; if there are more than two identical entries, they are
@@ -226,7 +279,11 @@
 
 ; search tags table in db for exact matches
 ; returns a list of paths or empty
-(define (search-db-exact #:db-conn [db-conn sqlc] type tag-lst)
+(define/contract (search-db-exact #:db-conn [db-conn sqlc] type tag-lst)
+  (->* ([or/c 'or 'and]
+        [listof string?])
+       (#:db-conn connection?)
+       (or/c (listof path?) empty?))
   (cond [(zero? (length tag-lst)) empty]
         [else
          ; sql query will complain if a tag as spaces, but no quotes around it
@@ -247,15 +304,20 @@
                 (map string->path (keep-duplicates sorted)))])]))
 
 ; returns a list of paths or empty
-(define (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
+(define/contract (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
+  (->* ([or/c 'or 'and]
+        [listof string?])
+       (#:db-conn connection?)
+       (or/c (listof path?) empty?))
   (cond [(zero? (length tag-lst)) empty]
         [else
          (define search-results
            ; loop over the images in the database
-           (for/list ([img-pair (in-table-pairs #:db-conn db-conn "images")])
+           (for/list ([img-pair (in-table-pairs #:db-conn db-conn 'images)])
              (define tags-searched
                ; loop over the tags supplied
                (for/list ([tag (in-list tag-lst)])
+                 (define img-tags (second img-pair))
                  ; list of path-strings and #f
                  (map (λ (img-tag)
                         ; if the string is inside that particular tag
@@ -263,25 +325,28 @@
                             ; grab its path
                             (first img-pair)
                             #f))
-                      (rest img-pair))))
+                      img-tags)))
              ; remove any duplicate string-contains-ci matches
              ; for images that have tags containing more than
              ; one of the same phrase (e.g. images with the tags
              ; "beach" "beach towel" will appear more than once)
              (map remove-duplicates tags-searched)))
          ; filter out any #f
-         ; list of path-string only
-         (define filtered (sort (filter path-string? (flatten search-results)) string<?))
-         (cond [(or (= (length tag-lst) 1)
-                    (eq? type 'or))
-                ; turn the path-strings into paths and remove any duplicates
-                (map string->path (remove-duplicates filtered))]
+         ; list of path only
+         (define filtered (sort (filter path? (flatten search-results)) path<?))
+         (cond [(or (= (length tag-lst) 1) (eq? type 'or))
+                ; remove any duplicates
+                (remove-duplicates filtered)]
                [else
-                ; turn the path-strings into paths and keep any duplicates
-                (map string->path (keep-duplicates filtered))])]))
+                ; keep any duplicates
+                (keep-duplicates filtered)])]))
 
 ; returns a list of paths or empty
-(define (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
+(define/contract (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
+  (->* ([or/c (listof path?) empty?]
+        [or/c (listof string?) empty?])
+       (#:db-conn connection?)
+       (or/c (listof path?) empty?))
   (cond [(or (empty? searched-imgs) (empty? exclusion-tags)) searched-imgs]
         [else
          (define searched-str (if (path? (first searched-imgs))
@@ -291,14 +356,18 @@
            (remove-duplicates
             (flatten
              (for/list ([exclusion (in-list exclusion-tags)])
-               (cond [(db-has-key? #:db-conn db-conn "tags" exclusion)
+               (cond [(db-has-key? #:db-conn db-conn 'tags exclusion)
                       (define tag-obj (make-data-object db-conn tag% exclusion))
                       (send tag-obj get-images)]
                      [else #f])))))
          (map string->path (remove* (filter string? to-exclude) searched-str))]))
 
 ; returns a list of paths or empty
-(define (exclude-search-inexact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
+(define/contract (exclude-search-inexact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
+  (->* ([or/c (listof path?) empty?]
+        [or/c (listof string?) empty?])
+       (#:db-conn connection?)
+       (or/c (listof path?) empty?))
   (cond [(or (empty? searched-imgs) (empty? exclusion-tags)) searched-imgs]
         [else
          (define remove-imgs-messy
@@ -319,8 +388,4 @@
          ; remove #f and duplicates
          (define remove-imgs (remove-duplicates (filter path-string? remove-imgs-messy)))
          ; finally remove the excluded images from the list of searched images
-         (let loop ([searched searched-imgs]
-                    [to-remove remove-imgs])
-           (if (empty? to-remove)
-               searched
-               (loop (remove (first to-remove) searched) (rest to-remove))))]))
+         (remove* remove-imgs searched-imgs)]))
