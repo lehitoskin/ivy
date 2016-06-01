@@ -376,13 +376,12 @@
                    (load-image image-bmp-master))]))
 
 (define (on-escape-key tfield)
-  (define current-tags (send tfield get-value))
   (send tfield set-field-background (make-object color% "white"))
-  (cond [(string=? current-tags (incoming-tags))
-         (send (ivy-canvas) focus)]
-        [else (send tfield set-value (incoming-tags))
-              (define-values (base name-sym must-be-dir?) (split-path (image-path)))
-              (send ivy-frame set-label (path->string name-sym))]))
+  (define-values (base name-path must-be-dir?) (split-path (image-path)))
+  (if (string=? (send tfield get-value) (incoming-tags))
+      (send (ivy-canvas) focus)
+      (send tfield set-value (incoming-tags)))
+  (send ivy-frame set-label (path->string name-path)))
 
 (define ivy-tfield%
   (class text-field%
@@ -465,7 +464,7 @@
     
     (define/override (on-paint)
       (do-on-paint))
-
+    
     ; thunk: ((is-a?/c canvas%) (is-a?/c dc<%>) . -> . any)
     (define/public (set-on-paint! thunk)
       (set! paint-callback thunk))
