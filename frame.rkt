@@ -451,6 +451,8 @@
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)
+  (let ([txt (send (ivy-tag-tfield) get-editor)])
+    (send txt set-position (send txt last-position)))
   (send (ivy-tag-tfield) focus))
 
 (define ivy-canvas%
@@ -507,6 +509,8 @@
         [(right) (load-next-image)]
         [(home) (load-first-image)]
         [(end) (load-last-image)]
+        [(#\,) (focus-tag-tfield)
+               (send (send (ivy-tag-tfield) get-editor) insert ", ")]
         [(#\return) (focus-tag-tfield)]))))
 
 (ivy-canvas
