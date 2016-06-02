@@ -2,11 +2,13 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require racket/class
+(require racket/bool
+         racket/class
          racket/cmdline
          racket/list
          racket/path
          racket/string
+         racquel
          "base.rkt"
          "db.rkt"
          "frame.rkt")
@@ -19,6 +21,7 @@
 (define tags-to-exclude (make-parameter empty))
 (define null-flag (make-parameter #f))
 (define verbose? (make-parameter #f))
+(define moving? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
 (define (relative->absolute path)
@@ -159,42 +162,14 @@
       (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
     (db-set! #:threaded? #f absolute-path tags-to-set))]
  [("-M" "--move-image")
-  source dest
-  "Moves the source file to the destination, updating the database."
+  "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
-  ; make sure the paths are absolute
-  (define old-path (path->string (relative->absolute source)))
-  ; if source does not exist, error and exit
-  (unless (file-exists? old-path)
-    (raise-argument-error 'move-image "Existing file source" old-path)
-    (disconnect sqlc)
-    (exit))
-  (define absolute-dest (relative->absolute dest))
-  (define new-path
-    (let-values ([(base new-name must-be-dir?) (split-path absolute-dest)])
-      (define file-name (file-name-from-path old-path))
-      (cond
-        ; dest is a directory ending in /
-        [must-be-dir? (path->string (build-path base new-name file-name))]
-        ; dest is a directory that does not end in /
-        [(directory-exists? (build-path base new-name))
-         (path->string (build-path base new-name file-name))]
-        ; dest is a file path
-        [else (path->string absolute-dest)])))
-  (when (db-has-key? 'images old-path)
-    (define old-img-obj (make-data-object sqlc image% old-path))
-    (define tags (send old-img-obj get-tags))
-    (db-set! #:threaded? #f new-path tags)
-    ; copy the file over, overwrite dest if exists
-    (when (verbose?)
-      (printf "Moving ~a to ~a~n" old-path new-path))
-    (rename-file-or-directory old-path new-path #f)
-    (clean-db!))]
+  (moving? #t)]
  #:args requested-images
- (unless (empty? requested-images)
-   (define requested-paths
-     (map (λ (img) (simplify-path (expand-user-path img)))
-          requested-images))
+ ; hijack requested-images for -M
+ (unless (or (false? (show-frame?))
+             (empty? requested-images))
+   (define requested-paths (map relative->absolute requested-images))
    (define checked-paths
      (for/list ([rp requested-paths])
        ; in case the user called ivy in the same directory
@@ -275,7 +250,49 @@
                  (printf "~a~n" ex)))
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
-                     (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])])
+                     (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]
+   [(moving?)
+    (define len (length requested-images))
+    (cond
+      [(< len 2)
+       (raise-argument-error 'move-image "2 or more arguments" len)
+       (disconnect sqlc)
+       (exit)]
+      [else
+       ; make sure the paths are absolute
+       (define absolute-str (map (λ (ri)
+                                   (path->string (relative->absolute ri)))
+                                 requested-images))
+       (define dest-or-dir (last absolute-str))
+       (define-values (dest-base dest-name must-be-dir?) (split-path dest-or-dir))
+       (for ([old-path (in-list (take absolute-str (sub1 len)))])
+         (define new-path
+           (let ([file-name (file-name-from-path old-path)])
+             (cond
+               ; dest is a directory ending in /
+               [must-be-dir? (path->string (build-path dest-base dest-name file-name))]
+               ; dest is a directory that does not end in /
+               [(directory-exists? (build-path dest-base dest-name))
+                (path->string (build-path dest-base dest-name file-name))]
+               ; dest is a file path
+               [else
+                (cond
+                  [(> len 2)
+                   (raise-argument-error 'move-image
+                                         "destination as a directory when more than 2 args"
+                                         dest-or-dir)
+                   #f]
+                  [else
+                   (path->string dest-or-dir)])])))
+         (when (and new-path (db-has-key? 'images old-path))
+           (define old-img-obj (make-data-object sqlc image% old-path))
+           (define tags (send old-img-obj get-tags))
+           (db-set! #:threaded? #f new-path tags)
+           ; copy the file over, overwrite dest if exists
+           (when (verbose?)
+             (printf "Moving ~a to ~a~n" old-path new-path))
+           (rename-file-or-directory old-path new-path #f)
+           (delete-data-object sqlc old-img-obj)))])])
  ; exit explicitly
  (unless (show-frame?)
    (disconnect sqlc)
