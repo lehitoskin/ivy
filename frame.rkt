@@ -130,6 +130,7 @@
                    (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
                    (pfs (path-files))])
+            (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
             (image-path img-path)
             (load-image img-path)))]))
 
