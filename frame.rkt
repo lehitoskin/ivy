@@ -160,11 +160,7 @@
           (when paths
             (define path-default? (equal? (first (pfs)) (build-path "/")))
             (cond
-              ; empty collection and adding more than 1 image
-              [(and path-default? (> (length paths) 1))
-               (pfs paths)]
-              ; empty collection, adding 1 image
-              ; like file-open, but only open the single image
+              ; empty collection, adding images and load the first in the list
               [path-default?
                (define img-path (first paths))
                (define-values (base name dir?) (split-path img-path))
