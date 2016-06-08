@@ -193,31 +193,34 @@
           (send canvas set-canvas-background
                 (make-object color% "black"))
           
+          ; alleviate image "jaggies"
+          (define bmp (pict->bitmap image-pict))
+          
           (cond
             ; if the image is really big, place it at (0,0)
             [(and (> img-width canvas-x)
                   (> img-height canvas-y))
              (send canvas show-scrollbars #t #t)
-             (draw-pict image-pict dc 0 0)]
+             (send dc draw-bitmap bmp 0 0)]
             ; if the image is wider than the canvas,
             ; place it at (0,y)
             [(> img-width canvas-x)
              (send canvas show-scrollbars #t #f)
-             (draw-pict image-pict dc
-                        0 (- canvas-center-y img-center-y))]
+             (send dc draw-bitmap bmp
+                   0 (- canvas-center-y img-center-y))]
             ; if the image is taller than the canvas,
             ; place it at (x,0)
             [(> img-height canvas-y)
              (send canvas show-scrollbars #f #t)
-             (draw-pict image-pict dc
-                        (- canvas-center-x img-center-x) 0)]
+             (send dc draw-bitmap bmp
+                   (- canvas-center-x img-center-x) 0)]
             ; otherwise, place it at the normal position
             [else
              (send canvas show-scrollbars #f #f)
-             (draw-pict image-pict dc
-                        (- canvas-center-x img-center-x)
-                        (- canvas-center-y img-center-y))])))
-
+             (send dc draw-bitmap bmp
+                   (- canvas-center-x img-center-x)
+                   (- canvas-center-y img-center-y))])))
+  
   ; tell the scrollbars to adjust for the size of the image
   (let* ([pict-width (inexact->exact (round (pict-width image-pict)))]
          [pict-height (inexact->exact (round (pict-height image-pict)))])
