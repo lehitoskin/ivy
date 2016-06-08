@@ -112,10 +112,10 @@
             (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
            [else (bitmap img)])]
     ; only used by zoom-in, definitely a pict
-    [(larger)
+    [(larger wheel-larger)
      (scale-to-fit img (* img-width 1.2) (* img-height 1.2))]
     ; only used by zoom-out, definitely a pict
-    [(smaller)
+    [(smaller wheel-smaller)
      (scale-to-fit img (* img-width 0.8) (* img-height 0.8))]
     [(same) img]
     [(none) (bitmap img)]))
@@ -222,16 +222,37 @@
                    (- canvas-center-y img-center-y))])))
   
   ; tell the scrollbars to adjust for the size of the image
-  (let* ([pict-width (inexact->exact (round (pict-width image-pict)))]
-         [pict-height (inexact->exact (round (pict-height image-pict)))])
+  (let* ([img-width (inexact->exact (round (pict-width image-pict)))]
+         [img-height (inexact->exact (round (pict-height image-pict)))])
     ; will complain if width/height is less than 1
-    (define width (if (< pict-width 1) 1 pict-width))
-    (define height (if (< pict-height 1) 1 pict-height))
+    (define width (if (< img-width 1) 1 img-width))
+    (define height (if (< img-height 1) 1 img-height))
+    (define-values (virtual-x virtual-y) (send canvas get-virtual-size))
     
     (case scale
+      ; zoom with the center of the current center
       [(smaller larger)
-       ; set the scrollbars to the center of the image when zooming in/out
-       (send canvas init-auto-scrollbars width height 0.5 0.5)]
+       (define-values (client-x client-y) (send canvas get-client-size))
+       (define client-center-x (/ client-x 2))
+       (define client-center-y (/ client-y 2))
+       (send canvas init-auto-scrollbars width height
+             (exact->inexact (/ client-center-x virtual-x))
+             (exact->inexact (/ client-center-y virtual-y)))]
+      ; place scrollbars on mouse location
+      [(wheel-smaller wheel-larger)
+       (define-values (mouse-x mouse-y) (send canvas get-mouse-pos))
+       ; coordinates of top left corner of visible section of the virtual canvas
+       (define-values (visible-x visible-y) (send canvas get-view-start))
+       ; position of mouse over the entire displayed image
+       (define mouse/visible-x (if (> mouse-x virtual-x)
+                                   virtual-x
+                                   (+ mouse-x visible-x)))
+       (define mouse/visible-y (if (> mouse-y virtual-y)
+                                   virtual-y
+                                   (+ mouse-y visible-y)))
+       (send canvas init-auto-scrollbars width height
+             (exact->inexact (/ mouse/visible-x virtual-x))
+             (exact->inexact (/ mouse/visible-y virtual-y)))]
       [else
        ; otherwise just set it to the top left corner
        (send canvas init-auto-scrollbars width height 0.0 0.0)]))

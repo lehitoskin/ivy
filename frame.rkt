@@ -457,6 +457,12 @@
     (super-new)
     (init-field paint-callback)
     
+    (define mouse-x 0)
+    (define mouse-y 0)
+    
+    (define/public (get-mouse-pos)
+      (values mouse-x mouse-y))
+    
     (define (do-on-paint)
       (when paint-callback
         (paint-callback this (send this get-dc))))
@@ -491,15 +497,23 @@
                        (+ (get-index (image-path) (pfs)) 1)
                        (length (pfs))))]))
     
+    (define/override (on-event evt)
+      (define type (send evt get-event-type))
+      (case type
+        ; track where the mouse is
+        [(enter motion)
+         (set! mouse-x (send evt get-x))
+         (set! mouse-y (send evt get-y))]))
+    
     (define/override (on-char key)
       (define type (send key get-key-code))
       (case type
         [(wheel-down)
          (when image-pict
-           (load-image image-pict 'smaller))]
+           (load-image image-pict 'wheel-smaller))]
         [(wheel-up)
          (when image-pict
-           (load-image image-pict 'larger))]
+           (load-image image-pict 'wheel-larger))]
         [(f11) (cond [(not (macosx?))
                       (toggle-fullscreen this ivy-frame)])]
         [(left) (load-previous-image)]
