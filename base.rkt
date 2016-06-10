@@ -293,17 +293,14 @@
 (define load-first-image (load-image-in-collection 'home))
 (define load-last-image (load-image-in-collection 'end))
 
-; takes a list lst and a width x and
-; returns a list of lists of lengths no more than x
-(define (grid-list lst x)
-  (define len (length lst))
-  (for/list ([i len]
-             #:unless (>= i (/ len x)))
-    (for/list ([n x]
-               #:unless (> (+ (* i x) n) (sub1 len)))
-      (list-ref lst (+ (* i x) n)))))
+; takes a list lst and a width
+; returns a list of lists of lengths no more than width
+(define (grid-list lst width [accum empty])
+  (if (> width (length lst))
+      (append accum (list lst))
+      (grid-list (drop lst width) width (append accum (list (take lst width))))))
 
-; generates 100x100 thumbnails from a list of strings paths
+; generates 100x100 thumbnails from a list of string paths
 ; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
@@ -314,7 +311,8 @@
        (if (eq? (system-type) 'windows)
            (string-replace (string-replace path "\\" "_")
                            "C:" "C")
-           (string-replace path "/" "_"))))
+           (string-replace path "/" "_"))
+       ".png"))
     (define thumb-path (build-path thumbnails-path thumb-name))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))
