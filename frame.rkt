@@ -4,7 +4,6 @@
 (require images/flomap
          pict
          racket/class
-         racket/dict
          racket/gui/base
          racket/list
          racket/math
@@ -476,11 +475,10 @@
     
     (define/override (on-drop-file pathname)
       ; append the image to the current collection
-      (define path-default? (equal? (first (pfs)) (build-path "/")))
       (cond
         ; empty collection, adding 1 image
         ; like file-open, but only open the single image
-        [path-default?
+        [(equal? (first (pfs)) (build-path "/"))
          (define-values (base name dir?) (split-path pathname))
          (image-dir base)
          (pfs (list pathname))

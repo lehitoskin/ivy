@@ -2,11 +2,9 @@
 ; base.rkt
 ; base file for ivy, the taggable image viewer
 (require file/convertible
-         json
          pict
          racket/bool
          racket/class
-         racket/dict
          racket/gui/base
          racket/list
          racket/path
@@ -113,10 +111,10 @@
            [else (bitmap img)])]
     ; only used by zoom-in, definitely a pict
     [(larger wheel-larger)
-     (scale-to-fit img (* img-width 1.2) (* img-height 1.2))]
+     (scale-to-fit img (* img-width 1.1) (* img-height 1.1))]
     ; only used by zoom-out, definitely a pict
     [(smaller wheel-smaller)
-     (scale-to-fit img (* img-width 0.8) (* img-height 0.8))]
+     (scale-to-fit img (* img-width 0.9) (* img-height 0.9))]
     [(same) img]
     [(none) (bitmap img)]))
 
@@ -136,6 +134,7 @@
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
   (define sbp (status-bar-position))
+  
   (cond
     ; need to load the path into a bitmap first
     [(path? img)
@@ -222,8 +221,8 @@
                    (- canvas-center-y img-center-y))])))
   
   ; tell the scrollbars to adjust for the size of the image
-  (let* ([img-width (inexact->exact (round (pict-width image-pict)))]
-         [img-height (inexact->exact (round (pict-height image-pict)))])
+  (let ([img-width (inexact->exact (round (pict-width image-pict)))]
+        [img-height (inexact->exact (round (pict-height image-pict)))])
     ; will complain if width/height is less than 1
     (define width (if (< img-width 1) 1 img-width))
     (define height (if (< img-height 1) 1 img-height))

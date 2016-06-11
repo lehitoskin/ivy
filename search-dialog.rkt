@@ -3,8 +3,6 @@
 (require racket/class
          racket/gui/base
          racket/list
-         racket/stream
-         racket/string
          "base.rkt"
          "db.rkt"
          "search-results.rkt")
