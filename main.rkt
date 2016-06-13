@@ -251,6 +251,7 @@
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
                      (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]
+   ; moving an image in the database to another location
    [(moving?)
     (define len (length requested-images))
     (cond
@@ -282,8 +283,7 @@
                                          "destination as a directory when more than 2 args"
                                          dest-or-dir)
                    #f]
-                  [else
-                   (path->string dest-or-dir)])])))
+                  [else dest-or-dir])])))
          (when (and new-path (db-has-key? 'images old-path))
            (define old-img-obj (make-data-object sqlc image% old-path))
            (define tags (send old-img-obj get-tags))
