@@ -37,6 +37,7 @@
        [help-string "Create a collection containing the search results."]
        [callback (λ (button event)
                    (unless (empty? searched-images)
+                     (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
                      (pfs searched-images)
                      (load-image (first searched-images))
                      (send results-frame show #f)))]))
@@ -50,6 +51,7 @@
        [help-string "Append search results to existing collection"]
        [callback (λ (button event)
                    (unless (empty? searched-images)
+                     (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
                      (pfs (append (pfs) searched-images))
                      (load-image (first searched-images))
                      (send results-frame show #f)))]))
@@ -138,7 +140,7 @@
              (send txt insert snp)
              (send txt insert "  "))
            (send txt insert "\n"))
-
+         
          ; scroll back to the top of the window
          (send txt move-position 'home)
          
