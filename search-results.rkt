@@ -51,9 +51,19 @@
        [help-string "Append search results to existing collection"]
        [callback (λ (button event)
                    (unless (empty? searched-images)
-                     (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
-                     (pfs (append (pfs) searched-images))
-                     (load-image (first searched-images))
+                     (cond
+                       ; empty collection, create a new one
+                       [(equal? (first (pfs)) (build-path "/"))
+                        (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+                        (pfs searched-images)
+                        (load-image (first searched-images))]
+                       ; append to the current collection
+                       [else
+                        (pfs (remove-duplicates (append (pfs) searched-images)))
+                        (send (status-bar-position) set-label
+                              (format "~a / ~a"
+                                      (+ (get-index (image-path) (pfs)) 1)
+                                      (length (pfs))))])
                      (send results-frame show #f)))]))
 
 (define file-close

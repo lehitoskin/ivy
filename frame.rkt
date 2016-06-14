@@ -157,10 +157,9 @@
                ("Any" "*.*"))))
           ; the user did not click cancel
           (when paths
-            (define path-default? (equal? (first (pfs)) (build-path "/")))
             (cond
               ; empty collection, adding images and load the first in the list
-              [path-default?
+              [(equal? (first (pfs)) (build-path "/"))
                (define img-path (first paths))
                (define-values (base name dir?) (split-path img-path))
                (image-dir base)
