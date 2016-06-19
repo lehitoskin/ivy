@@ -75,7 +75,7 @@
        [callback (λ (button event)
                    (send results-frame show #f))]))
 
-(define txt (new text%))
+(define txt (new text% [auto-wrap #t]))
 
 (define ecanvas
   (new editor-canvas%
@@ -113,7 +113,6 @@
          
          (define imgs-str (sort (map path->string imgs) string<?))
          (set! searched-images (map string->path imgs-str))
-         (define imgs-grid (grid-list imgs-str 6))
          
          (define thumbs-path
            (for/list ([path-str (in-list imgs-str)])
@@ -125,7 +124,6 @@
                     (string-replace path-str "/" "_"))
                 ".png"))
              (build-path thumbnails-path thumb-name)))
-         (define thumbs-grid (grid-list thumbs-path 6))
          
          ; generate the thumbnail in case it does not exist
          (generate-thumbnails
@@ -136,22 +134,18 @@
                         #f
                         path-str))))
          
-         (for ([thumbs-list (in-list thumbs-grid)]
-               [img-list (in-list imgs-grid)])
-           (for ([thumb-str (in-list thumbs-list)]
-                 [img-str (in-list img-list)])
-             (define img-name (path->string (file-name-from-path img-str)))
-             (define thumb+name
-               (pict->bitmap
-                (vc-append
-                 (bitmap thumb-str)
-                 (text img-name (list (make-object color% "white"))))))
-             (define snp (make-object image-snip% thumb+name))
-             (send txt insert snp)
-             (send txt insert "  "))
-           (send txt insert "\n"))
+         (for ([thumb-str (in-list thumbs-path)]
+               [img-str (in-list imgs-str)])
+           (define img-name (path->string (file-name-from-path img-str)))
+           (define thumb+name
+             (pict->bitmap
+              (vc-append
+               (bitmap thumb-str)
+               (text img-name (list (make-object color% "white"))))))
+           (send txt insert (make-object image-snip% thumb+name)))
          
          ; scroll back to the top of the window
+         (send txt insert "\n")
          (send txt move-position 'home)
          
          (send prep-notification show #f)

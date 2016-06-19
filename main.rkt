@@ -291,8 +291,8 @@
            ; copy the file over, overwrite dest if exists
            (when (verbose?)
              (printf "Moving ~a to ~a~n" old-path new-path))
-           (rename-file-or-directory old-path new-path #f)
-           (delete-data-object sqlc old-img-obj)))])])
+           (db-purge! old-path)
+           (rename-file-or-directory old-path new-path #f)))])])
  ; exit explicitly
  (unless (show-frame?)
    (disconnect sqlc)

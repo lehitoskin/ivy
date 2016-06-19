@@ -5,6 +5,7 @@
          pict
          racket/bool
          racket/class
+         racket/function
          racket/gui/base
          racket/list
          racket/path
@@ -296,7 +297,7 @@
 ; returns a list of lists of lengths no more than width
 (define (grid-list lst width [accum empty])
   (if (> width (length lst))
-      (append accum (list lst))
+      (filter (negate empty?) (append accum (list lst)))
       (grid-list (drop lst width) width (append accum (list (take lst width))))))
 
 ; generates 100x100 thumbnails from a list of string paths
