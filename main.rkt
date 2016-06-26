@@ -21,6 +21,10 @@
 (define tags-to-exclude (make-parameter empty))
 (define null-flag (make-parameter #f))
 (define verbose? (make-parameter #f))
+(define listing? (make-parameter #f))
+(define adding? (make-parameter #f))
+(define deleting? (make-parameter #f))
+(define setting? (make-parameter #f))
 (define moving? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
@@ -66,6 +70,26 @@
                     (for/list ([tag (string-split taglist ",")])
                       (string-trim tag))))
           (remove-duplicates (sort tags string<?))]))]
+ [("-L" "--list-tags")
+  "Lists the tags for the image(s)."
+  (show-frame? #f)
+  (listing? #t)]
+ [("-A" "--add-tags")
+  "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image ..."
+  (show-frame? #f)
+  (adding? #t)]
+ [("-D" "--delete-tags")
+  "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
+  (show-frame? #f)
+  (deleting? #t)]
+ [("-T" "--set-tags")
+  "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
+  (show-frame? #f)
+  (setting? #t)]
+ [("-M" "--move-image")
+  "Moves the source file(s) to the destination, updating the database."
+  (show-frame? #f)
+  (moving? #t)]
  #:once-each
  [("-e" "--exact-search")
   "Search the tags database for exact matches."
@@ -91,85 +115,11 @@
   "Display verbose information for certain operations."
   (show-frame? #f)
   (verbose? #t)]
- #:multi
- [("-L" "--list-tags")
-  img
-  "Lists the tags for the image."
-  (show-frame? #f)
-  (define absolute-path (path->string (relative->absolute img)))
-  (when (db-has-key? 'images absolute-path)
-    (define img-obj (make-data-object sqlc image% absolute-path))
-    (define taglist (send img-obj get-tags))
-    (for ([tag (in-list taglist)])
-      (if (null-flag)
-          (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
-          (printf "~a~n" tag))))]
- [("-A" "--add-tags")
-  taglist img
-  "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image"
-  (show-frame? #f)
-  (define absolute-path (path->string (relative->absolute img)))
-  (define tags-to-add
-    (cond [(string=? taglist "") empty]
-          [else
-           (define tags
-             (filter (λ (tag) (not (string=? tag "")))
-                     (for/list ([tag (string-split taglist ",")])
-                       (string-trim tag))))
-           (remove-duplicates (sort tags string<?))]))
-  (unless (empty? tags-to-add)
-    (define img-obj
-      (if (db-has-key? 'images absolute-path)
-          (make-data-object sqlc image% absolute-path)
-          (new image% [path absolute-path])))
-    (when (verbose?)
-      (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
-    (add-tags! img-obj tags-to-add))]
- [("-D" "--delete-tags")
-  taglist img
-  "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image"
-  (show-frame? #f)
-  (define absolute-path (path->string (relative->absolute img)))
-  (define tags-to-remove
-    (cond [(string=? taglist "") empty]
-          [else
-           (define tags
-             (filter (λ (tag) (not (string=? tag "")))
-                     (for/list ([tag (string-split taglist ",")])
-                       (string-trim tag))))
-           (remove-duplicates (sort tags string<?))]))
-  (when (and (not (empty? tags-to-remove))
-             (db-has-key? 'images absolute-path))
-    (define img-obj (make-data-object sqlc image% absolute-path))
-    (when (verbose?)
-      (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
-    (remove-img/tags! img-obj tags-to-remove))]
- [("-T" "--set-tags")
-  taglist img
-  "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image"
-  (show-frame? #f)
-  (define absolute-path (path->string (relative->absolute img)))
-  (define tags-to-set
-    (cond [(string=? taglist "") empty]
-          [else
-           (define tags
-             (filter (λ (tag) (not (string=? tag "")))
-                     (for/list ([tag (string-split taglist ",")])
-                       (string-trim tag))))
-           (remove-duplicates (sort tags string<?))]))
-  (unless (empty? tags-to-set)
-    (when (verbose?)
-      (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
-    (db-set! #:threaded? #f absolute-path tags-to-set))]
- [("-M" "--move-image")
-  "Moves the source file(s) to the destination, updating the database."
-  (show-frame? #f)
-  (moving? #t)]
- #:args requested-images
+ #:args args
  ; hijack requested-images for -M
  (unless (or (false? (show-frame?))
-             (empty? requested-images))
-   (define requested-paths (map relative->absolute requested-images))
+             (empty? args))
+   (define requested-paths (map relative->absolute args))
    (define checked-paths
      (for/list ([rp requested-paths])
        ; in case the user called ivy in the same directory
@@ -178,7 +128,7 @@
        (if (eq? base 'relative)
            (build-path (current-directory-for-user) name)
            rp)))
-   (define absolute-paths (map relative->absolute requested-images))
+   (define absolute-paths (map relative->absolute args))
    (cond [(> (length absolute-paths) 1)
           ; we want to load a collection
           (pfs absolute-paths)]
@@ -251,9 +201,94 @@
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
                      (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]
+   [(listing?)
+    (for ([img (in-list args)])
+      (define absolute-path (path->string (relative->absolute img)))
+      (when (db-has-key? 'images absolute-path)
+        (define img-obj (make-data-object sqlc image% absolute-path))
+        (define taglist (send img-obj get-tags))
+        (for ([tag (in-list taglist)])
+          (if (null-flag)
+              (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
+              (printf "~a~n" tag)))))]
+   [(adding?)
+    (cond
+      [(< (length args) 2)
+       (raise-argument-error 'add-tags "2 or more arguments" (length args))
+       (disconnect sqlc)
+       (exit)]
+      [else
+       (define taglist (first args))
+       (define imagelist (rest args))
+       (for ([img (in-list imagelist)])
+         (define absolute-path (path->string (relative->absolute img)))
+         (define tags-to-add
+           (cond [(string=? taglist "") empty]
+                 [else
+                  (define tags
+                    (filter (λ (tag) (not (string=? tag "")))
+                            (for/list ([tag (string-split taglist ",")])
+                              (string-trim tag))))
+                  (remove-duplicates (sort tags string<?))]))
+         (unless (empty? tags-to-add)
+           (define img-obj
+             (if (db-has-key? 'images absolute-path)
+                 (make-data-object sqlc image% absolute-path)
+                 (new image% [path absolute-path])))
+           (when (verbose?)
+             (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
+           (add-tags! img-obj tags-to-add)))])]
+   [(deleting?)
+    (cond
+      [(< (length args) 2)
+       (raise-argument-error 'delete-tags "2 or more arguments" (length args))
+       (disconnect sqlc)
+       (exit)]
+      [else
+       (define taglist (first args))
+       (define imagelist (rest args))
+       (for ([img (in-list imagelist)])
+         (define absolute-path (path->string (relative->absolute img)))
+         (define tags-to-remove
+           (cond [(string=? taglist "") empty]
+                 [else
+                  (define tags
+                    (filter (λ (tag) (not (string=? tag "")))
+                            (for/list ([tag (string-split taglist ",")])
+                              (string-trim tag))))
+                  (remove-duplicates (sort tags string<?))]))
+         (when (and (not (empty? tags-to-remove))
+                    (db-has-key? 'images absolute-path))
+           (define img-obj (make-data-object sqlc image% absolute-path))
+           (when (verbose?)
+             (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
+           (remove-img/tags! img-obj tags-to-remove)))])]
+   [(setting?)
+    (cond
+      [(< (length args) 2)
+       (raise-argument-error 'set-tags "2 or more arguments" (length args))
+       (disconnect sqlc)
+       (exit)]
+      [else
+       (define taglist (first args))
+       (define imagelist (rest args))
+       (for ([img (in-list imagelist)])
+         (define absolute-path (path->string (relative->absolute img)))
+         (define tags-to-set
+           (cond [(string=? taglist "") empty]
+                 [else
+                  (define tags
+                    (filter (λ (tag) (not (string=? tag "")))
+                            (for/list ([tag (string-split taglist ",")])
+                              (string-trim tag))))
+                  (remove-duplicates (sort tags string<?))]))
+         (unless (empty? tags-to-set)
+           (when (verbose?)
+             (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
+           (db-set! #:threaded? #f absolute-path tags-to-set)))])]
    ; moving an image in the database to another location
    [(moving?)
-    (define len (length requested-images))
+    (define len (length args))
     (cond
       [(< len 2)
        (raise-argument-error 'move-image "2 or more arguments" len)
@@ -263,7 +298,7 @@
        ; make sure the paths are absolute
        (define absolute-str (map (λ (ri)
                                    (path->string (relative->absolute ri)))
-                                 requested-images))
+                                 args))
        (define dest-or-dir (last absolute-str))
        (define-values (dest-base dest-name must-be-dir?) (split-path dest-or-dir))
        (for ([old-path (in-list (take absolute-str (sub1 len)))])
