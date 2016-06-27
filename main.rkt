@@ -8,7 +8,6 @@
          racket/list
          racket/path
          racket/string
-         racquel
          "base.rkt"
          "db.rkt"
          "frame.rkt")

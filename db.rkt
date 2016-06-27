@@ -123,13 +123,13 @@
              empty?))
   (case table
     [(images)
-     (for/list ([img (select-data-objects db-conn image%)])
-       (list (string->path (get-column path img))
-             (send img get-tags)))]
+     (for/list ([img-obj (select-data-objects db-conn image%)])
+       (list (string->path (get-column path img-obj))
+             (send img-obj get-tags)))]
     [(tags)
-     (for/list ([tag (select-data-objects db-conn tag%)])
-       (list (get-column label tag)
-             (map string->path (send tag get-images))))]))
+     (for/list ([tag-obj (select-data-objects db-conn tag%)])
+       (list (get-column label tag-obj)
+             (map string->path (send tag-obj get-images))))]))
 
 ; table: (or/c 'images 'tags)
 ; -> sequence?
@@ -142,9 +142,12 @@
   (->* ([or/c 'images 'tags]
         [or/c 'Path 'Tag_List 'Tag_Label 'Image_List])
        (#:db-conn connection?)
-       (or/c (listof path?) empty?))
+       (or/c empty? (listof path?) (listof string?)))
   (define result (rows-result-rows (query db-conn (format "select ~a from ~a;" col table))))
-  (map string->path (flatten (map vector->list result))))
+  (define flattened (flatten (map vector->list result)))
+  (case table
+    [(images) (map string->path flattened)]
+    [(tags) flattened]))
 
 (define/contract (in-table-column #:db-conn [db-conn sqlc] table col)
   (->* ([or/c 'images 'tags]

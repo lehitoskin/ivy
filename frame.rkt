@@ -10,6 +10,7 @@
          racket/string
          "base.rkt"
          "db.rkt"
+         "db-statistics.rkt"
          "files.rkt"
          "search-dialog.rkt")
 (provide (all-defined-out))
@@ -44,6 +45,11 @@
     (new menu%
          [parent ivy-menu-bar]
          [label "&Window"])))
+
+(define ivy-menu-bar-help
+  (new menu%
+       [parent ivy-menu-bar]
+       [label "&Help"]))
 
 ;; Fullscreen handling ;;
 
@@ -314,6 +320,41 @@
          [shortcut #\M]
          [help-string "Minimize the Window."]
          [callback (λ (i e) (send ivy-frame iconize #t))])))
+
+; Help window items
+
+(define ivy-menu-bar-help-about
+  (new menu-item%
+       [parent ivy-menu-bar-help]
+       [label "&About"]
+       [help-string "Display license information."]
+       [callback
+        (λ (i e)
+          (message-box "Ivy - About"
+                       "Ivy, the Taggable Image Viewer
+Copyright (C) 2016  Lehi Toskin
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
+
+(define ivy-menu-bar-help-statistics
+  (new menu-item%
+       [parent ivy-menu-bar-help]
+       [label "&Statistics"]
+       [help-string "Display database statistics."]
+       [callback (λ (i e)
+                   (update-stats)
+                   (send stats-frame show #t))]))
 
 ;; main window layout ;;
 
