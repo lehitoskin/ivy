@@ -4,7 +4,6 @@
          racket/format
          racket/gui/base
          racket/list
-         racket/string
          "db.rkt")
 (provide stats-frame update-stats)
 
@@ -22,18 +21,18 @@
   (for ([child (in-list (send stats-vpanel get-children))])
     (send stats-vpanel delete-child child)))
 
+(define (greater lst [num 0] [name ""])
+  (cond [(empty? lst) (values num name)]
+        [else
+         (define len (length (second (first lst))))
+         (if (> len num)
+             (greater (rest lst) len (first (first lst)))
+             (greater (rest lst) num name))]))
+
 ; give an up-to-date reading of the database
 (define (create-children)
   (define imgs-pairs (table-pairs 'images))
   (define tags-pairs (table-pairs 'tags))
-  
-  (define (greater lst [num 0] [name ""])
-    (cond [(empty? lst) (values num name)]
-          [else
-           (define len (length (second (first lst))))
-           (if (> len num)
-               (greater (rest lst) len (first (first lst)))
-               (greater (rest lst) num name))]))
   
   (new message%
        [parent stats-vpanel]

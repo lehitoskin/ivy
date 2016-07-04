@@ -292,8 +292,14 @@
        (or/c (listof path?) empty?))
   (cond [(zero? (length tag-lst)) empty]
         [else
-         ; sql query will complain if a tag as spaces, but no quotes around it
-         (define lst-quotes (map ~v tag-lst))
+         ; sql queries will complain for several reasons:
+         ; - if a tag has spaces, but no quotes around it
+         ; - if the tag contains quotes, so add single quotes around the entire thing
+         ; - if the tag contains ', so replace it with ''
+         (define lst-quotes
+           (map (λ (str)
+                  (format "'~a'"
+                          (string-replace str "'" "''"))) tag-lst))
          (define results
            ; loop over the tags we're searching through
            (map (λ (tag-obj)
