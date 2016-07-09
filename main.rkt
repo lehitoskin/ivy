@@ -25,6 +25,7 @@
 (define deleting? (make-parameter #f))
 (define setting? (make-parameter #f))
 (define moving? (make-parameter #f))
+(define purging? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
 (define (relative->absolute path)
@@ -81,6 +82,10 @@
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (deleting? #t)]
+ [("-P" "--purge")
+  "Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ..."
+  (show-frame? #f)
+  (purging? #t)]
  [("-T" "--set-tags")
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
@@ -262,6 +267,15 @@
            (when (verbose?)
              (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
            (remove-img/tags! img-obj tags-to-remove)))])]
+   [(purging?)
+    (for ([img (in-list args)])
+      (define absolute-path (path->string (relative->absolute img)))
+      (when (db-has-key? 'images absolute-path)
+        (define img-obj (make-data-object sqlc image% absolute-path))
+        (define tag-lst (send img-obj get-tags))
+        (when (verbose?)
+          (printf "Puring ~v from the database.~n" absolute-path))
+        (remove-img/tags! img-obj tag-lst)))]
    [(setting?)
     (cond
       [(< (length args) 2)
