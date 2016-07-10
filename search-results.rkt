@@ -109,10 +109,11 @@
          (display-nil-results-alert)]
         [else
          (send prep-notification show #t)
+         ; remove everything from the text so we can reuse it
          (send txt erase)
          
          (define imgs-str (sort (map path->string imgs) string<?))
-         (set! searched-images (map string->path imgs-str))
+         (set! searched-images imgs)
          
          (define thumbs-path
            (for/list ([path-str (in-list imgs-str)])
@@ -145,9 +146,10 @@
            (send txt insert (make-object image-snip% thumb+name)))
          
          ; scroll back to the top of the window
-         (send txt insert "\n")
-         (send txt move-position 'home)
+         (send txt scroll-to-position 0)
          
          (send prep-notification show #f)
          
+         ; make sure the displayed images reflect any new searches
+         (send ecanvas refresh)
          (send results-frame show #t)]))
