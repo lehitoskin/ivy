@@ -202,6 +202,7 @@
           (send ivy-frame set-label "Ivy Image Viewer")
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
+          (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
           (send (status-bar-dimensions) set-label "0 x 0"))]))
 
 (define ivy-menu-bar-search-tag
