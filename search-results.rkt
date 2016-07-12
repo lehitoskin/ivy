@@ -117,14 +117,7 @@
          
          (define thumbs-path
            (for/list ([path-str (in-list imgs-str)])
-             (define thumb-name
-               (string-append
-                (if (eq? (system-type) 'windows)
-                    (string-replace (string-replace path-str "\\" "_")
-                                    "C:" "C")
-                    (string-replace path-str "/" "_"))
-                ".png"))
-             (build-path thumbnails-path thumb-name)))
+             (path->thumb-path path-str)))
          
          ; generate the thumbnail in case it does not exist
          (generate-thumbnails

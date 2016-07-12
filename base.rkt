@@ -300,20 +300,24 @@
       (filter (negate empty?) (append accum (list lst)))
       (grid-list (drop lst width) width (append accum (list (take lst width))))))
 
+(define (path->thumb-path path)
+  (define path-str (if (path? path) (path->string path) path))
+  (define thumb-name
+    (string-append
+     (if (eq? (system-type) 'windows)
+         (string-replace (string-replace path-str "\\" "_")
+                         "C:" "C")
+         (string-replace path-str "/" "_"))
+     ".png"))
+  (build-path thumbnails-path thumb-name))
+
 ; generates 100x100 thumbnails from a list of string paths
 ; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
     (define thumb-bmp (read-bitmap path))
-    (define thumb-name
-      (string-append
-       (if (eq? (system-type) 'windows)
-           (string-replace (string-replace path "\\" "_")
-                           "C:" "C")
-           (string-replace path "/" "_"))
-       ".png"))
-    (define thumb-path (build-path thumbnails-path thumb-name))
+    (define thumb-path (path->thumb-path path))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))
     (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 100 100)))

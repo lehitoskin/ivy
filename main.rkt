@@ -270,12 +270,14 @@
    [(purging?)
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
-      (when (db-has-key? 'images absolute-path)
-        (define img-obj (make-data-object sqlc image% absolute-path))
-        (define tag-lst (send img-obj get-tags))
-        (when (verbose?)
-          (printf "Puring ~v from the database.~n" absolute-path))
-        (remove-img/tags! img-obj tag-lst)))]
+      ; clean up the thumbnail cache a little
+      (define thumb-name (path->thumb-path absolute-path))
+      (when (verbose?)
+        (printf "Puring ~v from the database.~n" absolute-path))
+      (db-purge! absolute-path)
+      ; remove the old thumbnail
+      (when (file-exists? thumb-name)
+        (delete-file thumb-name)))]
    [(setting?)
     (cond
       [(< (length args) 2)
@@ -328,19 +330,27 @@
                 (cond
                   [(> len 2)
                    (raise-argument-error 'move-image
-                                         "destination as a directory when more than 2 args"
+                                         "destination as a directory when passed more than 2 args"
                                          dest-or-dir)
                    #f]
                   [else dest-or-dir])])))
          (when (and new-path (db-has-key? 'images old-path))
+           ; clean up the thumbnail cache a little
+           (define old-thumb-name (path->thumb-path old-path))
+           (define new-thumb-name (path->thumb-path new-path))
            (define old-img-obj (make-data-object sqlc image% old-path))
            (define tags (send old-img-obj get-tags))
            (db-set! #:threaded? #f new-path tags)
-           ; copy the file over, overwrite dest if exists
+           ; copy the file over, do not overwrite dest if exists
            (when (verbose?)
-             (printf "Moving ~a to ~a~n" old-path new-path))
+             (printf "Moving ~v to ~v~n" old-path new-path))
            (db-purge! old-path)
-           (rename-file-or-directory old-path new-path #f)))])])
+           (rename-file-or-directory old-path new-path #f)
+           ; remove the old thumbnails
+           (when (file-exists? old-thumb-name)
+             (delete-file old-thumb-name))
+           (when (file-exists? new-thumb-name)
+             (delete-file new-thumb-name))))])])
  ; exit explicitly
  (unless (show-frame?)
    (disconnect sqlc)
