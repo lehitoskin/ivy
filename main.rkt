@@ -273,7 +273,7 @@
       ; clean up the thumbnail cache a little
       (define thumb-name (path->thumb-path absolute-path))
       (when (verbose?)
-        (printf "Puring ~v from the database.~n" absolute-path))
+        (printf "Purging ~v from the database.~n" absolute-path))
       (db-purge! absolute-path)
       ; remove the old thumbnail
       (when (file-exists? thumb-name)
