@@ -388,6 +388,13 @@
         (lambda (editor kev)
           (send editor kill)))
   
+  (send km add-function "backward-kill-buffer"
+        (lambda (editor kev)
+          (define to (send editor get-start-position))
+          (send editor move-position 'home)
+          (define from (send editor get-start-position))
+          (send editor delete from to)))
+  
   (send km add-function "mark-char-backward"
         (lambda (editor kev)
           (let ([cur (send editor get-start-position)])
@@ -462,6 +469,7 @@
          (send km map-function ":d:a" "select-all")
          (send km map-function ":d:ф" "select-all") ;; russian cyrillic
          (send km map-function ":backspace" "delete-backward-char")
+         (send km map-function ":d:backspace" "backward-kill-buffer")
          (send km map-function ":delete" "delete-forward-char")
          (send km map-function ":left" "backward-char")
          (send km map-function ":right" "forward-char")
