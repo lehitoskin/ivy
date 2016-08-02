@@ -50,10 +50,10 @@
   (show-frame? #f)
   (search-type 'or)
   (tags-to-search
-   (cond [(string=? taglist "") empty]
+   (cond [(string-null? taglist) empty]
          [else
           (define tags
-            (filter (λ (tag) (not (string=? tag "")))
+            (filter (λ (tag) (not (string-null? tag)))
                     (for/list ([tag (string-split taglist ",")])
                       (string-trim tag))))
           (remove-duplicates (sort tags string<?))]))]
@@ -63,10 +63,10 @@
   (show-frame? #f)
   (search-type 'and)
   (tags-to-search
-   (cond [(string=? taglist "") empty]
+   (cond [(string-null? taglist) empty]
          [else
           (define tags
-            (filter (λ (tag) (not (string=? tag "")))
+            (filter (λ (tag) (not (string-null? tag)))
                     (for/list ([tag (string-split taglist ",")])
                       (string-trim tag))))
           (remove-duplicates (sort tags string<?))]))]
@@ -104,10 +104,10 @@
   "Search the tags database with -o/-a, but exclude images with the specified tags."
   (show-frame? #f)
   (tags-to-exclude
-   (cond [(string=? exclude "") empty]
+   (cond [(string-null? exclude) empty]
          [else
           (define tags
-            (filter (λ (tag) (not (string=? tag "")))
+            (filter (λ (tag) (not (string-null? tag)))
                     (for/list ([tag (string-split exclude ",")])
                       (string-trim tag))))
           (remove-duplicates (sort tags string<?))]))]
@@ -227,10 +227,10 @@
        (for ([img (in-list imagelist)])
          (define absolute-path (path->string (relative->absolute img)))
          (define tags-to-add
-           (cond [(string=? taglist "") empty]
+           (cond [(string-null? taglist) empty]
                  [else
                   (define tags
-                    (filter (λ (tag) (not (string=? tag "")))
+                    (filter (λ (tag) (not (string-null? tag)))
                             (for/list ([tag (string-split taglist ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))
@@ -254,10 +254,10 @@
        (for ([img (in-list imagelist)])
          (define absolute-path (path->string (relative->absolute img)))
          (define tags-to-remove
-           (cond [(string=? taglist "") empty]
+           (cond [(string-null? taglist) empty]
                  [else
                   (define tags
-                    (filter (λ (tag) (not (string=? tag "")))
+                    (filter (λ (tag) (not (string-null? tag)))
                             (for/list ([tag (string-split taglist ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))
@@ -290,10 +290,10 @@
        (for ([img (in-list imagelist)])
          (define absolute-path (path->string (relative->absolute img)))
          (define tags-to-set
-           (cond [(string=? taglist "") empty]
+           (cond [(string-null? taglist) empty]
                  [else
                   (define tags
-                    (filter (λ (tag) (not (string=? tag "")))
+                    (filter (λ (tag) (not (string-null? tag)))
                             (for/list ([tag (string-split taglist ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))

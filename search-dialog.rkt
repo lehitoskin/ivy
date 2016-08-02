@@ -52,7 +52,7 @@
         (λ (tf evt)
           (when (and
                  (eq? (send evt get-event-type) 'text-field-enter)
-                 (not (string=? (send tf get-value) "")))
+                 (not (string-null? (send tf get-value))))
             (ok-callback)))]))
 
 (define exclude-tfield
@@ -63,7 +63,7 @@
         (λ (tf evt)
           (when (and
                  (eq? (send evt get-event-type) 'text-field-enter)
-                 (not (string=? (send tf get-value) "")))
+                 (not (string-null? (send tf get-value))))
             (ok-callback)))]))
 
 (define modifier-hpanel
@@ -116,5 +116,5 @@
        [label "&Ok"]
        [callback
         (λ (button event)
-          (unless (string=? (send search-tfield get-value) "")
+          (unless (string-null? (send search-tfield get-value))
             (ok-callback)))]))

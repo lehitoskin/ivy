@@ -11,10 +11,12 @@
          racket/path
          racket/string
          (only-in srfi/13
-                  string-contains-ci)
+                  string-contains-ci
+                  string-null?)
          "db.rkt"
          "files.rkt")
-(provide (all-defined-out))
+(provide (all-defined-out)
+         string-null?)
 
 (define (path->symbol p)
   (string->symbol (path->string p)))
@@ -54,10 +56,10 @@
 
 (define (tfield->list tf)
   (define val (send tf get-value))
-  (cond [(string=? val "") empty]
+  (cond [(string-null? val) empty]
         [else
          (define tags
-           (filter (λ (tag) (not (string=? tag "")))
+           (filter (negate string-null?)
                    (for/list ([tag (string-split val ",")])
                      (string-trim tag))))
          (remove-duplicates (sort tags string<?))]))

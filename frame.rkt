@@ -413,12 +413,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (load-image image-bmp-master))]))
 
 (define (on-escape-key tfield)
-  (send tfield set-field-background (make-object color% "white"))
-  (define-values (base name-path must-be-dir?) (split-path (image-path)))
-  (if (string=? (send tfield get-value) (incoming-tags))
-      (send (ivy-canvas) focus)
-      (send tfield set-value (incoming-tags)))
-  (send ivy-frame set-label (path->string name-path)))
+  (unless (string=? (path->string (image-path)) "/")
+    (send tfield set-field-background (make-object color% "white"))
+    (define-values (base name-path must-be-dir?) (split-path (image-path)))
+    (if (string=? (send tfield get-value) (incoming-tags))
+        (send (ivy-canvas) focus)
+        (send tfield set-value (incoming-tags)))
+    (send ivy-frame set-label (path->string name-path))))
 
 (define ivy-tfield%
   (class text-field%
@@ -447,11 +448,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
                   (define tags (send tf get-value))
                   (send ivy-frame set-label name-str)
-                  (cond [(string=? tags "")
+                  (cond [(string-null? tags)
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
                          (db-purge! img-str)]
                         [else
+                         (incoming-tags tags)
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (tfield->list tf))
                          ; set and save the dictionary
@@ -477,12 +479,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
             (send (ivy-tag-tfield) set-field-background
                   (make-object color% "spring green"))
             ; empty tag string means delete the entry
-            (cond [(string=? tags "")
+            (cond [(string-null? tags)
                    ; no failure if key doesn't exist
                    (db-purge! img-str)]
                   [else
+                   (incoming-tags tags)
                    ; turn the string of tag(s) into a list then sort it
-                   (define tag-lst (sort (string-split tags ", ") string<?))
+                   (define tag-lst (tfield->list (ivy-tag-tfield)))
                    ; set and save the dictionary
                    (db-set! img-str tag-lst)])
             (send (ivy-canvas) focus)))]))
