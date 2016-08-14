@@ -203,7 +203,8 @@
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
           (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
-          (send (status-bar-dimensions) set-label "0 x 0"))]))
+          (send (status-bar-dimensions) set-label "0 x 0")
+          (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%
@@ -387,7 +388,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
-                   (when image-pict
+                   ; do nothing if we've pressed ctrl+n
+                   (when (and image-pict
+                              (not (string=? (path->string (image-path)) "/")))
                      (load-image image-pict 'larger)))]))
 
 (define ivy-actions-zoom-out
@@ -395,7 +398,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
-                   (when image-pict
+                   ; do nothing if we've pressed ctrl+n
+                   (when (and image-pict
+                              (not (string=? (path->string (image-path)) "/")))
                      (load-image image-pict 'smaller)))]))
 
 (define ivy-actions-zoom-normal
@@ -403,14 +408,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
-                   (load-image image-bmp-master 'none))]))
+                   ; do nothing if we've pressed ctrl+n
+                   (unless (string=? (path->string (image-path)) "/")
+                     (load-image image-bmp-master 'none)))]))
 
 (define ivy-actions-zoom-fit
   (new button%
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
-                   (load-image image-bmp-master))]))
+                   ; do nothing if we've pressed ctrl+n
+                   (unless (string=? (path->string (image-path)) "/")
+                     (load-image image-bmp-master)))]))
 
 (define (on-escape-key tfield)
   (unless (string=? (path->string (image-path)) "/")
@@ -551,13 +560,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       (define type (send key get-key-code))
       (case type
         [(wheel-down)
-         (when image-pict
+         ; do nothing if we've pressed ctrl+n
+         (when (and image-pict
+                    (not (string=? (path->string (image-path)) "/")))
            (load-image image-pict 'wheel-smaller))]
         [(wheel-up)
-         (when image-pict
+         ; do nothing if we've pressed ctrl+n
+         (when (and image-pict
+                    (not (string=? (path->string (image-path)) "/")))
            (load-image image-pict 'wheel-larger))]
-        [(f11) (cond [(not (macosx?))
-                      (toggle-fullscreen this ivy-frame)])]
+        ; osx does things a little different
+        [(f11) (unless (macosx?)
+                 (toggle-fullscreen this ivy-frame))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
