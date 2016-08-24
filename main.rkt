@@ -334,23 +334,30 @@
                                          dest-or-dir)
                    #f]
                   [else dest-or-dir])])))
-         (when (and new-path (db-has-key? 'images old-path))
-           ; clean up the thumbnail cache a little
-           (define old-thumb-name (path->thumb-path old-path))
-           (define new-thumb-name (path->thumb-path new-path))
-           (define old-img-obj (make-data-object sqlc image% old-path))
-           (define tags (send old-img-obj get-tags))
-           (db-set! #:threaded? #f new-path tags)
+         ; do the actual moving
+         (when new-path
+           (cond
+             ; reassociate the tags to the new destination
+             [(db-has-key? 'images old-path)
+              ; clean up the thumbnail cache a little
+              (define old-thumb-name (path->thumb-path old-path))
+              (define new-thumb-name (path->thumb-path new-path))
+              (define old-img-obj (make-data-object sqlc image% old-path))
+              (define tags (send old-img-obj get-tags))
+              ; remove the old thumbnails
+              (when (file-exists? old-thumb-name)
+                (delete-file old-thumb-name))
+              (when (file-exists? new-thumb-name)
+                (delete-file new-thumb-name))
+              (db-set! #:threaded? #f new-path tags)
+              (db-purge! old-path)]
+             [else
+              ; spit out an error message, but move anyway
+              (eprintf "Database does not contain ~v~n" old-path)])
            ; copy the file over, do not overwrite dest if exists
            (when (verbose?)
              (printf "Moving ~v to ~v~n" old-path new-path))
-           (db-purge! old-path)
-           (rename-file-or-directory old-path new-path #f)
-           ; remove the old thumbnails
-           (when (file-exists? old-thumb-name)
-             (delete-file old-thumb-name))
-           (when (file-exists? new-thumb-name)
-             (delete-file new-thumb-name))))])])
+           (rename-file-or-directory old-path new-path #f)))])])
  ; exit explicitly
  (unless (show-frame?)
    (disconnect sqlc)
