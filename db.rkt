@@ -262,12 +262,51 @@
                 (add-tags! #:db-conn db-conn img tag-lst)))
       (add-tags! #:db-conn db-conn img tag-lst)))
 
+; reconcile between the old tags and new tags
+; instead of a scorched earth approach like db-set!, only delete and add
+; the tags as necessary
+(define/contract (reconcile-tags! #:db-conn [db-conn sqlc] img tag-lst)
+  (->* ([or/c string? data-object?]
+        [listof string?])
+       (#:db-conn connection?)
+       void?)
+  (define img-obj
+    (cond [(data-object? img) img]
+          [(db-has-key? #:db-conn db-conn 'images img)
+           (make-data-object db-conn image% img)]
+          [else #f]))
+  (when img-obj
+    (define old-tags (send img-obj get-tags))
+    (define diff (lst-diff old-tags tag-lst))
+    (unless (empty? diff)
+      ; remove no longer used tags
+      (remove-tags! #:db-conn db-conn img (first diff))
+      ; add new tags
+      (add-tags! #:db-conn db-conn img (second diff))
+      ; save db object
+      (save-data-object db-conn img-obj))))
+
 ; go through each image entry and check if it is a file that still exists
 ; and then purge from the database if it does not
 (define (clean-db! #:db-conn [db-conn sqlc])
   ; grab all the entries in images
   (for ([key (in-table-column 'images 'Path)])
     (unless (file-exists? key) (db-purge! #:db-conn db-conn key))))
+
+; spit out the differences between a and b
+; if all are different, return b
+; if all the same, return empty
+; if differences and similarities, return in form '(diff-a diff-b)
+(define (lst-diff a b [cmp string<?])
+  (define both (sort (append a b) cmp))
+  (define same (sort (keep-duplicates both) cmp))
+  (cond
+    ; everything is different
+    [(empty? same) b]
+    ; no differences
+    [(equal? (remove-duplicates both) same) empty]
+    ; at least one is a duplicate
+    [else (list (remove* same a) (remove* same b))]))
 
 ; saves only the entries in the list that are duplicates.
 ; if there are more than two identical entries, they are

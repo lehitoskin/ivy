@@ -465,8 +465,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (incoming-tags tags)
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (tfield->list tf))
-                         ; set and save the dictionary
-                         (db-set! img-str tag-lst)])
+                         ; add/remove tags as necessary
+                         (reconcile-tags! img-str tag-lst)])
                   (send tf set-field-background (make-object color% "spring green"))
                   (send (ivy-canvas) focus)]
                  [else
@@ -495,8 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (incoming-tags tags)
                    ; turn the string of tag(s) into a list then sort it
                    (define tag-lst (tfield->list (ivy-tag-tfield)))
-                   ; set and save the dictionary
-                   (db-set! img-str tag-lst)])
+                   ; add/remove tags as necessary
+                   (reconcile-tags! img-str tag-lst)])
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)
