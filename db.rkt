@@ -280,11 +280,9 @@
     (define diff (lst-diff old-tags tag-lst))
     (unless (empty? diff)
       ; remove no longer used tags
-      (remove-tags! #:db-conn db-conn img (first diff))
+      (remove-img/tags! #:db-conn db-conn img-obj (first diff))
       ; add new tags
-      (add-tags! #:db-conn db-conn img (second diff))
-      ; save db object
-      (save-data-object db-conn img-obj))))
+      (add-tags! #:db-conn db-conn img-obj (second diff)))))
 
 ; go through each image entry and check if it is a file that still exists
 ; and then purge from the database if it does not
