@@ -274,15 +274,15 @@
     (cond [(data-object? img) img]
           [(db-has-key? #:db-conn db-conn 'images img)
            (make-data-object db-conn image% img)]
-          [else #f]))
-  (when img-obj
-    (define old-tags (send img-obj get-tags))
-    (define diff (lst-diff old-tags tag-lst))
-    (unless (empty? diff)
-      ; remove no longer used tags
-      (remove-img/tags! #:db-conn db-conn img-obj (first diff))
-      ; add new tags
-      (add-tags! #:db-conn db-conn img-obj (second diff)))))
+          [else (new image% [path img])]))
+  (define old-tags (send img-obj get-tags))
+  (define diff (lst-diff old-tags tag-lst))
+  (unless (empty? diff)
+    ; add new tags (if any)
+    (add-tags! #:db-conn db-conn img-obj (second diff))
+    ; remove no longer used tags
+    ; delete img-obj if no more tags
+    (remove-img/tags! #:db-conn db-conn img-obj (first diff))))
 
 ; go through each image entry and check if it is a file that still exists
 ; and then purge from the database if it does not
@@ -292,7 +292,7 @@
     (unless (file-exists? key) (db-purge! #:db-conn db-conn key))))
 
 ; spit out the differences between a and b
-; if all are different, return b
+; if all are different, return '(empty b)
 ; if all the same, return empty
 ; if differences and similarities, return in form '(diff-a diff-b)
 (define (lst-diff a b [cmp string<?])
@@ -300,7 +300,7 @@
   (define same (sort (keep-duplicates both) cmp))
   (cond
     ; everything is different
-    [(empty? same) b]
+    [(empty? same) (list empty b)]
     ; no differences
     [(equal? (remove-duplicates both) same) empty]
     ; at least one is a duplicate
