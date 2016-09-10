@@ -124,8 +124,8 @@
              null
              `(("All images"
                 ,(string-append
-                  "*."
-                  (string-join supported-extensions ";*.")))
+                  "*"
+                  (string-join supported-extensions ";*")))
                ("Any" "*.*"))))
           ; make sure the path is not false
           (when paths
@@ -158,8 +158,8 @@
              null
              `(("All images"
                 ,(string-append
-                  "*."
-                  (string-join supported-extensions ";*.")))
+                  "*"
+                  (string-join supported-extensions ";*")))
                ("Any" "*.*"))))
           ; the user did not click cancel
           (when paths
@@ -196,8 +196,7 @@
           (image-path (build-path "/"))
           (send (ivy-canvas) set-on-paint!
                 (λ (canvas dc)
-                  (send canvas set-canvas-background
-                        (make-object color% "black"))))
+                  (send canvas set-canvas-background (make-object color% "black"))))
           (send (ivy-canvas) refresh)
           (send ivy-frame set-label "Ivy Image Viewer")
           (send (status-bar-position) set-label "0 / 0")
@@ -587,8 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       [style '(hscroll vscroll)]
       [stretchable-height #t]
       [paint-callback (λ (canvas dc)
-                        (send canvas set-canvas-background
-                              (make-object color% "black")))]))
+                        (send canvas set-canvas-background (make-object color% "black")))]))
 (send (ivy-canvas) accept-drop-files #t)
 
 (define status-bar-hpanel
