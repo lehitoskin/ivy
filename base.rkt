@@ -343,7 +343,10 @@
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
-    (define thumb-bmp (read-bitmap path))
+    (define thumb-bmp
+      (if (bytes=? (path-get-extension path) #".svg")
+          (load-svg-from-file path)
+          (read-bitmap path)))
     (define thumb-path (path->thumb-path path))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))
