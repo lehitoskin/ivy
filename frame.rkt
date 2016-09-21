@@ -287,7 +287,10 @@
        [parent ivy-menu-bar-view]
        [label "&Gif Animation"]
        [help-string "Animate GIFs, if possible."]
-       [callback (λ (i e) (want-animation? (send i is-checked?)))]))
+       [callback (λ (i e)
+                   (want-animation? (send i is-checked?))
+                   (when (gif-animated? (image-path))
+                     (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%

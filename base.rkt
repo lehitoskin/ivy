@@ -17,7 +17,8 @@
          "db.rkt"
          "files.rkt")
 (provide (all-defined-out)
-         string-null?)
+         string-null?
+         gif-animated?)
 
 (define (path->symbol p)
   (string->symbol (path->string p)))
@@ -224,10 +225,10 @@
         ; make a list of picts
         (set! gif-lst
               (with-handlers
-                  ([exn:fail? (λ (unexn)
+                  ([exn:fail? (λ (e)
                                 (eprintf "Error loading animated gif ~v: ~v\n"
                                          (path->string name)
-                                         (exn-message unexn))
+                                         (exn-message e))
                                 (send sbe set-label
                                       (format "Error loading file ~v"
                                               (string-truncate (path->string name) 30)))
