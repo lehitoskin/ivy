@@ -3,6 +3,7 @@
 ; main frame file for ivy, the taggable image viewer
 (require images/flomap
          pict
+         racket/bool
          racket/class
          racket/gui/base
          racket/list
@@ -225,7 +226,12 @@
            [label "&Quit"]
            [shortcut #\Q]
            [help-string "Quit the program."]
-           [callback (λ (i e) (disconnect sqlc) (exit))])))
+           [callback (λ (i e)
+                       ; kill the gif thread, if applicable
+                       (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+                         (kill-thread (gif-thread)))
+                       (disconnect sqlc)
+                       (exit))])))
 
 ;; Navigation menu items ;;
 
@@ -389,9 +395,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (when (and image-pict
-                              (not (string=? (path->string (image-path)) "/")))
-                     (load-image image-pict 'larger)))]))
+                   (if (and (not (string=? (path->string (image-path)) "/"))
+                            image-pict
+                            (empty? gif-lst))
+                       (load-image image-pict 'larger)
+                       (load-image gif-lst 'larger)))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -399,9 +407,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (when (and image-pict
-                              (not (string=? (path->string (image-path)) "/")))
-                     (load-image image-pict 'smaller)))]))
+                   (if (and (not (string=? (path->string (image-path)) "/"))
+                            image-pict
+                            (empty? gif-lst))
+                       (load-image image-pict 'smaller)
+                       (load-image gif-lst 'smaller)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -409,8 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (string=? (path->string (image-path)) "/")
-                     (load-image image-bmp-master 'none)))]))
+                   (if (and (string=? (path->string (image-path)) "/")
+                            (empty? gif-lst))
+                       (load-image image-bmp-master 'none)
+                       (load-image (image-path) 'none)))]))
 
 (define ivy-actions-zoom-fit
   (new button%
@@ -418,8 +430,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (string=? (path->string (image-path)) "/")
-                     (load-image image-bmp-master)))]))
+                   (if (and (string=? (path->string (image-path)) "/")
+                            (empty? gif-lst))
+                       (load-image image-bmp-master)
+                       (load-image (image-path))))]))
 
 (define (on-escape-key tfield)
   (unless (string=? (path->string (image-path)) "/")
@@ -561,14 +575,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       (case type
         [(wheel-down)
          ; do nothing if we've pressed ctrl+n
-         (when (and image-pict
-                    (not (string=? (path->string (image-path)) "/")))
-           (load-image image-pict 'wheel-smaller))]
+         (if (and image-pict
+                  (not (string=? (path->string (image-path)) "/"))
+                  (empty? gif-lst))
+             (load-image image-pict 'wheel-smaller)
+             (load-image gif-lst 'wheel-smaller))]
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
-         (when (and image-pict
-                    (not (string=? (path->string (image-path)) "/")))
-           (load-image image-pict 'wheel-larger))]
+         (if (and image-pict
+                  (not (string=? (path->string (image-path)) "/"))
+                  (empty? gif-lst))
+             (load-image image-pict 'wheel-larger)
+             (load-image gif-lst 'wheel-larger))]
         ; osx does things a little different
         [(f11) (unless (macosx?)
                  (toggle-fullscreen this ivy-frame))]
