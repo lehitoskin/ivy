@@ -4,7 +4,6 @@
 (require file/convertible
          gif-image
          pict
-         pict/convert
          racket/bool
          racket/class
          racket/function
@@ -80,6 +79,11 @@
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
 
+(define (string-truncate str n)
+  (if (<= (string-length str) n)
+      str
+      (substring str 0 n)))
+
 ; scales an image to the current canvas size
 ; img is either a pict or a bitmap%
 ; type is a symbol
@@ -139,8 +143,10 @@
 (define ivy-canvas (make-parameter #f))
 (define ivy-tag-tfield (make-parameter #f))
 (define status-bar-dimensions (make-parameter #f))
+(define status-bar-error (make-parameter #f))
 (define status-bar-position (make-parameter #f))
 (define incoming-tags (make-parameter ""))
+(define want-animation? (make-parameter #f))
 
 (define (animated-gif-callback canvas dc lst)
   (define gif-x (inexact->exact (round (pict-width (first lst)))))
@@ -199,7 +205,10 @@
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
+  (define sbe (status-bar-error))
   (define sbp (status-bar-position))
+
+  (send sbe set-label "")
   
   (cond
     ; need to load the path into a bitmap first
@@ -210,18 +219,30 @@
      (define img-str (path->string img))
      (cond
        ; load an animated gif
-       [(and (gif? img) (gif-animated? img))
+       [(and (want-animation?) (gif? img) (gif-animated? img))
+        (define load-success (send image-bmp-master load-file img))
         ; make a list of picts
         (set! gif-lst
-              (for/list ([bits (gif-images img)])
-                (define bmp-in-port (open-input-bytes bits))
-                (define bmp (make-object bitmap% 50 50))
-                (send bmp load-file bmp-in-port 'gif/alpha)
-                (close-input-port bmp-in-port)
-                (scale-image bmp scale)))
+              (with-handlers
+                  ([exn:fail? (λ (unexn)
+                                (eprintf "Error loading animated gif ~v: ~v\n"
+                                         (path->string name)
+                                         (exn-message unexn))
+                                (send sbe set-label
+                                      (format "Error loading file ~v"
+                                              (string-truncate (path->string name) 30)))
+                                (for/list ([frame (gif-images img)])
+                                  (if load-success
+                                      (scale-image image-bmp-master scale)
+                                      (scale-image (make-object bitmap% 50 50) scale))))])
+                (for/list ([bits (gif-images img)])
+                  (define bmp-in-port (open-input-bytes bits))
+                  (define bmp (make-object bitmap% 50 50))
+                  (send bmp load-file bmp-in-port 'gif/alpha)
+                  (close-input-port bmp-in-port)
+                  (scale-image bmp scale))))
         (set! gif-lst-timings (gif-timings img))
         (set! image-pict #f)
-        (send image-bmp-master load-file img)
         (send sbd set-label
               (format "~a x ~a pixels"
                       (send image-bmp-master get-width)
@@ -239,7 +260,10 @@
                (set! gif-lst empty)
                (set! gif-lst-timings empty)]
               [else
-               (eprintf "Error loading file ~a~n" img)])])
+               (eprintf "Error loading file ~v~n" img)
+               (send sbe set-label
+                     (format "Error loading file ~v"
+                             (string-truncate (path->string name) 30)))])])
      
      (send (send canvas get-parent) set-label (path->string name))
      (send sbp set-label

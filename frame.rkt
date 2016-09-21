@@ -282,6 +282,13 @@
        [shortcut-prefix (if (macosx?) '(ctl cmd) (get-default-shortcut-prefix))]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
 
+(define ivy-menu-bar-view-gif-animation
+  (new checkable-menu-item%
+       [parent ivy-menu-bar-view]
+       [label "&Gif Animation"]
+       [help-string "Animate GIFs, if possible."]
+       [callback (λ (i e) (want-animation? (send i is-checked?)))]))
+
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
        [parent ivy-menu-bar-view]
@@ -620,6 +627,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [stretchable-height #f]
        [alignment '(left center)]))
 
+(define error-hpanel
+  (new horizontal-panel%
+       [parent status-bar-hpanel]
+       [stretchable-height #f]
+       [alignment '(center center)]))
+
 (define position-hpanel
   (new horizontal-panel%
        [parent status-bar-hpanel]
@@ -632,6 +645,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       [label (format "~a x ~a pixels"
                      (send image-bmp-master get-width)
                      (send image-bmp-master get-height))]
+      [auto-resize #t]))
+
+(status-bar-error
+ (new message%
+      [parent error-hpanel]
+      [label ""]
       [auto-resize #t]))
 
 (status-bar-position
