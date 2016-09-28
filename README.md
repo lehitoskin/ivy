@@ -4,15 +4,20 @@ Ivy, the Taggable Image Viewer
 Ivy is an image viewer that allows the user to set or remove tags that are
 tracked solely by the application.
 
-
 ## Installation
 
-Ivy requires [Racket](http://racket-lang.org/) version 6.5.3 and up as well as the
-[racquel](https://github.com/brown131/racquel) Racket package. Beyond that, you
-actually don't *need* to install Ivy, per se. Simply point the Racket
-interpreter to the location of the `main.rkt` file. However, it will be easier
-to use Ivy if the executable is in your PATH. Compiling Ivy is simple. In the
-directory where you saved Ivy, you can just run
+### Dependencies
+
+- [Racket](http://racket-lang.org/) version 6.6 and up
+- [racquel](https://github.com/brown131/racquel)
+- [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
+
+### Compilation
+
+You actually don't *need* to install Ivy, per se. Simply point the Racket
+interpreter to the location of the `main.rkt` file. However, it will be
+easier to use Ivy if the executable is in your PATH. Compiling Ivy is simple:
+in the directory where you saved Ivy, you can just run
 
 ```
 make
