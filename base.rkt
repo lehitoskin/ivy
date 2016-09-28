@@ -10,6 +10,7 @@
          racket/list
          racket/path
          racket/string
+         rsvg
          (only-in srfi/13
                   string-contains-ci
                   string-null?)
@@ -35,7 +36,7 @@
 (define image-pict #f)
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions '("png" "jpg" "jpe" "jpeg" "bmp" "gif"))
+(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
 (define exact-search? (make-parameter #f))
 
 ; all image files contained within image-dir
@@ -43,7 +44,7 @@
   (define dir-lst (directory-list (image-dir) #:build? #t))
   (define file-lst
     (for/list ([file dir-lst])
-      (define ext (filename-extension file))
+      (define ext (path-get-extension file))
       (cond [(false? ext) #f]
             [else
              (define ext-str (string-downcase (bytes->string/utf-8 ext)))
@@ -70,6 +71,27 @@
   (define len (length lst))
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
+
+; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
+(define (transparency-grid img)
+  (define dgray-color (make-object color% 128 128 128))
+  (define lgray-color (make-object color% 204 204 204))
+  (define x (if (pict? img) (pict-width img) (send img get-width)))
+  (define y (if (pict? img) (pict-height img) (send img get-height)))
+  (define x-times (inexact->exact (floor (/ x 20))))
+  (define y-times (inexact->exact (floor (/ y 20))))
+  (define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
+  (define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
+  (define vboth (vl-append dgray-square lgray-square))
+  (define aline (apply hc-append (make-list x-times (hc-append dgray-square lgray-square))))
+  (define bline (apply hc-append (make-list x-times (hc-append lgray-square dgray-square))))
+  (apply vl-append (make-list y-times (vl-append aline bline))))
+
+; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
+(define (transparency-grid-append img)
+  (define x (if (pict? img) (pict-width img) (send img get-width)))
+  (define pct (if (pict? img) img (bitmap img)))
+  (hc-append (- x) (transparency-grid img) pct))
 
 ; scales an image to the current canvas size
 ; img is either a pict or a bitmap%
@@ -146,7 +168,11 @@
      (image-path img)
      (define img-str (path->string img))
      ; make sure the bitmap loaded correctly
-     (define load-success (send image-bmp-master load-file img))
+     (define load-success
+       (cond [(bytes=? (path-get-extension img) #".svg")
+              (set! image-bmp-master (load-svg-from-file img))]
+             [else
+              (send image-bmp-master load-file img 'unknown/alpha)]))
      (cond [load-success
             (send (send canvas get-parent) set-label (path->string name))
             (send sbd set-label
@@ -192,11 +218,10 @@
           (define canvas-center-y (/ canvas-y 2))
           
           ; keep the background black
-          (send canvas set-canvas-background
-                (make-object color% "black"))
+          (send canvas set-canvas-background (make-object color% "black"))
           
           ; alleviate image "jaggies"
-          (define bmp (pict->bitmap image-pict))
+          (define bmp (pict->bitmap (transparency-grid-append image-pict)))
           
           (cond
             ; if the image is really big, place it at (0,0)
@@ -318,7 +343,10 @@
 (define (generate-thumbnails imgs)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
-    (define thumb-bmp (read-bitmap path))
+    (define thumb-bmp
+      (if (bytes=? (path-get-extension path) #".svg")
+          (load-svg-from-file path)
+          (read-bitmap path)))
     (define thumb-path (path->thumb-path path))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))

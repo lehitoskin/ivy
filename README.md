@@ -7,7 +7,7 @@ tracked solely by the application.
 
 ## Installation
 
-Ivy requires [Racket](http://racket-lang.org/) version 6.0 and up as well as the
+Ivy requires [Racket](http://racket-lang.org/) version 6.5.3 and up as well as the
 [racquel](https://github.com/brown131/racquel) Racket package. Beyond that, you
 actually don't *need* to install Ivy, per se. Simply point the Racket
 interpreter to the location of the `main.rkt` file. However, it will be easier
