@@ -76,42 +76,16 @@
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
 
-; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
-; creates a dark-gray/light-gray grid to place behind images
-; so that if they are transparent, the grid will become visible.
-#|(define (transparency-grid img)
-  (define dgray-color (make-object color% 128 128 128))
-  (define lgray-color (make-object color% 204 204 204))
-  (define x (if (pict? img) (pict-width img) (send img get-width)))
-  (define y (if (pict? img) (pict-height img) (send img get-height)))
-  ; 10 for a square's width
-  (define x-times (inexact->exact (floor (/ x 10))))
-  ; 20 for both squares' height
-  (define y-times (inexact->exact (floor (/ y 20))))
-  (define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
-  (define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
-  (define aline
-    (apply hc-append
-           (for/list ([times (in-range x-times)]
-                      [i (in-naturals)])
-             (if (even? i)
-                 dgray-square
-                 lgray-square))))
-  (define bline
-    (apply hc-append
-           (for/list ([times (in-range x-times)]
-                      [i (in-naturals)])
-             (if (even? i)
-                 lgray-square
-                 dgray-square))))
-  (apply vl-append (make-list y-times (vl-append aline bline))))|#
+; objects that will be used extensively in transparency-grid
+(define dgray-color (make-object color% 128 128 128))
+(define lgray-color (make-object color% 204 204 204))
+(define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
+(define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
 
 ; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
 ; creates a dark-gray/light-gray grid to place behind images
 ; so that if they are transparent, the grid will become visible.
 (define (transparency-grid img)
-  (define dgray-color (make-object color% 128 128 128))
-  (define lgray-color (make-object color% 204 204 204))
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define y (if (pict? img) (pict-height img) (send img get-height)))
   ; 10 for a square's width
@@ -120,8 +94,6 @@
   (define y-times (inexact->exact (floor (/ y 20))))
   (define remainder-x (modulo (floor x) 10))
   (define remainder-y (modulo (floor y) 20))
-  (define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
-  (define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
   ; remainder square for width
   (define rdsquare-x
     (if (> remainder-x 0)
@@ -132,13 +104,13 @@
         (filled-rectangle remainder-x 10 #:color lgray-color #:draw-border? #f)
         #f))
   ; remainder square for height
-  (define rds-y
+  (define rdsquare-y
     (if (> remainder-y 0)
         (filled-rectangle 10 (if (> remainder-y 10)
                                  (- remainder-y 10)
                                  remainder-y) #:color dgray-color #:draw-border? #f)
         #f))
-  (define rls-y
+  (define rlsquare-y
     (if (> remainder-y 0)
         (filled-rectangle 10 (if (> remainder-y 10)
                                  (- remainder-y 10)
@@ -154,7 +126,7 @@
                (filled-rectangle remainder-x remainder-y #:color dgray-color #:draw-border? #f))
            #f)]
       [else #f]))
-  (define rls-xy
+  (define rlsquare-xy
     (cond
       [(> remainder-x 0)
        (if (> remainder-y 0)
@@ -190,6 +162,7 @@
               (apply hc-append (flatten (append bline (if rdsquare-x rdsquare-x empty)))))
           (apply hc-append bline))))
   ; remainder-sized line for both x and y
+  ; if there is no remainder for x or y, don't add them
   (define raline
     (let ([aline
            (flatten
@@ -197,18 +170,18 @@
                        [i (in-naturals)])
               (if (even? i)
                   ; rds-y or rls-y may be #f
-                  (if rds-y rds-y empty)
-                  (if rls-y rls-y empty))))]
+                  (if rdsquare-y rdsquare-y empty)
+                  (if rlsquare-y rlsquare-y empty))))]
           [bline
            (flatten
             (for/list ([times (in-range x-times)]
                        [i (in-naturals)])
               (if (even? i)
                   ; rds-y or rls-y may be #f
-                  (if rls-y rls-y empty)
-                  (if rds-y rds-y empty))))])
+                  (if rlsquare-y rlsquare-y empty)
+                  (if rdsquare-y rdsquare-y empty))))])
       (if (even? x-times)
-          (apply hc-append (flatten (append aline (if rls-xy rls-xy empty))))
+          (apply hc-append (flatten (append aline (if rlsquare-xy rlsquare-xy empty))))
           (apply hc-append (flatten (append bline (if rdsquare-xy rdsquare-xy empty)))))))
   (define rbline
     (let ([aline
@@ -217,18 +190,18 @@
                        [i (in-naturals)])
               (if (even? i)
                   ; rds-y or rls-y may be #f
-                  (if rds-y rds-y empty)
-                  (if rls-y rls-y empty))))]
+                  (if rdsquare-y rdsquare-y empty)
+                  (if rlsquare-y rlsquare-y empty))))]
           [bline
            (flatten
             (for/list ([times (in-range x-times)]
                        [i (in-naturals)])
               (if (even? i)
                   ; rds-y or rls-y may be #f
-                  (if rls-y rls-y empty)
-                  (if rds-y rds-y empty))))])
+                  (if rlsquare-y rlsquare-y empty)
+                  (if rdsquare-y rdsquare-y empty))))])
       (if (even? x-times)
-          (apply hc-append (flatten (append bline (if rls-xy rls-xy empty))))
+          (apply hc-append (flatten (append bline (if rlsquare-xy rlsquare-xy empty))))
           (apply hc-append (flatten (append aline (if rdsquare-xy rdsquare-xy empty)))))))
   ; put it all together
   (let ([base-grid (make-list y-times (vl-append aline bline))])
@@ -238,18 +211,18 @@
                                                                (if (> remainder-y 10)
                                                                    (list aline rbline)
                                                                    raline)
-                                                               bline))))
+                                                               rbline))))
                (apply vl-append (flatten (append base-grid (if (> remainder-y 0)
                                                                (if (> remainder-y 10)
                                                                    (list aline raline)
                                                                    rbline)
-                                                               aline)))))]
+                                                               raline)))))]
           [(> remainder-y 0)
            (if (> remainder-y 10)
                (apply vl-append
                       (append base-grid (list aline (if (even? x-times) rbline raline))))
                (apply vl-append
-                      (append base-grid (list aline))))]
+                      (append base-grid (list raline))))]
           [else (apply vl-append base-grid)])))
 
 ; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
