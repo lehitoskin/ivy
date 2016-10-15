@@ -34,6 +34,10 @@
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
 (define image-pict #f)
+; bitmap to actually display
+; eliminate image "jaggies"
+; reduce amount of times we use pict->bitmap, as this takes a very long time
+(define image-bmp #f)
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
@@ -72,26 +76,165 @@
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
 
+; objects that will be used extensively in transparency-grid
+(define dgray-color (make-object color% 128 128 128))
+(define lgray-color (make-object color% 204 204 204))
+(define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
+(define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
+
 ; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
+; creates a dark-gray/light-gray grid to place behind images
+; so that if they are transparent, the grid will become visible.
 (define (transparency-grid img)
-  (define dgray-color (make-object color% 128 128 128))
-  (define lgray-color (make-object color% 204 204 204))
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define y (if (pict? img) (pict-height img) (send img get-height)))
-  (define x-times (inexact->exact (floor (/ x 20))))
+  ; 10 for a square's width
+  (define x-times (inexact->exact (floor (/ x 10))))
+  ; 20 for both square's height
   (define y-times (inexact->exact (floor (/ y 20))))
-  (define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
-  (define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
-  (define vboth (vl-append dgray-square lgray-square))
-  (define aline (apply hc-append (make-list x-times (hc-append dgray-square lgray-square))))
-  (define bline (apply hc-append (make-list x-times (hc-append lgray-square dgray-square))))
-  (apply vl-append (make-list y-times (vl-append aline bline))))
+  (define remainder-x (modulo (floor x) 10))
+  (define remainder-y (modulo (floor y) 20))
+  ; remainder square for width
+  (define rdsquare-x
+    (if (> remainder-x 0)
+        (filled-rectangle remainder-x 10 #:color dgray-color #:draw-border? #f)
+        #f))
+  (define rlsquare-x
+    (if (> remainder-x 0)
+        (filled-rectangle remainder-x 10 #:color lgray-color #:draw-border? #f)
+        #f))
+  ; remainder square for height
+  (define rdsquare-y
+    (if (> remainder-y 0)
+        (filled-rectangle 10 (if (> remainder-y 10)
+                                 (- remainder-y 10)
+                                 remainder-y) #:color dgray-color #:draw-border? #f)
+        #f))
+  (define rlsquare-y
+    (if (> remainder-y 0)
+        (filled-rectangle 10 (if (> remainder-y 10)
+                                 (- remainder-y 10)
+                                 remainder-y) #:color lgray-color #:draw-border? #f)
+        #f))
+  ; remainder square for both width and height
+  (define rdsquare-xy
+    (cond
+      [(> remainder-x 0)
+       (if (> remainder-y 0)
+           (if (> remainder-y 10)
+               (filled-rectangle remainder-x (- remainder-y 10) #:color dgray-color #:draw-border? #f)
+               (filled-rectangle remainder-x remainder-y #:color dgray-color #:draw-border? #f))
+           #f)]
+      [else #f]))
+  (define rlsquare-xy
+    (cond
+      [(> remainder-x 0)
+       (if (> remainder-y 0)
+           (filled-rectangle remainder-x (if (> remainder-y 10)
+                                             (- remainder-y 10)
+                                             remainder-y) #:color lgray-color #:draw-border? #f)
+           #f)]
+      [else #f]))
+  ; normal dgray-lgray line
+  (define aline
+    (let ([aline
+           (for/list ([times (in-range x-times)]
+                      [i (in-naturals)])
+             (if (even? i)
+                 dgray-square
+                 lgray-square))])
+      (if (> remainder-x 0)
+          (if (even? x-times)
+              (apply hc-append (flatten (append aline (if rdsquare-x rdsquare-x empty))))
+              (apply hc-append (flatten (append aline (if rlsquare-x rlsquare-x empty)))))
+          (apply hc-append aline))))
+  ; normal lgray-dgray line
+  (define bline
+    (let ([bline
+           (for/list ([times (in-range x-times)]
+                      [i (in-naturals)])
+             (if (even? i)
+                 lgray-square
+                 dgray-square))])
+      (if (> remainder-x 0)
+          (if (even? x-times)
+              (apply hc-append (flatten (append bline (if rlsquare-x rlsquare-x empty))))
+              (apply hc-append (flatten (append bline (if rdsquare-x rdsquare-x empty)))))
+          (apply hc-append bline))))
+  ; remainder-sized line for both x and y
+  ; if there is no remainder for x or y, don't add them
+  (define raline
+    (let ([aline
+           (flatten
+            (for/list ([times (in-range x-times)]
+                       [i (in-naturals)])
+              (if (even? i)
+                  ; rds-y or rls-y may be #f
+                  (if rdsquare-y rdsquare-y empty)
+                  (if rlsquare-y rlsquare-y empty))))]
+          [bline
+           (flatten
+            (for/list ([times (in-range x-times)]
+                       [i (in-naturals)])
+              (if (even? i)
+                  ; rds-y or rls-y may be #f
+                  (if rlsquare-y rlsquare-y empty)
+                  (if rdsquare-y rdsquare-y empty))))])
+      (if (even? x-times)
+          (apply hc-append (flatten (append aline (if rlsquare-xy rlsquare-xy empty))))
+          (apply hc-append (flatten (append bline (if rdsquare-xy rdsquare-xy empty)))))))
+  (define rbline
+    (let ([aline
+           (flatten
+            (for/list ([times (in-range x-times)]
+                       [i (in-naturals)])
+              (if (even? i)
+                  ; rds-y or rls-y may be #f
+                  (if rdsquare-y rdsquare-y empty)
+                  (if rlsquare-y rlsquare-y empty))))]
+          [bline
+           (flatten
+            (for/list ([times (in-range x-times)]
+                       [i (in-naturals)])
+              (if (even? i)
+                  ; rds-y or rls-y may be #f
+                  (if rlsquare-y rlsquare-y empty)
+                  (if rdsquare-y rdsquare-y empty))))])
+      (if (even? x-times)
+          (apply hc-append (flatten (append bline (if rlsquare-xy rlsquare-xy empty))))
+          (apply hc-append (flatten (append aline (if rdsquare-xy rdsquare-xy empty)))))))
+  ; put it all together
+  (let ([base-grid (make-list y-times (vl-append aline bline))])
+    (cond [(> remainder-x 0)
+           (if (even? x-times)
+               (apply vl-append (flatten (append base-grid (if (> remainder-y 0)
+                                                               (if (> remainder-y 10)
+                                                                   (list aline rbline)
+                                                                   raline)
+                                                               rbline))))
+               (apply vl-append (flatten (append base-grid (if (> remainder-y 0)
+                                                               (if (> remainder-y 10)
+                                                                   (list aline raline)
+                                                                   rbline)
+                                                               raline)))))]
+          [(> remainder-y 0)
+           (if (> remainder-y 10)
+               (apply vl-append
+                      (append base-grid (list aline (if (even? x-times) rbline raline))))
+               (apply vl-append
+                      (append base-grid (list raline))))]
+          [else (apply vl-append base-grid)])))
 
 ; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
 (define (transparency-grid-append img)
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define pct (if (pict? img) img (bitmap img)))
-  (hc-append (- x) (transparency-grid img) pct))
+  (define grid (transparency-grid img))
+  ; generated grid size is imperfect
+  (define offset (- x (pict-width grid)))
+  (if (= offset 0)
+      (hc-append (- x) grid pct)
+      (hc-append (- offset x) grid pct)))
 
 ; scales an image to the current canvas size
 ; img is either a pict or a bitmap%
@@ -124,8 +267,9 @@
            [else (bitmap img)])]
     [(cmd)
      ; canvas is very small before everything is completely loaded
+     ; these are the effective dimensions of the canvas
      (set! max-width 800)
-     (set! max-height 528)
+     (set! max-height 516)
      (cond [(and (> img-width max-width)
                  (> img-height max-height))
             (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
@@ -198,14 +342,16 @@
            [else (eprintf "Error loading file ~a~n" img)])]
     [else
      ; we already have the image loaded
-     (set! image-pict (scale-image img scale))])
+     (set! image-pict (scale-image img scale))
+     (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))])
   
   (send canvas set-on-paint!
         (λ (canvas dc)
           (when (and (path? img) (eq? scale 'default))
             ; have the canvas re-scale the image so when the canvas is
             ; resized, it'll also be the proper size
-            (set! image-pict (scale-image image-bmp-master 'default)))
+            (set! image-pict (scale-image image-bmp-master 'default))
+            (set! image-bmp (pict->bitmap (transparency-grid-append image-pict))))
           
           (define img-width (inexact->exact (round (pict-width image-pict))))
           (define img-height (inexact->exact (round (pict-height image-pict))))
@@ -220,31 +366,28 @@
           ; keep the background black
           (send canvas set-canvas-background (make-object color% "black"))
           
-          ; alleviate image "jaggies"
-          (define bmp (pict->bitmap (transparency-grid-append image-pict)))
-          
           (cond
             ; if the image is really big, place it at (0,0)
             [(and (> img-width canvas-x)
                   (> img-height canvas-y))
              (send canvas show-scrollbars #t #t)
-             (send dc draw-bitmap bmp 0 0)]
+             (send dc draw-bitmap image-bmp 0 0)]
             ; if the image is wider than the canvas,
             ; place it at (0,y)
             [(> img-width canvas-x)
              (send canvas show-scrollbars #t #f)
-             (send dc draw-bitmap bmp
+             (send dc draw-bitmap image-bmp
                    0 (- canvas-center-y img-center-y))]
             ; if the image is taller than the canvas,
             ; place it at (x,0)
             [(> img-height canvas-y)
              (send canvas show-scrollbars #f #t)
-             (send dc draw-bitmap bmp
+             (send dc draw-bitmap image-bmp
                    (- canvas-center-x img-center-x) 0)]
             ; otherwise, place it at the normal position
             [else
              (send canvas show-scrollbars #f #f)
-             (send dc draw-bitmap bmp
+             (send dc draw-bitmap image-bmp
                    (- canvas-center-x img-center-x)
                    (- canvas-center-y img-center-y))])))
   
@@ -262,9 +405,15 @@
        (define-values (client-x client-y) (send canvas get-client-size))
        (define client-center-x (/ client-x 2))
        (define client-center-y (/ client-y 2))
+       (define ratio-x (exact->inexact (/ client-center-x virtual-x)))
+       (define ratio-y (exact->inexact (/ client-center-y virtual-y)))
        (send canvas init-auto-scrollbars width height
-             (exact->inexact (/ client-center-x virtual-x))
-             (exact->inexact (/ client-center-y virtual-y)))]
+             (if (> ratio-x 1.0)
+                 1.0
+                 ratio-x)
+             (if (> ratio-y 1.0)
+                 1.0
+                 ratio-y))]
       ; place scrollbars on mouse location
       [(wheel-smaller wheel-larger)
        (define-values (mouse-x mouse-y) (send canvas get-mouse-pos))
