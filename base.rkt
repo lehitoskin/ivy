@@ -37,7 +37,7 @@
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time
-(define image-bmp #f)
+(define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
@@ -324,6 +324,7 @@
                           (send image-bmp-master get-width)
                           (send image-bmp-master get-height)))
             (set! image-pict (scale-image image-bmp-master scale))
+            (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))
             (send sbp set-label
                   (format "~a / ~a"
                           (+ (get-index img (pfs)) 1)
