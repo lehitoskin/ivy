@@ -46,6 +46,7 @@
 ; list of real?
 (define gif-lst-timings empty)
 (define gif-thread (make-parameter #f))
+(define cumulative? (make-parameter #f))
 
 ; all image files contained within image-dir
 (define (path-files)
@@ -167,7 +168,8 @@
              [i 0])
     
     ; remove any previous frames from the canvas
-    (send dc clear)
+    (unless (cumulative?)
+      (send dc clear))
     
     (cond
       ; if the image is really big, place it at (0,0)
@@ -236,6 +238,7 @@
                                   (if load-success
                                       (scale-image image-bmp-master scale)
                                       (scale-image (make-object bitmap% 50 50) scale))))])
+                (cumulative? (gif-cumulative? img))
                 (for/list ([bits (gif-images img)])
                   (define bmp-in-port (open-input-bytes bits))
                   (define bmp (make-object bitmap% 50 50))
