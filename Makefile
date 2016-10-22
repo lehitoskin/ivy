@@ -7,8 +7,8 @@ PLATFORM = posix
 endif
 
 all:
-	make -f Makefile.$(PLATFORM) all
+	$(MAKE) -f Makefile.$(PLATFORM) all
 
 %:
-	make -f Makefile.$(PLATFORM) $@
+	$(MAKE) -f Makefile.$(PLATFORM) $@
 
