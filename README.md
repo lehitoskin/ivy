@@ -11,6 +11,7 @@ tracked solely by the application.
 - [Racket](http://racket-lang.org/) version 6.6 and up
 - [racquel](https://github.com/brown131/racquel)
 - [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
+- [gif-image](https://github.com/lehitoskin/gif-image)
 
 ### Compilation
 
@@ -86,5 +87,5 @@ OS X note: All <kbd>Ctrl</kbd>- keyboard shortcuts are available as
   press the "Set" button or <kbd>Enter</kbd> key, and the entry for that image will be
   deleted.
 
-Ivy cannot yet display animation in gifs due to a limitation of the GUI
-library. A static image will be displayed instead.
+Animated GIF support is currently marked as experimental. To animate a GIF, select
+View -> GIF Animation. Know that some GIF's may not load properly or at all.

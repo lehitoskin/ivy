@@ -94,7 +94,7 @@
   (new radio-box%
        [parent type-pane]
        [label "Search type"]
-       [choices '("or" "and")]
+       [choices '("and" "or")]
        [style '(horizontal)]))
 
 (define button-hpanel

@@ -16,30 +16,35 @@
          "search-dialog.rkt")
 (provide (all-defined-out))
 
-(define ivy-frame (new frame%
-                       [label "Ivy Image Viewer"]
-                       [style '(fullscreen-button)]
-                       [width 800]
-                       [height 600]))
+(define ivy-frame
+  (new frame%
+       [label "Ivy Image Viewer"]
+       [style '(fullscreen-button)]
+       [width 800]
+       [height 600]))
 
 ; set the icon for the frame
 (unless (macosx?)
   (send ivy-frame set-icon (read-bitmap logo)))
 
-(define ivy-menu-bar (new menu-bar%
-                          [parent ivy-frame]))
+(define ivy-menu-bar
+  (new menu-bar%
+       [parent ivy-frame]))
 
-(define ivy-menu-bar-file (new menu%
-                               [parent ivy-menu-bar]
-                               [label "&File"]))
+(define ivy-menu-bar-file
+  (new menu%
+       [parent ivy-menu-bar]
+       [label "&File"]))
 
-(define ivy-menu-bar-navigation (new menu%
-                                     [parent ivy-menu-bar]
-                                     [label "&Navigation"]))
+(define ivy-menu-bar-navigation
+  (new menu%
+       [parent ivy-menu-bar]
+       [label "&Navigation"]))
 
-(define ivy-menu-bar-view (new menu%
-                               [parent ivy-menu-bar]
-                               [label "&View"]))
+(define ivy-menu-bar-view
+  (new menu%
+       [parent ivy-menu-bar]
+       [label "&View"]))
 
 (define ivy-menu-bar-window
   (when (macosx?)
@@ -69,13 +74,11 @@
 (define (toggle-fullscreen canvas frame)
   (define was-fullscreen?  (send frame is-fullscreened?))
   (define going-to-be-fullscreen? (not was-fullscreen?))
-  ;(eprintf "(toggle-fullscreen ...) going-to-be-fullscreen? == ~v~n" going-to-be-fullscreen?)
   (send frame fullscreen going-to-be-fullscreen?)
   (unless (macosx?)
     (on-fullscreen-event going-to-be-fullscreen?)))
 
 (define (on-fullscreen-event is-fullscreen?)
-  ;(eprintf "(on-fucllscreen-event ~v)~n" is-fullscreen?)
   (cond [is-fullscreen?
          (remove-children ivy-frame (list ivy-toolbar-hpanel status-bar-hpanel))]
         [else
@@ -94,10 +97,9 @@
          [notify-callback (λ ()
                             (define is-fullscreen? (send ivy-frame is-fullscreened?))
                             (cond [(not (eq? (was-fullscreen?) is-fullscreen?))
-                                   ;(eprintf "(notify-callback)~n")
                                    (on-fullscreen-event is-fullscreen?)
                                    (was-fullscreen? is-fullscreen?)]))]))
-  (let [(default-handler (application-quit-handler))]
+  (let ([default-handler (application-quit-handler)])
     (application-quit-handler
      (λ ()
        (send ivy-fullscreen-poller stop)
@@ -166,7 +168,7 @@
           (when paths
             (cond
               ; empty collection, adding images and load the first in the list
-              [(equal? (first (pfs)) (build-path "/"))
+              [(equal? (first (pfs)) root-path)
                (define img-path (first paths))
                (define-values (base name dir?) (split-path img-path))
                (image-dir base)
@@ -196,8 +198,8 @@
           (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
             (kill-thread (gif-thread)))
           (image-dir (find-system-path 'home-dir))
-          (pfs (list (build-path "/")))
-          (image-path (build-path "/"))
+          (pfs (list root-path))
+          (image-path root-path)
           (send (ivy-canvas) set-on-paint!
                 (λ (canvas dc)
                   (send canvas set-canvas-background (make-object color% "black"))))
@@ -287,11 +289,12 @@
 (define ivy-menu-bar-view-gif-animation
   (new checkable-menu-item%
        [parent ivy-menu-bar-view]
-       [label "&Gif Animation"]
+       [label "&GIF Animation"]
        [help-string "Animate GIFs, if possible."]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                   (when (and (gif? (image-path))
+                   (when (and (not (equal? (image-path) root-path))
+                              (gif? (image-path))
                               (gif-animated? (image-path)))
                      (load-image (image-path))))]))
 
@@ -408,11 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (if (and (not (string=? (path->string (image-path)) "/"))
-                            image-pict
-                            (empty? gif-lst))
-                       (load-image image-pict 'larger)
-                       (load-image gif-lst 'larger)))]))
+                   (unless (equal? (image-path) root-path)
+                     (if (and image-pict
+                              (empty? gif-lst))
+                         (load-image image-pict 'larger)
+                         (load-image gif-lst 'larger))))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -420,11 +423,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (if (and (not (string=? (path->string (image-path)) "/"))
-                            image-pict
-                            (empty? gif-lst))
-                       (load-image image-pict 'smaller)
-                       (load-image gif-lst 'smaller)))]))
+                   (unless (equal? (image-path) root-path)
+                     (if (and image-pict
+                              (empty? gif-lst))
+                         (load-image image-pict 'smaller)
+                         (load-image gif-lst 'smaller))))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -432,10 +435,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (if (and (string=? (path->string (image-path)) "/")
-                            (empty? gif-lst))
-                       (load-image image-bmp-master 'none)
-                       (load-image (image-path) 'none)))]))
+                   (unless (equal? (image-path) root-path)
+                     (if (empty? gif-lst)
+                         (load-image image-bmp-master 'none)
+                         (load-image (image-path) 'none))))]))
 
 (define ivy-actions-zoom-fit
   (new button%
@@ -443,13 +446,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (if (and (string=? (path->string (image-path)) "/")
-                            (empty? gif-lst))
-                       (load-image image-bmp-master)
-                       (load-image (image-path))))]))
+                   (unless (equal? (image-path) root-path)
+                     (if (empty? gif-lst)
+                         (load-image image-bmp-master)
+                         (load-image (image-path)))))]))
 
 (define (on-escape-key tfield)
-  (unless (string=? (path->string (image-path)) "/")
+  (unless (equal? (image-path) root-path)
     (send tfield set-field-background (make-object color% "white"))
     (define-values (base name-path must-be-dir?) (split-path (image-path)))
     (if (string=? (send tfield get-value) (incoming-tags))
@@ -477,8 +480,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (define img-str (path->string (image-path)))
-         (unless (string=? img-str "/")
+         (unless (equal? (image-path) root-path)
+           (define img-str (path->string (image-path)))
            (define-values (base name-path must-be-dir?) (split-path (image-path)))
            (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
@@ -507,8 +510,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label "Set"]
        [callback
         (λ (button event)
-          (define img-str (path->string (image-path)))
-          (unless (string=? img-str "/")
+          (unless (equal? (image-path) root-path)
+            (define img-str (path->string (image-path)))
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
             (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
@@ -558,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       (cond
         ; empty collection, adding 1 image
         ; like file-open, but only open the single image
-        [(equal? (first (pfs)) (build-path "/"))
+        [(equal? (first (pfs)) root-path)
          (define-values (base name dir?) (split-path pathname))
          (image-dir base)
          (pfs (list pathname))
@@ -588,18 +591,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       (case type
         [(wheel-down)
          ; do nothing if we've pressed ctrl+n
-         (if (and image-pict
-                  (not (string=? (path->string (image-path)) "/"))
-                  (empty? gif-lst))
-             (load-image image-pict 'wheel-smaller)
-             (load-image gif-lst 'wheel-smaller))]
+         (unless (equal? (image-path) root-path)
+           (if (and image-pict
+                    (empty? gif-lst))
+               (load-image image-pict 'wheel-smaller)
+               (load-image gif-lst 'wheel-smaller)))]
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
-         (if (and image-pict
-                  (not (string=? (path->string (image-path)) "/"))
-                  (empty? gif-lst))
-             (load-image image-pict 'wheel-larger)
-             (load-image gif-lst 'wheel-larger))]
+         (unless (equal? (image-path) root-path)
+           (if (and image-pict
+                    (empty? gif-lst))
+               (load-image image-pict 'wheel-larger)
+               (load-image gif-lst 'wheel-larger)))]
         ; osx does things a little different
         [(f11) (unless (macosx?)
                  (toggle-fullscreen this ivy-frame))]

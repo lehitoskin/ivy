@@ -12,7 +12,7 @@
          "db.rkt"
          "frame.rkt")
 
-(define ivy-version 1.1)
+(define ivy-version 1.2)
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))

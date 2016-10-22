@@ -31,8 +31,12 @@
 (define (macosx?)
   (eq? (system-type) 'macosx))
 
+(define root-path
+  (if (eq? (system-type) 'windows)
+      (build-path "C:\\")
+      (build-path "/")))
 ; path of the currently displayed image
-(define image-path (make-parameter (build-path "/")))
+(define image-path (make-parameter root-path))
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
@@ -68,7 +72,7 @@
 ; parameter listof path
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
-(define pfs (make-parameter (list (build-path "/"))))
+(define pfs (make-parameter (list root-path)))
 
 (define (tfield->list tf)
   (define val (send tf get-value))
@@ -581,7 +585,7 @@
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry
 (define ((load-image-in-collection direction))
-  (unless (eq? (path->symbol (image-path)) '/)
+  (unless (equal? (image-path) root-path)
     ; kill the gif thread, if applicable
     (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
       (kill-thread (gif-thread)))
