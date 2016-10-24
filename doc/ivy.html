@@ -1,0 +1,52 @@
+<h1 id="name">NAME</h1>
+<p>Ivy Image Viewer</p>
+<h1 id="synopsis">SYNOPSIS</h1>
+<p>ivy [option ... ] [args] ...</p>
+<h1 id="description">DESCRIPTION</h1>
+<p>OS X note: All Ctrl- keyboard shortcuts are available as Cmd-.</p>
+<ul>
+<li><p>Calling <em>ivy</em> by itself will start Ivy with the image-viewing area blank. You can then load images from the menu (File -&gt; Open), or with the keyboard shortcut Ctrl-O.</p></li>
+<li><p>To load an image right away, call <em>ivy</em> and then the path to the image. For example: <em>ivy &quot;praise the sun.jpg&quot;</em></p></li>
+<li><p>Once you have loaded an image, you can view all the other images in the same folder, cycling through the image files by either clicking on the arrow buttons or hitting the arrow keys. Pressing the home or end keys will take you to the first and last images available respectively.</p></li>
+<li><p>If you want to view images from disparate locations, Ivy can also create a temporary collection, so that you only cycle through the set of images that you specified. For example, <em>ivy ~/Downloads/cat*.jpg ~/Pictures/dog*.jpg</em> will allow you to look at all your downloaded cat pictures and all the photos you've taken of your dog, and only those photos. (Assuming, of course, that your cat and dog pictures have &quot;cat&quot; and &quot;dog&quot; at the beginning of their filenames.) The same effect occurs when selecting multiple images from File -&gt; Open.</p></li>
+<li><p>You may append files to a collection through File -&gt; Append, or with the keyboard shortcut Ctrl-Shift-O. When using the Append functionality on an empty collection (e.g. when first opening Ivy) only the files selected will be available for viewing. Appending files is also accomplished by the drag-and-drop feature: simply drag and drop images onto the canvas and they will be appeneded to the collection.</p></li>
+<li><p>To add a tag or list of tags to an image, simply enter them into the tag text field, separated by a comma and a space. E.g., <em>flower, beach, roller coaster</em> and then press the &quot;Set&quot; button or the Enter key.</p></li>
+<li><p>If you are currently editing tags and wish to revert any unsaved changes, simply hit the Esc key. Hitting Esc when there's no pending changes to be saved will unfocus the tag text field.</p></li>
+<li><p>To remove any set tags, simply delete the contents in the tag text field, press the &quot;Set&quot; button or Enter key, and the entry for that image will be deleted.</p></li>
+</ul>
+<p>Animated GIF support is currently marked as experimental. To animate a GIF, select View -&gt; GIF Animation. Know that some GIF's may not load properly or at all.</p>
+<p>Calling Ivy without a path will simply open the GUI. Supplying a path will tell Ivy to load the provided image. Supplying multiple paths will tell Ivy to load them as a collection.</p>
+<h1 id="options">OPTIONS</h1>
+<h2 id="mutually-exclusive-options">Mutually exclusive options</h2>
+<h3 id="v---version">-V, --version</h3>
+<p>Display Ivy version.</p>
+<h3 id="o---search-or-taglist">-o , --search-or <em>[taglist]</em></h3>
+<p>Search the tags database inclusively with a comma-separated string.</p>
+<h3 id="a---search-and-taglist">-a, --search-and <em>[taglist]</em></h3>
+<p>Search the tags database exclusively with a comma-separated string.</p>
+<h3 id="l---list-tags-imagelist">-L, --list-tags <em>[imagelist]</em></h3>
+<p>Lists the tags for the image(s).</p>
+<h3 id="a---add-tags-taglist">-A, --add-tags <em>[taglist]</em></h3>
+<p>Add tags to an image. ex: ivy -A &quot;tag0, tag1, ...&quot; /path/to/image ...</p>
+<h3 id="d---delete-tags-taglist">-D, --delete-tags <em>[taglist]</em></h3>
+<p>Delete tags from image. ex: ivy -D &quot;tag0, tag1, ...&quot; /path/to/image ...</p>
+<h3 id="p---purge-imglist">-P, --purge <em>[imglist]</em></h3>
+<p>Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ...</p>
+<h3 id="t---set-tags-taglist">-T, --set-tags <em>[taglist]</em></h3>
+<p>Sets the taglist of the image. ex: ivy -T &quot;tag0, tag1, ...&quot; /path/to/image ...</p>
+<h3 id="m---move-image-images-...-destination">-M, --move-image <em>[image(s) ... destination]</em></h3>
+<p>Moves the source file(s) to the destination, updating the database.</p>
+<h2 id="may-be-specified-once-each">May be specified once each</h2>
+<h3 id="e---exact-search">-e, --exact-search</h3>
+<p>Search the tags database for exact matches.</p>
+<h3 id="x---exclude-taglist">-x, --exclude <em>[taglist]</em></h3>
+<p>Search the tags database with -o/-a, but exclude images with the specified tags.</p>
+<h3 id="n---null">-n, --null</h3>
+<p>Search result items are terminated by a null character instead of by whitespace.</p>
+<h3 id="v---verbose">-v, --verbose</h3>
+<p>Display verbose information for certain operations.</p>
+<h3 id="help--h">--help, -h</h3>
+<p>Show this help</p>
+<h3 id="section">--</h3>
+<p>Do not treat any remaining argument as a switch (at this level)</p>
+<p>Multiple single-letter switches can be combined after one <em>-</em>; for example: <em>-h-</em> is the same as <em>-h --</em></p>
