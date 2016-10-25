@@ -1,5 +1,5 @@
 DESTDIR ?= /Applications
-MANDIR ?= /usr/local/man/man1
+MANDIR ?= /usr/local/share/man/man1
 
 RACO ?= raco
 RFLAGS ?= --vv --gui
