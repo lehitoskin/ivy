@@ -6,6 +6,7 @@
          pict
          racket/bool
          racket/class
+         racket/contract
          racket/function
          racket/gui/base
          racket/list
@@ -51,12 +52,16 @@
 (define exact-search? (make-parameter #f))
 
 ; animated gif stuff
-; list of pict?
+; listof pict?
 (define gif-lst empty)
-; list of real?
+; listof real?
 (define gif-lst-timings empty)
 (define gif-thread (make-parameter #f))
 (define cumulative? (make-parameter #f))
+
+; contract for image scaling
+(define image-scale/c
+  (or/c 'default 'cmd 'larger 'wheel-larger 'smaller 'wheel-smaller 'same 'none))
 
 ; all image files contained within image-dir
 (define (path-files)
@@ -74,7 +79,8 @@
 ; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list root-path)))
 
-(define (tfield->list tf)
+(define/contract (tfield->list tf)
+  (-> (is-a?/c text-field%) list?)
   (define val (send tf get-value))
   (cond [(string-null? val) empty]
         [else
@@ -86,7 +92,8 @@
 
 ; get index of an item in the list
 ; numbering starts from 0
-(define (get-index item lst)
+(define/contract (get-index item lst)
+  (-> any/c list? (or/c integer? false?))
   (define len (length lst))
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
@@ -102,10 +109,10 @@
 (define dgray-square (filled-rectangle 10 10 #:color dgray-color #:draw-border? #f))
 (define lgray-square (filled-rectangle 10 10 #:color lgray-color #:draw-border? #f))
 
-; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
 ; creates a dark-gray/light-gray grid to place behind images
 ; so that if they are transparent, the grid will become visible.
-(define (transparency-grid img)
+(define/contract (transparency-grid img)
+  (-> (or/c (is-a?/c bitmap%) pict?) pict?)
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define y (if (pict? img) (pict-height img) (send img get-height)))
   ; 10 for a square's width
@@ -245,8 +252,8 @@
                       (append base-grid (list raline))))]
           [else (apply vl-append base-grid)])))
 
-; (-> (or/c (is-a?/c bitmap%) pict?) pict?)
-(define (transparency-grid-append img)
+(define/contract (transparency-grid-append img)
+  (-> (or/c (is-a?/c bitmap%) pict?) pict?)
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define pct (if (pict? img) img (bitmap img)))
   (define grid (transparency-grid img))
@@ -260,7 +267,8 @@
 ; img is either a pict or a bitmap%
 ; type is a symbol
 ; returns a pict
-(define (scale-image img type)
+(define/contract (scale-image img type)
+  (-> (or/c (is-a?/c bitmap%) pict?) image-scale/c pict?)
   (define canvas (ivy-canvas))
   ; width and height of the image
   (define img-width (if (pict? img)
@@ -305,12 +313,7 @@
     [(smaller wheel-smaller)
      (scale-to-fit img (* img-width 0.9) (* img-height 0.9))]
     [(same) img]
-    [(none) (bitmap img)]
-    [else
-     (raise-argument-error
-      'scale-image
-      "(or/c 'default 'cmd 'larger 'wheel-larger 'smaller 'wheel-smaller 'same 'none)"
-      type)]))
+    [(none) (bitmap img)]))
 
 ; janky!
 (define ivy-canvas (make-parameter #f))
@@ -321,7 +324,8 @@
 (define incoming-tags (make-parameter ""))
 (define want-animation? (make-parameter #f))
 
-(define (animated-gif-callback canvas dc lst)
+(define/contract (animated-gif-callback canvas dc lst)
+  (-> (is-a?/c canvas%) (is-a?/c dc<%>) list? void?)
   (define gif-x (inexact->exact (round (pict-width (first lst)))))
   (define gif-y (inexact->exact (round (pict-height (first lst)))))
   (define gif-center-x (/ gif-x 2))
@@ -334,38 +338,40 @@
   
   (define len (length lst))
   
+  ; determine x and y placement as well as
+  ; modify the scrollbars outside the animation loop
+  (define x-loc 0)
+  (define y-loc 0)
+  (cond
+    ; if the image is really big, place it at (0,0)
+    [(and (> gif-x canvas-x)
+          (> gif-y canvas-y))
+     ; x-loc and y-loc are already 0
+     (send canvas show-scrollbars #t #t)]
+    ; if the image is wider than the canvas, place it at (0,y)
+    [(> gif-y canvas-x)
+     (send canvas show-scrollbars #t #f)
+     ; x-loc is already 0
+     (set! y-loc (- canvas-center-y gif-center-y))]
+    ; if the image is taller than the canvas, place it at (x,0)
+    [(> gif-y canvas-y)
+     (send canvas show-scrollbars #f #t)
+     ; y-loc is already 0
+     (set! x-loc (- canvas-center-x gif-center-x))]
+    ; otherwise, place it at the center of the canvas
+    [else
+     (send canvas show-scrollbars #f #f)
+     (set! x-loc (- canvas-center-x gif-center-x))
+     (set! y-loc (- canvas-center-y gif-center-y))])
+
+  ; actual animation loop
+  ; runs until gif-thread is killed
   (let loop ([gif-frame (first lst)]
              [timing (first gif-lst-timings)]
              [i 0])
-    
     ; remove any previous frames from the canvas
-    (unless (cumulative?)
-      (send dc clear))
-    
-    (cond
-      ; if the image is really big, place it at (0,0)
-      [(and (> gif-x canvas-x)
-            (> gif-y canvas-y))
-       (send canvas show-scrollbars #t #t)
-       (draw-pict gif-frame dc 0 0)]
-      ; if the image is wider than the canvas,
-      ; place it at (0,y)
-      [(> gif-y canvas-x)
-       (send canvas show-scrollbars #t #f)
-       (draw-pict gif-frame dc
-                  0 (- canvas-center-y gif-center-y))]
-      ; if the image is taller than the canvas,
-      ; place it at (x,0)
-      [(> gif-y canvas-y)
-       (send canvas show-scrollbars #f #t)
-       (draw-pict gif-frame dc
-                  (- canvas-center-x gif-center-x) 0)]
-      ; otherwise, place it at the normal position
-      [else
-       (send canvas show-scrollbars #f #f)
-       (draw-pict gif-frame dc
-                  (- canvas-center-x gif-center-x)
-                  (- canvas-center-y gif-center-y))])
+    (unless (cumulative?) (send dc clear))
+    (draw-pict gif-frame dc x-loc y-loc)
     (sleep timing)
     (if (>= i len)
         (loop (first lst) (first gif-lst-timings) 0)
@@ -374,8 +380,9 @@
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
 ; the position message
-; scale: (or/c 'default 'cmd 'larger 'smaller 'none)
-(define (load-image img [scale 'default])
+(define/contract (load-image img [scale 'default])
+  (->* ([or/c path-string? pict? (is-a?/c bitmap%) (listof pict?)])
+       (image-scale/c) void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
@@ -640,7 +647,8 @@
 
 ; generates 100x100 thumbnails from a list of string paths
 ; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
-(define (generate-thumbnails imgs)
+(define/contract (generate-thumbnails imgs)
+  (-> (listof path-string?) void?)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
     (define thumb-bmp
