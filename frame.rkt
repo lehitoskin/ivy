@@ -552,9 +552,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
     (define/override (on-paint)
       (do-on-paint))
     
-    ; thunk: ((is-a?/c canvas%) (is-a?/c dc<%>) . -> . any)
-    (define/public (set-on-paint! thunk)
-      (set! paint-callback thunk))
+    ; proc: ((is-a?/c canvas%) (is-a?/c dc<%>) . -> . any)
+    (define/public (set-on-paint! proc)
+      (set! paint-callback proc))
     
     (define/override (on-drop-file pathname)
       ; append the image to the current collection
