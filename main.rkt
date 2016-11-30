@@ -2,8 +2,7 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require racket/bool
-         racket/class
+(require racket/class
          racket/cmdline
          racket/list
          racket/path
@@ -121,7 +120,7 @@
   (verbose? #t)]
  #:args args
  ; hijack requested-images for -M
- (unless (or (false? (show-frame?))
+ (unless (or (not (show-frame?))
              (empty? args))
    (define requested-paths (map relative->absolute args))
    (define checked-paths

@@ -5,7 +5,6 @@
          racket/gui/base
          racket/list
          racket/path
-         racket/string
          "base.rkt"
          "files.rkt")
 (provide results-frame display-tags display-nil-results-alert)
