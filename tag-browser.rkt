@@ -3,6 +3,7 @@
 ; browse taglist and images, modify tags if necessary
 (require racket/class
          racket/gui/base
+         racket/string
          (only-in srfi/13 string-null?)
          "base.rkt"
          "db.rkt")
@@ -22,6 +23,12 @@
        [parent browser-menu-bar]
        [label "&File"]))
 
+(define (err-mbox)
+  (message-box "Ivy Tag Browser - Error"
+               "You must first select a tag from the list."
+               #f
+               '(ok stop)))
+
 (define browser-menu-bar-file-rename
   (new menu-item%
        [parent browser-menu-bar-file]
@@ -33,25 +40,69 @@
                           (define tag-label (send tag-lbox get-string sel))
                           (send dialog-tfield set-value tag-label)
                           (send rename-dialog show #t)]
-                         [else
-                          (message-box "Ivy Tag Browser - Error"
-                                       "You must first select a tag to rename."
-                                       #f
-                                       '(ok stop))]))]))
+                         [else (err-mbox)]))]))
 
 (define rename-dialog
   (new dialog%
        [label "Ivy Tag Browser - Rename"]
        [width 400]
-       [height 200]))
+       [height 100]))
+
+(define dialog-hpanel
+  (new horizontal-panel% [parent rename-dialog]))
+
+(define (rename-ok-callback tfield)
+  (define sel (send tag-lbox get-selection))
+  (define old-tag-label (send tag-lbox get-string sel))
+  ; scrub the new tag label of any commas
+  (define new-tag-label (string-replace (send tfield get-value) "," ""))
+  (printf "Changing tag label from ~v to ~v\n" old-tag-label new-tag-label)
+  ; get the image list from the old tag
+  (define imagelist (map path->string (search-db-exact 'or (list old-tag-label))))
+  (for ([img (in-list imagelist)])
+    (add-tags! img (list new-tag-label))
+    (remove-img/tags! img (list old-tag-label)))
+  (send rename-dialog show #f)
+  (update-tag-browser))
 
 (define dialog-tfield
   (new text-field%
-       [parent rename-dialog]
+       [parent dialog-hpanel]
        [label ""]
        [callback (λ (tfield evt)
-                   (when (eq? (send evt get-event-type) 'tfield-enter)
-                     (eprintf "dialog-tfield pressed enter!\n")))]))
+                   (when (eq? (send evt get-event-type) 'text-field-enter)
+                     (rename-ok-callback tfield)))]))
+
+(define dialog-button
+  (new button%
+       [parent dialog-hpanel]
+       [label "Ok"]
+       [callback (λ (button evt)
+                   (rename-ok-callback dialog-tfield))]))
+
+(define browser-menu-bar-file-delete
+  (new menu-item%
+       [parent browser-menu-bar-file]
+       [label "Delete Tag"]
+       [help-string "Delete tag and refresh browser."]
+       [callback
+        (λ (button evt)
+          (define sel (send tag-lbox get-selection))
+          (cond [(number? sel)
+                 (define tag-label (send tag-lbox get-string sel))
+                 ; make certain we want to delete this tag
+                 (define ok-cancel
+                   (message-box "Ivy Tag Browser - Delete Tag"
+                                "Are you sure you want to delete this tag?"
+                                #f
+                                '(ok-cancel caution)))
+                 (when (eq? ok-cancel 'ok)
+                   (define imagelist
+                     (map path->string (search-db-exact 'or (list tag-label))))
+                   (for ([img (in-list imagelist)])
+                     (remove-img/tags! img (list tag-label)))
+                   (update-tag-browser))]
+                [else (err-mbox)]))]))
 
 (define hpanel
   (new horizontal-panel% [parent browser-frame]))
