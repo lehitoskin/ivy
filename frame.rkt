@@ -13,7 +13,8 @@
          "db.rkt"
          "db-statistics.rkt"
          "files.rkt"
-         "search-dialog.rkt")
+         "search-dialog.rkt"
+         "tag-browser.rkt")
 (provide (all-defined-out))
 
 (define ivy-frame
@@ -297,6 +298,14 @@
                               (gif? (image-path))
                               (gif-animated? (image-path)))
                      (load-image (image-path))))]))
+
+(define ivy-menu-bar-view-tag-browser
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Tag Browser"]
+       [help-string "Open the Tag Browser."]
+       [callback (λ (i e)
+                   (show-tag-browser))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%

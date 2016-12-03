@@ -381,7 +381,7 @@
 ; takes care of updating the dimensions message and
 ; the position message
 (define/contract (load-image img [scale 'default])
-  (->* ([or/c path-string? pict? (is-a?/c bitmap%) (listof pict?)])
+  (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
        (image-scale/c) void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
