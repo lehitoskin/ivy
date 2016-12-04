@@ -14,6 +14,8 @@
        [width 800]
        [height 500]))
 
+; begin menu bar definitions
+
 (define browser-menu-bar
   (new menu-bar%
        [parent browser-frame]))
@@ -125,6 +127,10 @@
                    (update-tag-browser))]
                 [else (err-mbox)]))]))
 
+(define browser-menu-bar-separator
+  (new separator-menu-item%
+       [parent browser-menu-bar-edit]))
+
 (define browser-menu-bar-edit-edit
   (new menu-item%
        [parent browser-menu-bar-edit]
@@ -201,6 +207,8 @@
        [label "Ok"]
        [callback (λ (button evt)
                    (edit-tags-callback edit-tags-tfield))]))
+
+; end menu bar definitions
 
 (define browser-hpanel
   (new horizontal-panel%
