@@ -4,7 +4,6 @@
 (require racket/class
          racket/gui/base
          racket/string
-         (only-in srfi/13 string-null?)
          "base.rkt"
          "db.rkt")
 (provide show-tag-browser)
@@ -16,7 +15,8 @@
        [height 500]))
 
 (define browser-menu-bar
-  (new menu-bar% [parent browser-frame]))
+  (new menu-bar%
+       [parent browser-frame]))
 
 (define browser-menu-bar-file
   (new menu%
@@ -38,7 +38,7 @@
 
 (define (err-mbox)
   (message-box "Ivy Tag Browser - Error"
-               "You must first select a tag from the list."
+               "You must first select a item from the list."
                #f
                '(ok stop)))
 
@@ -52,6 +52,8 @@
                    (cond [(number? sel)
                           (define tag-label (send tag-lbox get-string sel))
                           (send dialog-tfield set-value tag-label)
+                          (send dialog-tfield refresh)
+                          (send dialog-tfield focus)
                           (send rename-dialog show #t)]
                          [else (err-mbox)]))]))
 
@@ -80,7 +82,7 @@
          (define imagelist (map path->string (search-db-exact 'or (list old-tag-label))))
          (for ([img (in-list imagelist)])
            (add-tags! img (list new-tag-label))
-           (remove-img/tags! img (list old-tag-label)))
+           (del-tags! img (list old-tag-label)))
          (send rename-dialog show #f)
          (update-tag-browser)]))
 
@@ -119,15 +121,94 @@
                    (define imagelist
                      (map path->string (search-db-exact 'or (list tag-label))))
                    (for ([img (in-list imagelist)])
-                     (remove-img/tags! img (list tag-label)))
+                     (del-tags! img (list tag-label)))
                    (update-tag-browser))]
                 [else (err-mbox)]))]))
 
-(define hpanel
-  (new horizontal-panel% [parent browser-frame]))
+(define browser-menu-bar-edit-edit
+  (new menu-item%
+       [parent browser-menu-bar-edit]
+       [label "Edit Image Tags"]
+       [help-string "Edit the taglist of the selected image."]
+       [callback
+        (λ (button evt)
+          (define sel (send img-lbox get-selection))
+          (cond [(number? sel)
+                 (define img-label (send img-lbox get-string sel))
+                 ; 15 the tallest any column can be
+                 (define tag-grid (grid-list (image-taglist img-label) 15))
+                 ; remove any children vpanel might have
+                 (define children (send edit-tags-check-hpanel get-children))
+                 (unless (null? children)
+                   (map (λ (child) (send edit-tags-check-hpanel delete-child child)) children))
+                 ; loop over the tag sections
+                 (for ([tag-section (in-list tag-grid)])
+                   (define vpanel-section
+                     (new vertical-panel%
+                          [parent edit-tags-check-hpanel]
+                          [alignment '(left top)]))
+                   ; add check boxes to the vpanel
+                   (for ([tag (in-list tag-section)])
+                     (new check-box%
+                          [label tag]
+                          [parent vpanel-section]
+                          [value #t]
+                          [callback
+                           (λ (button evt)
+                             (if (send button get-value)
+                                 (add-tags! img-label tag)
+                                 (del-tags! img-label (list tag))))])))
+                 (send edit-tags-dialog show #t)]
+                [else (err-mbox)]))]))
+
+(define edit-tags-dialog
+  (new dialog%
+       [label "Ivy Tag Browser - Edit Tags"]
+       [width 200]
+       [height 400]))
+
+(define edit-tags-check-hpanel
+  (new horizontal-panel%
+       [parent edit-tags-dialog]))
+
+(define edit-tags-new-hpanel
+  (new horizontal-panel%
+       [parent edit-tags-dialog]))
+
+(define (edit-tags-callback tfield)
+  (define sel (send img-lbox get-selection))
+  (define img (send img-lbox get-string sel))
+  (define tags (send tfield get-value))
+  ; empty tag string means add no new tags
+  (unless (string-null? tags)
+    ; turn the string of tag(s) into a list then sort it
+    (define tag-lst (sort (tfield->list tfield) string<?))
+    (add-tags! img tag-lst)
+    (send tfield set-value ""))
+  (send edit-tags-dialog show #f))
+
+(define edit-tags-tfield
+  (new text-field%
+       [parent edit-tags-new-hpanel]
+       [label "New tag(s): "]
+       [callback (λ (tfield evt)
+                   (when (eq? (send evt get-event-type) 'text-field-enter)
+                     (edit-tags-callback tfield)))]))
+
+(define edit-tags-button
+  (new button%
+       [parent edit-tags-new-hpanel]
+       [label "Ok"]
+       [callback (λ (button evt)
+                   (edit-tags-callback edit-tags-tfield))]))
+
+(define browser-hpanel
+  (new horizontal-panel%
+       [parent browser-frame]))
 
 (define tag-vpanel
-  (new vertical-panel% [parent hpanel]))
+  (new vertical-panel%
+       [parent browser-hpanel]))
 
 (define tag-lbox
   (new list-box%
@@ -145,7 +226,8 @@
                      (send img-lbox append img-str)))]))
 
 (define img-vpanel
-  (new vertical-panel% [parent hpanel]))
+  (new vertical-panel%
+       [parent browser-hpanel]))
 
 (define img-lbox
   (new list-box%
@@ -181,18 +263,17 @@
                     (define-values (base name dir?) (split-path img-path))
                     (image-dir base)
                     (pfs (path-files))
-                    (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+                    (send (ivy-tag-tfield) set-field-background color-white)
                     (image-path img-path)
-                    (load-image img-path))])))]))
+                    (load-image img-path)
+                    (define ivy-frame (send (ivy-canvas) get-parent))
+                    (send ivy-frame show #t))])))]))
 
 (define thumb-vpanel
   (new vertical-panel%
-       [parent hpanel]
+       [parent browser-hpanel]
        [alignment '(center center)]
        [stretchable-width #f]))
-
-(define (thumb-callback button event)
-  (void))
 
 (define thumb-bmp (make-object bitmap% 100 100))
 

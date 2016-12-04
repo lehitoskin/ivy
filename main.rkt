@@ -11,7 +11,7 @@
          "db.rkt"
          "frame.rkt")
 
-(define ivy-version 1.2)
+(define ivy-version 1.3)
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
@@ -208,8 +208,7 @@
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
       (when (db-has-key? 'images absolute-path)
-        (define img-obj (make-data-object sqlc image% absolute-path))
-        (define taglist (send img-obj get-tags))
+        (define taglist (image-taglist absolute-path))
         (for ([tag (in-list taglist)])
           (if (null-flag)
               (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
@@ -265,7 +264,7 @@
            (define img-obj (make-data-object sqlc image% absolute-path))
            (when (verbose?)
              (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
-           (remove-img/tags! img-obj tags-to-remove)))])]
+           (del-tags! img-obj tags-to-remove)))])]
    [(purging?)
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))

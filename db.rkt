@@ -226,7 +226,7 @@
              (save-data-object db-conn tag-obj))
          (remove-image! #:db-conn db-conn img (rest tag-lst))]))
 
-(define/contract (remove-img/tags! #:db-conn [db-conn sqlc] img tag-lst)
+(define/contract (del-tags! #:db-conn [db-conn sqlc] img tag-lst)
   (->* ([or/c string? data-object?]
         [listof string?])
        (#:db-conn connection?)
@@ -244,7 +244,7 @@
     (define img-obj (make-data-object db-conn image% img-str))
     ; grab all current tags for removal
     (define tag-lst (send img-obj get-tags))
-    (remove-img/tags! #:db-conn db-conn img-obj tag-lst)))
+    (del-tags! #:db-conn db-conn img-obj tag-lst)))
 
 ; nukes the image from the database in both tables
 ; adds it back to both tables
@@ -282,7 +282,7 @@
     (add-tags! #:db-conn db-conn img-obj (second diff))
     ; remove no longer used tags
     ; delete img-obj if no more tags
-    (remove-img/tags! #:db-conn db-conn img-obj (first diff))))
+    (del-tags! #:db-conn db-conn img-obj (first diff))))
 
 ; go through each image entry and check if it is a file that still exists
 ; and then purge from the database if it does not
@@ -329,6 +329,14 @@
     (if (empty? accum)
         sorted
         (keep-duplicates sorted))))
+
+; list the tags associated with the image
+(define/contract (image-taglist #:db-conn [db-conn sqlc] img)
+  (->* ([or/c string? data-object?])
+       (#:db-conn connection?)
+       (or/c (listof string?) empty))
+  (define img-obj (if (data-object? img) img (make-data-object sqlc image% img)))
+  (send img-obj get-tags))
 
 ; search tags table in db for exact matches
 ; returns a list of paths or empty

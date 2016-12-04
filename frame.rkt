@@ -139,7 +139,7 @@
                    (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
                    (pfs (path-files))])
-            (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+            (send (ivy-tag-tfield) set-field-background color-white)
             (image-path img-path)
             (load-image img-path)))]))
 
@@ -203,12 +203,12 @@
           (image-path root-path)
           (send (ivy-canvas) set-on-paint!
                 (λ (canvas dc)
-                  (send canvas set-canvas-background (make-object color% "black"))))
+                  (send canvas set-canvas-background color-black)))
           (send (ivy-canvas) refresh)
           (send ivy-frame set-label "Ivy Image Viewer")
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
-          (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+          (send (ivy-tag-tfield) set-field-background color-white)
           (send (status-bar-dimensions) set-label "0 x 0")
           (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0))]))
 
@@ -302,7 +302,8 @@
 (define ivy-menu-bar-view-tag-browser
   (new menu-item%
        [parent ivy-menu-bar-view]
-       [label "Tag Browser"]
+       [label "Tag &Browser"]
+       [shortcut #\B]
        [help-string "Open the Tag Browser."]
        [callback (λ (i e)
                    (show-tag-browser))]))
@@ -462,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
 
 (define (on-escape-key tfield)
   (unless (equal? (image-path) root-path)
-    (send tfield set-field-background (make-object color% "white"))
+    (send tfield set-field-background color-white)
     (define-values (base name-path must-be-dir?) (split-path (image-path)))
     (if (string=? (send tfield get-value) (incoming-tags))
         (send (ivy-canvas) focus)
@@ -506,12 +507,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (define tag-lst (tfield->list tf))
                          ; add/remove tags as necessary
                          (reconcile-tags! img-str tag-lst)])
-                  (send tf set-field-background (make-object color% "spring green"))
+                  (send tf set-field-background color-spring-green)
                   (send (ivy-canvas) focus)]
                  [else
                   (send ivy-frame set-label (string-append "* " name-str))
                   ; see color-database<%> for more named colors
-                  (send tf set-field-background (make-object color% "gold"))])))]))
+                  (send tf set-field-background color-gold)])))]))
 
 (define ivy-tag-button
   (new button%
@@ -524,8 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
             (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
-            (send (ivy-tag-tfield) set-field-background
-                  (make-object color% "spring green"))
+            (send (ivy-tag-tfield) set-field-background color-spring-green)
             ; empty tag string means delete the entry
             (cond [(string-null? tags)
                    ; no failure if key doesn't exist
@@ -630,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       [style '(hscroll vscroll)]
       [stretchable-height #t]
       [paint-callback (λ (canvas dc)
-                        (send canvas set-canvas-background (make-object color% "black")))]))
+                        (send canvas set-canvas-background color-black))]))
 (send (ivy-canvas) accept-drop-files #t)
 
 (define status-bar-hpanel

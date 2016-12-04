@@ -36,7 +36,7 @@
        [help-string "Create a collection containing the search results."]
        [callback (λ (button event)
                    (unless (empty? searched-images)
-                     (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+                     (send (ivy-tag-tfield) set-field-background color-white)
                      (pfs searched-images)
                      (load-image (first searched-images))
                      (send results-frame show #f)))]))
@@ -53,7 +53,7 @@
                      (cond
                        ; empty collection, create a new one
                        [(equal? (first (pfs)) (build-path "/"))
-                        (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+                        (send (ivy-tag-tfield) set-field-background color-white)
                         (pfs searched-images)
                         (load-image (first searched-images))]
                        ; append to the current collection
@@ -81,7 +81,7 @@
        [parent results-frame]
        [editor txt]
        [style '(auto-hscroll auto-vscroll no-focus)]))
-(send ecanvas set-canvas-background (make-object color% "black"))
+(send ecanvas set-canvas-background color-black)
 
 (define (display-nil-results-alert)
   (message-box "Ivy - No Images Found"
@@ -134,7 +134,7 @@
              (pict->bitmap
               (vc-append
                (bitmap thumb-str)
-               (text img-name (list (make-object color% "white"))))))
+               (text img-name (list color-white)))))
            (send txt insert (make-object image-snip% thumb+name)))
          
          ; scroll back to the top of the window
