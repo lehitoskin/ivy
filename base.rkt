@@ -50,6 +50,10 @@
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
 (define exact-search? (make-parameter #f))
+(define color-white (make-object color% "white"))
+(define color-black (make-object color% "black"))
+(define color-spring-green (make-object color% "spring green"))
+(define color-gold (make-object color% "gold"))
 
 ; animated gif stuff
 ; listof pict?
@@ -381,7 +385,7 @@
 ; takes care of updating the dimensions message and
 ; the position message
 (define/contract (load-image img [scale 'default])
-  (->* ([or/c path-string? pict? (is-a?/c bitmap%) (listof pict?)])
+  (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
        (image-scale/c) void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
@@ -519,7 +523,7 @@
               (define canvas-center-y (/ canvas-y 2))
               
               ; keep the background black
-              (send canvas set-canvas-background (make-object color% "black"))
+              (send canvas set-canvas-background color-black)
               
               (cond
                 ; if the image is really big, place it at (0,0)
@@ -596,7 +600,7 @@
     ; kill the gif thread, if applicable
     (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
       (kill-thread (gif-thread)))
-    (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
+    (send (ivy-tag-tfield) set-field-background color-white)
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
       [(previous)
