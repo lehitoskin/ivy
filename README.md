@@ -44,6 +44,8 @@ place it in `/Applications/`.
 
 ## Usage
 
+### GUI Interface
+
 OS X note: All <kbd>Ctrl</kbd>- keyboard shortcuts are available as
 <kbd>Cmd</kbd>-.
 
@@ -87,5 +89,20 @@ OS X note: All <kbd>Ctrl</kbd>- keyboard shortcuts are available as
   press the "Set" button or <kbd>Enter</kbd> key, and the entry for that image will be
   deleted.
 
-Animated GIF support is currently marked as experimental. To animate a GIF, select
-View -> GIF Animation. Know that some GIF's may not load properly or at all.
+### Tag Browser
+
+Ivy comes with a tag browser mode (available from the `View` menu or with
+<kbd>Ctrl</kbd>-<kbd>b</kbd>) so that you may view every tag category and its
+contents. Clicking on a tag will show the images you have tagged. Clicking on
+the image will show a thumbnail preview which is itself clickable. Clicking on
+the thumbnail button will tell Ivy to load the source image for further viewing.
+
+From the tag browser it is also possible to delete entire tag categories or
+rename them. Also, it is possible to edit the taglist of an image by clicking on
+an image path and selecting "Edit Tags" from the menu.
+
+### Animated GIF Support
+
+Animated GIF support is currently marked as experimental. To animate a GIF,
+select View -> GIF Animation. Due to the unstable natue of the related code,
+know that some GIF's may not load properly or at all.

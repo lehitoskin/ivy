@@ -1,4 +1,4 @@
-% IVY(1) Ivy Image Viewer | Version 1.2
+% IVY(1) Ivy Image Viewer | Version 1.3
 
 # NAME
 Ivy Image Viewer
@@ -7,6 +7,12 @@ Ivy Image Viewer
 ivy [option ... ] [args] ...
 
 # DESCRIPTION
+
+Calling Ivy without a path will simply open the GUI.
+Supplying a path will tell Ivy to load the provided image.
+Supplying multiple paths will tell Ivy to load them as a collection.
+
+## GUI Interface
 OS X note: All Ctrl- keyboard shortcuts are available as
 Cmd-.
 
@@ -50,12 +56,23 @@ Cmd-.
   press the "Set" button or Enter key, and the entry for that image will be
   deleted.
 
-Animated GIF support is currently marked as experimental. To animate a GIF, select
-View -> GIF Animation. Know that some GIF's may not load properly or at all.
+## Tag Browser
 
-Calling Ivy without a path will simply open the GUI.
-Supplying a path will tell Ivy to load the provided image.
-Supplying multiple paths will tell Ivy to load them as a collection.
+Ivy comes with a tag browser mode (available from the `View` menu or with
+<kbd>Ctrl</kbd>-<kbd>b</kbd>) so that you may view every tag category and its
+contents. Clicking on a tag will show the images you have tagged. Clicking on
+the image will show a thumbnail preview which is itself clickable. Clicking on
+the thumbnail button will tell Ivy to load the source image for further viewing.
+
+From the tag browser it is also possible to delete entire tag categories or
+rename them. Also, it is possible to edit the taglist of an image by clicking on
+an image path and selecting "Edit Tags" from the menu.
+
+## Animated GIF Support
+
+Animated GIF support is currently marked as experimental. To animate a GIF,
+select View -> GIF Animation. Due to the unstable natue of the related code,
+know that some GIF's may not load properly or at all.
 
 # OPTIONS
 

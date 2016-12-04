@@ -3,6 +3,8 @@
 <h1 id="synopsis">SYNOPSIS</h1>
 <p>ivy [option ... ] [args] ...</p>
 <h1 id="description">DESCRIPTION</h1>
+<p>Calling Ivy without a path will simply open the GUI. Supplying a path will tell Ivy to load the provided image. Supplying multiple paths will tell Ivy to load them as a collection.</p>
+<h2 id="gui-interface">GUI Interface</h2>
 <p>OS X note: All Ctrl- keyboard shortcuts are available as Cmd-.</p>
 <ul>
 <li><p>Calling <em>ivy</em> by itself will start Ivy with the image-viewing area blank. You can then load images from the menu (File -&gt; Open), or with the keyboard shortcut Ctrl-O.</p></li>
@@ -14,8 +16,11 @@
 <li><p>If you are currently editing tags and wish to revert any unsaved changes, simply hit the Esc key. Hitting Esc when there's no pending changes to be saved will unfocus the tag text field.</p></li>
 <li><p>To remove any set tags, simply delete the contents in the tag text field, press the &quot;Set&quot; button or Enter key, and the entry for that image will be deleted.</p></li>
 </ul>
-<p>Animated GIF support is currently marked as experimental. To animate a GIF, select View -&gt; GIF Animation. Know that some GIF's may not load properly or at all.</p>
-<p>Calling Ivy without a path will simply open the GUI. Supplying a path will tell Ivy to load the provided image. Supplying multiple paths will tell Ivy to load them as a collection.</p>
+<h2 id="tag-browser">Tag Browser</h2>
+<p>Ivy comes with a tag browser mode (available from the <code>View</code> menu or with <kbd>Ctrl</kbd>-<kbd>b</kbd>) so that you may view every tag category and its contents. Clicking on a tag will show the images you have tagged. Clicking on the image will show a thumbnail preview which is itself clickable. Clicking on the thumbnail button will tell Ivy to load the source image for further viewing.</p>
+<p>From the tag browser it is also possible to delete entire tag categories or rename them. Also, it is possible to edit the taglist of an image by clicking on an image path and selecting &quot;Edit Tags&quot; from the menu.</p>
+<h2 id="animated-gif-support">Animated GIF Support</h2>
+<p>Animated GIF support is currently marked as experimental. To animate a GIF, select View -&gt; GIF Animation. Due to the unstable natue of the related code, know that some GIF's may not load properly or at all.</p>
 <h1 id="options">OPTIONS</h1>
 <h2 id="mutually-exclusive-options">Mutually exclusive options</h2>
 <h3 id="v---version">-V, --version</h3>
