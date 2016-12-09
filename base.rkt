@@ -107,6 +107,18 @@
       str
       (substring str 0 n)))
 
+; awww yeah... so oldskool...
+(define (remove-children parent kids)
+  (when (> (length kids) 0)
+    (send parent delete-child (car kids))
+    (remove-children parent (cdr kids))))
+
+; just check out those tail recursions...
+(define (add-children parent kids)
+  (when (> (length kids) 0)
+    (send parent add-child (car kids))
+    (add-children parent (cdr kids))))
+
 ; objects that will be used extensively in transparency-grid
 (define dgray-color (make-object color% 128 128 128))
 (define lgray-color (make-object color% 204 204 204))

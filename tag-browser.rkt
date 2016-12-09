@@ -5,7 +5,8 @@
          racket/gui/base
          racket/string
          "base.rkt"
-         "db.rkt")
+         "db.rkt"
+         "files.rkt")
 (provide show-tag-browser)
 
 (define browser-frame
@@ -13,6 +14,10 @@
        [label "Ivy Tag Browser"]
        [width 800]
        [height 500]))
+
+; set the icon for the frame
+(unless (macosx?)
+  (send browser-frame set-icon (read-bitmap logo)))
 
 ; begin menu bar definitions
 
@@ -144,9 +149,7 @@
                  ; 15 the tallest any column can be
                  (define tag-grid (grid-list (image-taglist img-label) 15))
                  ; remove any children vpanel might have
-                 (define children (send edit-tags-check-hpanel get-children))
-                 (unless (null? children)
-                   (map (λ (child) (send edit-tags-check-hpanel delete-child child)) children))
+                 (remove-children edit-tags-check-hpanel (send edit-tags-check-hpanel get-children))
                  ; loop over the tag sections
                  (for ([tag-section (in-list tag-grid)])
                    (define vpanel-section
@@ -259,9 +262,7 @@
               (generate-thumbnails (list img-str)))
             (send thumb-bmp load-file thumb-path)
             ; remove old thumb-button
-            (define vpanel-children (send thumb-vpanel get-children))
-            (unless (null? vpanel-children)
-              (send thumb-vpanel delete-child (car (send thumb-vpanel get-children))))
+            (remove-children thumb-vpanel (send thumb-vpanel get-children))
             ; generate new thumb-button
             (new button%
                  [parent thumb-vpanel]
@@ -303,9 +304,7 @@
   (send tag-lbox clear)
   (send img-lbox clear)
   ; remove old thumb-button
-  (define vpanel-children (send thumb-vpanel get-children))
-  (unless (null? vpanel-children)
-    (send thumb-vpanel delete-child (car (send thumb-vpanel get-children))))
+  (remove-children thumb-vpanel (send thumb-vpanel get-children))
   ; get every tag in the database
   (define tag-labels (sort (table-column 'tags 'Tag_Label) string<?))
   ; add them to the list-box

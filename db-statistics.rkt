@@ -4,7 +4,9 @@
          racket/format
          racket/gui/base
          racket/list
-         "db.rkt")
+         "base.rkt"
+         "db.rkt"
+         "files.rkt")
 (provide stats-frame update-stats)
 
 (define stats-frame (new frame%
@@ -12,14 +14,13 @@
                          [width 800]
                          [height 100]))
 
+(unless (macosx?)
+  (send stats-frame set-icon (read-bitmap logo)))
+
 (define stats-vpanel
   (new vertical-panel%
        [parent stats-frame]
        [alignment '(left center)]))
-
-(define (remove-children)
-  (for ([child (in-list (send stats-vpanel get-children))])
-    (send stats-vpanel delete-child child)))
 
 (define (greater lst [num 0] [name ""])
   (cond [(empty? lst) (values num name)]
@@ -62,5 +63,5 @@
   (void))
 
 (define (update-stats)
-  (remove-children)
+  (remove-children stats-vpanel (send stats-vpanel get-children))
   (create-children))

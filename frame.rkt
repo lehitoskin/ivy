@@ -60,18 +60,6 @@
 
 ;; Fullscreen handling ;;
 
-; awww yeah... so oldskool...
-(define (remove-children parent kids)
-  (when (> (length kids) 0)
-    (send parent delete-child (car kids))
-    (remove-children parent (cdr kids))))
-
-; just check out those tail recursions...
-(define (add-children parent kids)
-  (when (> (length kids) 0)
-    (send parent add-child (car kids))
-    (add-children parent (cdr kids))))
-
 (define (toggle-fullscreen canvas frame)
   (define was-fullscreen?  (send frame is-fullscreened?))
   (define going-to-be-fullscreen? (not was-fullscreen?))
