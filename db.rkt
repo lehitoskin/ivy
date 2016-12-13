@@ -11,6 +11,7 @@
          racquel
          (only-in srfi/13
                   string-contains-ci)
+         "embed.rkt"
          "files.rkt")
 (provide (all-defined-out)
          disconnect
@@ -187,6 +188,9 @@
     ; add the image to each tag% object
     (send tag-obj add-img img)
     (save-data-object db-conn tag-obj))
+  (define img-path (get-column path img-obj))
+  (when (embed-support? img-path)
+    (set-embed-tags! img-path (send img-obj get-tags)))
   (save-data-object db-conn img-obj))
 
 ; remove the tags from the img entry
@@ -204,6 +208,10 @@
   (when img-obj
     ; remove the tags from the image
     (send img-obj del-tag tag-lst)
+    ; remove the embedded tags from the image
+    (define img-path (get-column path img-obj))
+    (when (embed-support? img-path)
+      (remove-embed! img-path tag-lst))
     ; if the image has no tags, remove from database
     (if (empty? (send img-obj get-tags))
         (delete-data-object db-conn img-obj)

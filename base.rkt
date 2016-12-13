@@ -17,6 +17,7 @@
                   string-contains-ci
                   string-null?)
          "db.rkt"
+         "embed.rkt"
          "files.rkt")
 (provide (all-defined-out)
          string-null?
@@ -398,7 +399,8 @@
 ; the position message
 (define/contract (load-image img [scale 'default])
   (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
-       (image-scale/c) void?)
+       (image-scale/c)
+       void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
@@ -485,6 +487,13 @@
             (define tags (send img-obj get-tags))
             (incoming-tags (string-join tags ", "))]
            [else (incoming-tags "")])
+     ; check to see if the image has embedded tags
+     ; and use them instead of what's in the DB
+     (when (embed-support? img-str)
+       (define embed-list (get-embed-tags img-str))
+       (unless (empty? embed-list)
+         (incoming-tags (string-join embed-list ", "))))
+            
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
      ; ensure the text-field displays the changes we just made
