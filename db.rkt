@@ -190,7 +190,7 @@
     (save-data-object db-conn tag-obj))
   (define img-path (get-column path img-obj))
   (when (embed-support? img-path)
-    (set-embed-tags! img-path (send img-obj get-tags)))
+    (add-embed-tags! img-path tag-lst))
   (save-data-object db-conn img-obj))
 
 ; remove the tags from the img entry
@@ -256,6 +256,7 @@
 
 ; nukes the image from the database in both tables
 ; adds it back to both tables
+; sets the tags in the embedded XMP
 ; tag-lst assumed to be sorted
 (define/contract (db-set! #:db-conn [db-conn sqlc] #:threaded? [threaded? #t] img tag-lst)
   (->* ([or/c string? data-object?]
@@ -265,6 +266,7 @@
        (or/c void? thread?))
   (db-purge! #:db-conn db-conn img)
   (add-tags! #:db-conn db-conn img tag-lst)
+  (set-embed-tags! img tag-lst)
   (if threaded?
       (thread (λ ()
                 (add-tags! #:db-conn db-conn img tag-lst)))

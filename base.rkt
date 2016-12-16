@@ -494,7 +494,7 @@
      ; because it may be out of date
      (when (embed-support? img-str)
        (define embed-lst (get-embed-tags img-str))
-       (incoming-tags (string-join embed-lst ", ")))
+       (incoming-tags (sort (string-join embed-lst ", ") string<?)))
             
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))

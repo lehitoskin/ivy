@@ -7,7 +7,8 @@
          racket/string
          txexpr
          xml)
-(provide dc:subject->list
+(provide add-embed-tags!
+         dc:subject->list
          embed-support?
          get-embed-tags
          is-dc:subject?
@@ -38,6 +39,34 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
   (any/c . -> . boolean?)
   ;(or (png? img) (jpeg? img)))
   (png? img))
+
+(define/contract (add-embed-tags! img taglist)
+  (embed-support? list? . -> . void?)
+  (cond [(png? img) (add-embed-png! img taglist)]
+        [(jpeg? img) (void)]))
+
+; adds taglist to the existing tags
+; if there are no existing tags, set them
+(define (add-embed-png! png taglist)
+  (define png-hash (png->hash png))
+  ; grab the old XMP data as an XEXPR
+  (define old-xmp (get-embed-png png-hash))
+  (define old-tags (get-embed-tags png))
+  (define reconciled (remove-duplicates (append old-tags taglist)))
+  (define xexpr (if (empty? old-xmp)
+                    ; if the image has no XMP data, generate some
+                    (make-xmp-xexpr taglist)
+                    (set-dc:subject (string->xexpr old-xmp) reconciled)))
+  (define str (xexpr->xmp xexpr))
+  (define itxt-bstr (make-itxt-chunk "XML:com.adobe.xmp" str))
+  (define itxt-hash (make-itxt-hash itxt-bstr))
+  (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
+  (define new-png (hash->png new-hash))
+  (with-output-to-file png
+    (λ ()
+      (display new-png))
+    #:mode 'binary
+    #:exists 'truncate/replace))
 
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
