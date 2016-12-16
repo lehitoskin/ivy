@@ -9,9 +9,10 @@ tracked solely by the application.
 ### Dependencies
 
 - [Racket](http://racket-lang.org/) version 6.6 and up
+- [gif-image](https://github.com/lehitoskin/gif-image)
+- [png-image](https://github.com/lehitoskin/png-image)
 - [racquel](https://github.com/brown131/racquel)
 - [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
-- [gif-image](https://github.com/lehitoskin/gif-image)
 
 ### Compilation
 
@@ -106,3 +107,11 @@ an image path and selecting "Edit Tags" from the menu.
 Animated GIF support is currently marked as experimental. To animate a GIF,
 select View -> GIF Animation. Due to the unstable natue of the related code,
 know that some GIF's may not load properly or at all.
+
+### Embedding Tags as XMP metadata
+
+Ivy embeds the taglist as XMP metadata in the file itself. That way if you move
+your images around, the tags will stay the same. However, the information in the
+database will then be out of date, so it is recommended that if you move files
+around, utilize Ivy's command-line interface with the switch `-M` to ensure the
+changes are tracked.

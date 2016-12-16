@@ -5,15 +5,14 @@
          racket/contract
          racket/list
          racket/string
-         txexpr)
+         txexpr
+         xml)
 (provide dc:subject->list
          embed-support?
          get-embed-tags
-         list->dc:subject
+         is-dc:subject?
          remove-embed!
-         set-dc:subject
-         set-embed-tags!
-         xexpr->xmp)
+         set-embed-tags!)
 
 #|
 xmp packet comments
@@ -25,18 +24,20 @@ PNG XMP keyword: #"XML:com.adobe.xmp"
 JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
 |#
 
-(define (jpeg? img)
+(define/contract (jpeg? img)
+  (any/c . -> . boolean?)
   (define img-in (if (bytes? img)
                      (open-input-bytes img)
                      (open-input-file img)))
-  (define byts (peek-bytes img-in 2 0 img-in))
+  (define byts (peek-bytes 2 0 img-in))
   (close-input-port img-in)
   ; #"\377\330" -> #xffd8
   (bytes=? byts #"\377\330"))
 
 (define/contract (embed-support? img)
   (any/c . -> . boolean?)
-  (or (png? img) (jpeg? img)))
+  ;(or (png? img) (jpeg? img)))
+  (png? img))
 
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
@@ -44,13 +45,19 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
         [(jpeg? img) (void)]))
 
 ; takes a sorted list of strings and embeds them into a valid PNG
-(define/contract (set-embed-png! png taglist)
-  ((and/c png? path-string?) (listof string?) . -> . void?)
-  (define str (string-join taglist ","))
+(define (set-embed-png! png taglist)
   (define png-hash (png->hash png))
-  (define itxt-bstr (make-itxt-chunk "Tags" str))
+  ; grab the old XMP data as an XEXPR
+  (define old-xmp (get-embed-png png-hash))
+  (define xexpr (if (empty? old-xmp)
+                    ; if the image has no XMP data, generate some
+                    (make-xmp-xexpr taglist)
+                    ; change the old dc:subject xexpr
+                    (set-dc:subject (string->xexpr old-xmp) taglist)))
+  (define str (xexpr->xmp xexpr))
+  (define itxt-bstr (make-itxt-chunk "XML:com.adobe.xmp" str))
   (define itxt-hash (make-itxt-hash itxt-bstr))
-  (define new-hash (itxt-set png-hash itxt-hash "Tags"))
+  (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
   (with-output-to-file png
     (λ ()
@@ -58,33 +65,51 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
     #:mode 'binary
     #:exists 'truncate/replace))
 
+; retrieve the taglist from the XMP data
 (define/contract (get-embed-tags img)
   (embed-support? . -> . list?)
-  (cond [(png? img) (get-embed-png img)]
-        [(jpeg? img) null]))
+  (cond [(png? img)
+         (define embed-xmp (get-embed-png img))
+         (cond [(empty? embed-xmp) empty]
+               [else
+                ; turn the XMP string into an XEXPR
+                (define xexpr (string->xexpr (first embed-xmp)))
+                ; find the dc:subject info
+                (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
+                (if dc:sub-lst
+                    ; grab the embedded tags
+                    (flatten (map dc:subject->list dc:sub-lst))
+                    empty)])]
+        [(jpeg? img) empty]))
 
-(define/contract (get-embed-png png)
-  (png? . -> . list?)
-  (define png-hash (png->hash png))
-  (first
-   (filter list?
-           (if (hash-has-key? png-hash 'iTXt)
-               (map (λ (hsh)
-                      (define inner (hash-ref hsh 'data))
-                      (if (bytes=? #"XML:com.adobe.xmp" (hash-ref inner 'keyword))
-                          (string-split (bytes->string/utf-8 (hash-ref inner 'text)) ",")
-                          inner))
-                    (hash-ref png-hash 'iTXt))
-               null))))
+; retrieve the XMP data located inside the iTXt block(s)
+(define (get-embed-png png)
+  (define png-hash (if (hash? png) png (png->hash png)))
+  (define itxt-lst
+    (filter string?
+            (if (hash-has-key? png-hash 'iTXt)
+                (map (λ (hsh)
+                       (define inner (hash-ref hsh 'data))
+                       (if (bytes=? #"XML:com.adobe.xmp" (hash-ref inner 'keyword))
+                           ; the XMP string
+                           (bytes->string/utf-8 (hash-ref inner 'text))
+                           inner))
+                     (hash-ref png-hash 'iTXt))
+                empty)))
+  (if (empty? itxt-lst)
+      empty
+      itxt-lst))
 
 ; remove the tags in taglist from the image
 (define/contract (remove-embed! img taglist)
   (embed-support? list? . -> . void?)
   (cond [(png? img)
-         (define old-tags (get-embed-tags img))
-         (unless (null? old-tags)
-           (define removed (remove* taglist old-tags))
-           (set-embed-png! img removed))]
+         ; get the tags from the image (if any)
+         (define embed-lst (get-embed-tags img))
+         (unless (empty? embed-lst)
+           ; remove taglist items from embed-list
+           (define new-taglist (remove* taglist embed-lst))
+           (set-embed-tags! img new-taglist))]
         [(jpeg? img) (void)]))
 
 (define (is-dc:subject? x) (and (txexpr? x) (eq? 'dc:subject (get-tag x))))

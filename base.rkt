@@ -16,6 +16,8 @@
          (only-in srfi/13
                   string-contains-ci
                   string-null?)
+         txexpr
+         xml
          "db.rkt"
          "embed.rkt"
          "files.rkt")
@@ -489,10 +491,10 @@
            [else (incoming-tags "")])
      ; check to see if the image has embedded tags
      ; and use them instead of what's in the DB
+     ; because it may be out of date
      (when (embed-support? img-str)
-       (define embed-list (get-embed-tags img-str))
-       (unless (empty? embed-list)
-         (incoming-tags (string-join embed-list ", "))))
+       (define embed-lst (get-embed-tags img-str))
+       (incoming-tags (string-join embed-lst ", ")))
             
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
