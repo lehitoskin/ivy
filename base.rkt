@@ -51,7 +51,7 @@
 (define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
+(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".JPEG" ".jpg" ".JPG" ".png" ".svg"))
 (define exact-search? (make-parameter #f))
 (define color-white (make-object color% "white"))
 (define color-black (make-object color% "black"))

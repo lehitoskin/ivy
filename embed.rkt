@@ -1,10 +1,12 @@
 #lang racket/base
 ; embed.rkt
 ; embed tags into images that support it
-(require png-image
+(require file/sha1
+         png-image
          racket/contract
+         racket/file
+         racket/format
          racket/list
-         racket/string
          txexpr
          xml)
 (provide add-embed-tags!
@@ -22,28 +24,68 @@ payload goes here
 #"<?xpacket end=\"w\"?>"
 
 PNG XMP keyword: #"XML:com.adobe.xmp"
-JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
+JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
 |#
+
+; jpeg XMP string
+(define XMP-id #"http://ns.adobe.com/xap/1.0/\0")
+(define SOI #xd8)
+(define APP1 #xe1)
+(define EOI #xd9)
+
+; takes a byte string and turns it into a decimal number
+(define (bytes->number bstr)
+  (string->number (bytes->hex-string bstr) 16))
+
+; takes a decimal number and turns it into a byte string
+(define (number->bytes num)
+  (define str (~r num #:base 16 #:min-width 4 #:pad-string "0"))
+  (hex-string->bytes str))
+
+(define (jpeg-xmp? bstr)
+  (bytes=? (subbytes bstr 4 (+ (bytes-length XMP-id) 4)) XMP-id))
+
+(define (jpeg-has-marker? in marker-byte)
+  (and (regexp-try-match (byte-regexp (bytes #xff marker-byte)) in)
+       #t))
+
+; returns a list of position pairs via regexp-match-positions*
+(define/contract (jpeg-goto-marker in marker-byte)
+  (bytes? byte? . -> . (or/c (listof pair?) empty?))
+  (regexp-match-positions* (byte-regexp (bytes #xff marker-byte)) in))
 
 (define/contract (jpeg? img)
   (any/c . -> . boolean?)
-  (define img-in (if (bytes? img)
-                     (open-input-bytes img)
-                     (open-input-file img)))
-  (define byts (peek-bytes 2 0 img-in))
-  (close-input-port img-in)
-  ; #"\377\330" -> #xffd8
-  (bytes=? byts #"\377\330"))
+  (cond [(path-string? img)
+         (define img-in (open-input-file img))
+         (define jpg? (jpeg-has-marker? img-in SOI))
+         (close-input-port img-in)
+         jpg?]
+        [(bytes? img)
+         (define byts (subbytes img 0 2))
+         (bytes=? byts (bytes #xff SOI))]
+        [else #f]))
+
+; returns a list of APP1 bytes
+(define/contract (jpeg-get-app1 img)
+  (jpeg? . -> . (listof bytes?))
+  (define img-bytes (if (bytes? img)
+                        img
+                        (file->bytes img)))
+  (define positions (jpeg-goto-marker img-bytes APP1))
+  (for/list ([pair (in-list positions)])
+    (define bstr (subbytes img-bytes (cdr pair) (+ (cdr pair) 2)))
+    (define len (bytes->number bstr))
+    (subbytes img-bytes (car pair) (+ (car pair) len 2))))
 
 (define/contract (embed-support? img)
   (any/c . -> . boolean?)
-  ;(or (png? img) (jpeg? img)))
-  (png? img))
+  (or (png? img) (jpeg? img)))
 
 (define/contract (add-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
   (cond [(png? img) (add-embed-png! img taglist)]
-        [(jpeg? img) (void)]))
+        [(jpeg? img) (add-embed-jpeg! img taglist)]))
 
 ; adds taglist to the existing tags
 ; if there are no existing tags, set them
@@ -68,10 +110,18 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
     #:mode 'binary
     #:exists 'truncate/replace))
 
+(define (add-embed-jpeg! jpeg taglist)
+  (define jpeg-bytes (if (bytes? jpeg)
+                         jpeg
+                         (file->bytes jpeg)))
+  ; only one XMP block allowed in a jpeg file
+  (define old-lst (get-embed-tags jpeg-bytes))
+  (set-embed-jpeg! jpeg (remove-duplicates (append taglist old-lst))))
+
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
   (cond [(png? img) (set-embed-png! img taglist)]
-        [(jpeg? img) (void)]))
+        [(jpeg? img) (set-embed-jpeg! img taglist)]))
 
 ; takes a sorted list of strings and embeds them into a valid PNG
 (define (set-embed-png! png taglist)
@@ -94,22 +144,74 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
     #:mode 'binary
     #:exists 'truncate/replace))
 
+; what a giant mess this is
+(define (set-embed-jpeg! jpeg taglist)
+  (define jpeg-bytes (file->bytes jpeg))
+  (define positions (jpeg-goto-marker jpeg-bytes APP1))
+  (define app1-lst (jpeg-get-app1 jpeg-bytes))
+  (define app1-xmp (filter bytes?
+                           (map (λ (bstr) (if (jpeg-xmp? bstr) bstr empty)) app1-lst)))
+  (define filtered
+    (filter pair?
+            (for/list ([app1 (in-list app1-lst)]
+                       [i (in-range (length app1-lst))])
+              (if (jpeg-xmp? app1)
+                  (list-ref positions i)
+                  #f))))
+  (define pos (if (empty? filtered)
+                  empty
+                  (car filtered)))
+  (define len-bstr (if (empty? filtered)
+                       #"\0"
+                       (subbytes jpeg-bytes (cdr pos) (+ (cdr pos) 2))))
+  (define len (bytes->number len-bstr))
+  (define bstr-before (if (empty? filtered)
+                          (bytes #xff SOI)
+                          (subbytes jpeg-bytes 0 (car pos))))
+  (define bstr-after (if (empty? filtered)
+                         (subbytes jpeg-bytes 2)
+                         (subbytes jpeg-bytes (+ (car pos) len 2))))
+  (define xmp-str
+    (cond [(empty? filtered) (xexpr->xmp (make-xmp-xexpr taglist))]
+          [else
+           (define bstr-before (subbytes jpeg-bytes 0 (- (car pos) 1)))
+           (define xmp-str
+             (bytes->string/utf-8 (subbytes (car app1-xmp) (+ 4 (bytes-length XMP-id)))))
+           (define xexpr (set-dc:subject (string->xexpr xmp-str) taglist))
+           (xexpr->xmp xexpr)]))
+  ; create the APP1 byte string
+  (define app1-bstr
+    (let ([xmp-bstr (string->bytes/utf-8 xmp-str)])
+      (bytes-append (bytes #xff APP1)
+                    (number->bytes (+ 2 (bytes-length xmp-bstr) (bytes-length XMP-id)))
+                    XMP-id
+                    xmp-bstr)))
+  (with-output-to-file jpeg
+    (λ ()
+      ; sandwich the new XMP APP1 between the old data
+      (printf "~a~a~a"
+              bstr-before
+              app1-bstr
+              bstr-after))
+    #:mode 'binary
+    #:exists 'truncate/replace))
+
 ; retrieve the taglist from the XMP data
 (define/contract (get-embed-tags img)
   (embed-support? . -> . list?)
-  (cond [(png? img)
-         (define embed-xmp (get-embed-png img))
-         (cond [(empty? embed-xmp) empty]
-               [else
-                ; turn the XMP string into an XEXPR
-                (define xexpr (string->xexpr (first embed-xmp)))
-                ; find the dc:subject info
-                (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
-                (if dc:sub-lst
-                    ; grab the embedded tags
-                    (flatten (map dc:subject->list dc:sub-lst))
-                    empty)])]
-        [(jpeg? img) empty]))
+  (define embed-xmp (if (png? img)
+                        (get-embed-png img)
+                        (get-embed-jpeg img)))
+  (cond [(empty? embed-xmp) empty]
+        [else
+         ; turn the XMP string into an XEXPR
+         (define xexpr (string->xexpr (first embed-xmp)))
+         ; find the dc:subject info
+         (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
+         (if dc:sub-lst
+             ; grab the embedded tags
+             (flatten (map dc:subject->list dc:sub-lst))
+             empty)]))
 
 ; retrieve the XMP data located inside the iTXt block(s)
 (define (get-embed-png png)
@@ -128,6 +230,18 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0\0"
   (if (empty? itxt-lst)
       empty
       itxt-lst))
+
+(define (get-embed-jpeg jpeg)
+  (define jpeg-bytes (if (bytes? jpeg)
+                         jpeg
+                         (file->bytes jpeg)))
+  ; only one XMP block allowed in a jpeg file
+  (define xmp-lst (filter jpeg-xmp? (jpeg-get-app1 jpeg-bytes)))
+  (if (empty? xmp-lst)
+      empty
+      (list
+       (bytes->string/utf-8
+        (subbytes (car xmp-lst) (+ 4 (bytes-length XMP-id)))))))
 
 ; remove the tags in taglist from the image
 (define/contract (remove-embed! img taglist)
