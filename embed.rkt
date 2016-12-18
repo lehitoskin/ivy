@@ -2,6 +2,9 @@
 ; embed.rkt
 ; embed tags into images that support it
 (require file/sha1
+         gif-image
+         ; identifier conflict with xml
+         (prefix-in gif: gif-image/gif-basics)
          png-image
          racket/contract
          racket/file
@@ -25,13 +28,19 @@ payload goes here
 
 PNG XMP keyword: #"XML:com.adobe.xmp"
 JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
+GIF XMP keyword: #"XMP Data" with auth #"XMP"
 |#
 
 ; jpeg XMP string
-(define XMP-id #"http://ns.adobe.com/xap/1.0/\0")
+(define jpeg-XMP-id #"http://ns.adobe.com/xap/1.0/\0")
 (define SOI #xd8)
 (define APP1 #xe1)
 (define EOI #xd9)
+
+; GIF XMP stuff
+(define gif-XMP-id #"XMP Data")
+(define gif-XMP-auth #"XMP")
+(define gif-XMP-header (bytes-append gif-XMP-id gif-XMP-auth))
 
 ; takes a byte string and turns it into a decimal number
 (define (bytes->number bstr)
@@ -43,11 +52,13 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
   (hex-string->bytes str))
 
 (define (jpeg-xmp? bstr)
-  (bytes=? (subbytes bstr 4 (+ (bytes-length XMP-id) 4)) XMP-id))
+  (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id))
 
 (define (jpeg-has-marker? in marker-byte)
   (and (regexp-try-match (byte-regexp (bytes #xff marker-byte)) in)
        #t))
+
+#|     JPEG stuff     |#
 
 ; returns a list of position pairs via regexp-match-positions*
 (define/contract (jpeg-goto-marker in marker-byte)
@@ -78,14 +89,72 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
     (define len (bytes->number bstr))
     (subbytes img-bytes (car pair) (+ (car pair) len 2))))
 
+#|     GIF stuff     |#
+
+(define (read-gif x)
+  (cond [(bytes? x) x]
+        [(path-string? x)
+         (call-with-input-file x (lambda (in) (read-bytes (file-size x) in)))]
+        [else (error "read-gif: invalid input:" x)]))
+
+(define (get-appn-pos x)
+  (define data (read-gif x))
+  (let loop ([n 0]
+             [lst '()])
+    (cond [(gif:trailer? data n) lst]
+          [(gif:img? data n)
+           (loop (+ n (gif:img-size data n)) lst)]
+          [(gif:gce? data n)
+           (loop (+ n (gif:gce-size data n)) lst)]
+          [(gif:appn? data n)
+           (define size (gif:appn-size data n))
+           (loop (+ n size) (cons (list n size) lst))]
+          [(gif:comment? data n)
+           (loop (+ n (gif:comment-size data n)) lst)]
+          [(gif:plain-text? data n)
+           (loop (+ n (gif:plain-text-size data n)) lst)]
+          [(gif:header? data n)
+           (loop (+ n (gif:header-size data)) lst)]
+          [else (loop (+ n 1) lst)])))
+
+(define (gif-get-appn x)
+  (define data (read-gif x))
+  (define appn-lst (get-appn-pos data))
+  (for/list ([appn (in-list appn-lst)])
+    (define pos (first appn))
+    (define len (second appn))
+    (subbytes data pos (+ pos len))))
+
+; takes the appn byte string and determines if it's XMP
+(define (gif-appn-xmp? bstr)
+  (bytes=? (subbytes bstr 3 (+ (bytes-length gif-XMP-header) 3))
+           gif-XMP-header))
+
+; generate appn byte string, ready to be inserted into the image
+(define (make-xmp-appn bstr)
+  (bytes-append
+   ; gif extension number + application extension label
+   (bytes #x21 #xff)
+   ; length of header + auth
+   (bytes (bytes-length gif-XMP-header))
+   gif-XMP-header
+   bstr
+   #"\1"
+   (apply bytes
+          (for/list ([magic (in-range #xff #x00 -1)]) magic))
+   #"\0\0"))
+
+#|     Embedding stuff     |#
+
 (define/contract (embed-support? img)
   (any/c . -> . boolean?)
-  (or (png? img) (jpeg? img)))
+  (or (gif? img) (jpeg? img) (png? img)))
 
 (define/contract (add-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
-  (cond [(png? img) (add-embed-png! img taglist)]
-        [(jpeg? img) (add-embed-jpeg! img taglist)]))
+  (cond [(gif? img) (add-embed-gif! img taglist)]
+        [(jpeg? img) (add-embed-jpeg! img taglist)]
+        [(png? img) (add-embed-png! img taglist)]))
 
 ; adds taglist to the existing tags
 ; if there are no existing tags, set them
@@ -118,10 +187,16 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
   (define old-lst (get-embed-tags jpeg-bytes))
   (set-embed-jpeg! jpeg (remove-duplicates (append taglist old-lst))))
 
+(define (add-embed-gif! gif taglist)
+  (define bstr (read-gif gif))
+  (define old-lst (get-embed-tags bstr))
+  (set-embed-gif! gif (remove-duplicates (append taglist old-lst))))
+
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
-  (cond [(png? img) (set-embed-png! img taglist)]
-        [(jpeg? img) (set-embed-jpeg! img taglist)]))
+  (cond [(gif? img) (set-embed-gif! img taglist)]
+        [(jpeg? img) (set-embed-jpeg! img taglist)]
+        [(png? img) (set-embed-png! img taglist)]))
 
 ; takes a sorted list of strings and embeds them into a valid PNG
 (define (set-embed-png! png taglist)
@@ -176,15 +251,15 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
           [else
            (define bstr-before (subbytes jpeg-bytes 0 (- (car pos) 1)))
            (define xmp-str
-             (bytes->string/utf-8 (subbytes (car app1-xmp) (+ 4 (bytes-length XMP-id)))))
+             (bytes->string/utf-8 (subbytes (car app1-xmp) (+ 4 (bytes-length jpeg-XMP-id)))))
            (define xexpr (set-dc:subject (string->xexpr xmp-str) taglist))
            (xexpr->xmp xexpr)]))
   ; create the APP1 byte string
   (define app1-bstr
     (let ([xmp-bstr (string->bytes/utf-8 xmp-str)])
       (bytes-append (bytes #xff APP1)
-                    (number->bytes (+ 2 (bytes-length xmp-bstr) (bytes-length XMP-id)))
-                    XMP-id
+                    (number->bytes (+ 2 (bytes-length xmp-bstr) (bytes-length jpeg-XMP-id)))
+                    jpeg-XMP-id
                     xmp-bstr)))
   (with-output-to-file jpeg
     (λ ()
@@ -196,12 +271,50 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
     #:mode 'binary
     #:exists 'truncate/replace))
 
+; embed the taglist into the gif
+; application extension only available for GIF89a!
+(define (set-embed-gif! img taglist)
+  (define bstr (read-gif img))
+  ; grab the old XMP data (if available)
+  (define old-xmp (get-embed-gif bstr))
+  (define xexpr (if (empty? old-xmp)
+                    (make-xmp-xexpr taglist)
+                    (string->xexpr (first old-xmp))))
+  ; xmp string
+  (define xmp-str (if (empty? old-xmp)
+                      (xexpr->xmp xexpr)
+                      (xexpr->xmp (set-dc:subject xexpr taglist))))
+  (define new-appn-xmp (make-xmp-appn (string->bytes/utf-8 xmp-str)))
+  (define appn-pos (get-appn-pos bstr))
+  ; find out which one is the xmp position
+  (define pos-pair
+    (filter pair?
+            (for/list ([pos (in-list appn-pos)])
+              (if (gif-appn-xmp? (subbytes bstr (first pos) (+ (first pos) (second pos))))
+                  pos
+                  #f))))
+  ; bytes before the XMP appn chunk
+  ; make sure the format is GIF89a, not GIF87a
+  (define before-bstr (if (empty? pos-pair)
+                          (bytes-append #"GIF89a"
+                                        (subbytes bstr 6 (- (bytes-length bstr) 1)))
+                          (subbytes bstr 0 (first (first pos-pair)))))
+  (define after-bstr (if (empty? pos-pair)
+                         (bytes #x3b)
+                         (subbytes bstr (+ (first (first pos-pair)) (second (first pos-pair))))))
+  (with-output-to-file img
+    (λ ()
+      (printf "~a~a~a" before-bstr new-appn-xmp after-bstr))
+    #:mode 'binary
+    #:exists 'truncate/replace))
+
 ; retrieve the taglist from the XMP data
 (define/contract (get-embed-tags img)
   (embed-support? . -> . list?)
-  (define embed-xmp (if (png? img)
-                        (get-embed-png img)
-                        (get-embed-jpeg img)))
+  (define embed-xmp
+    (cond [(gif? img) (get-embed-gif img)]
+          [(jpeg? img) (get-embed-jpeg img)]
+          [(png? img) (get-embed-png img)]))
   (cond [(empty? embed-xmp) empty]
         [else
          ; turn the XMP string into an XEXPR
@@ -241,19 +354,31 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
       empty
       (list
        (bytes->string/utf-8
-        (subbytes (car xmp-lst) (+ 4 (bytes-length XMP-id)))))))
+        (subbytes (car xmp-lst) (+ 4 (bytes-length jpeg-XMP-id)))))))
+
+; grab the taglist from the embedded XMP data
+(define (get-embed-gif img)
+  (define bstr (read-gif img))
+  (define appn-lst (gif-get-appn bstr))
+  (define filtered (filter gif-appn-xmp? appn-lst))
+  (if (empty? filtered)
+      empty
+      (list
+       (bytes->string/utf-8
+        (subbytes (first filtered)
+                  (+ (bytes-length gif-XMP-header) 3)
+                  ; due to "magic trailer", the last 258 bytes are garbage
+                  (- (bytes-length (first filtered)) 258))))))
 
 ; remove the tags in taglist from the image
 (define/contract (remove-embed! img taglist)
   (embed-support? list? . -> . void?)
-  (cond [(png? img)
-         ; get the tags from the image (if any)
-         (define embed-lst (get-embed-tags img))
-         (unless (empty? embed-lst)
-           ; remove taglist items from embed-list
-           (define new-taglist (remove* taglist embed-lst))
-           (set-embed-tags! img new-taglist))]
-        [(jpeg? img) (void)]))
+  ; get the tags from the image (if any)
+  (define embed-lst (get-embed-tags img))
+  (unless (empty? embed-lst)
+    ; remove taglist items from embed-list
+    (define new-taglist (remove* taglist embed-lst))
+    (set-embed-tags! img new-taglist)))
 
 (define (is-dc:subject? x) (and (txexpr? x) (eq? 'dc:subject (get-tag x))))
 (define (is-rdf:li? x) (and (txexpr? x) (eq? 'rdf:li (get-tag x))))
@@ -270,9 +395,10 @@ JPEG XMP keyword: #"http://ns.adobe.com/xap/1.0/\0"
 ; take a dc:subject entry and return a list of tags
 (define/contract (dc:subject->list dc:sub)
   (is-dc:subject? . -> . list?)
-  (flatten
-   (map (λ (item) (get-elements item))
-        (findf*-txexpr dc:sub is-rdf:li?))))
+  (define found (findf*-txexpr dc:sub is-rdf:li?))
+  (if found
+      (flatten (map (λ (item) (get-elements item)) found))
+      empty))
 
 ; takes an xexpr and replaces the dc:subject entry
 ; with the one generated from taglist
