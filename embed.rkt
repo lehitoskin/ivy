@@ -144,17 +144,29 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
           (for/list ([magic (in-range #xff #x00 -1)]) magic))
    #"\0\0"))
 
+#|     SVG stuff     |#
+
+(define (svg? img)
+  (define bstr (if (bytes? img)
+                   img
+                   (file->bytes img)))
+  (bytes=? (subbytes bstr 0 13) #"<?xml version"))
+
+(define (svg-has-tag? in bstr)
+  (and (regexp-try-match (byte-regexp bstr) in) #t))
+
 #|     Embedding stuff     |#
 
 (define/contract (embed-support? img)
   (any/c . -> . boolean?)
-  (or (gif? img) (jpeg? img) (png? img)))
+  (or (gif? img) (jpeg? img) (png? img) (svg? img)))
 
 (define/contract (add-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
   (cond [(gif? img) (add-embed-gif! img taglist)]
         [(jpeg? img) (add-embed-jpeg! img taglist)]
-        [(png? img) (add-embed-png! img taglist)]))
+        [(png? img) (add-embed-png! img taglist)]
+        [(svg? img) (add-embed-svg! img taglist)]))
 
 ; adds taglist to the existing tags
 ; if there are no existing tags, set them
@@ -192,11 +204,19 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define old-lst (get-embed-tags bstr))
   (set-embed-gif! gif (remove-duplicates (append taglist old-lst))))
 
+(define (add-embed-svg! svg taglist)
+  (define bstr (if (bytes? svg)
+                   svg
+                   (file->bytes svg)))
+  (define old-lst (get-embed-tags bstr))
+  (set-embed-svg! svg (remove-duplicates (append taglist old-lst))))
+
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
   (cond [(gif? img) (set-embed-gif! img taglist)]
         [(jpeg? img) (set-embed-jpeg! img taglist)]
-        [(png? img) (set-embed-png! img taglist)]))
+        [(png? img) (set-embed-png! img taglist)]
+        [(svg? img) (set-embed-svg! img taglist)]))
 
 ; takes a sorted list of strings and embeds them into a valid PNG
 (define (set-embed-png! png taglist)
@@ -308,13 +328,56 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
     #:mode 'binary
     #:exists 'truncate/replace))
 
+(define (set-embed-svg! img taglist)
+  (define bstr (file->bytes img))
+  (define old-xmp (get-embed-svg bstr))
+  (define xexpr (if (empty? old-xmp)
+                    (make-xmp-xexpr taglist)
+                    (string->xexpr (first old-xmp))))
+  (define xmp-str (if (empty? old-xmp)
+                      (xexpr->xmp xexpr)
+                      (xexpr->xmp (set-dc:subject xexpr taglist))))
+  (define start (regexp-match-positions (byte-regexp #"<metadata?") bstr))
+  (define end (regexp-match-positions (byte-regexp #"</metadata>") bstr))
+  (define before
+    (cond [start
+           ; find the closing > for the <metadata
+           (define close-pos
+             (if start
+                 (let loop ([end (cdr (car start))])
+                   (if (bytes=? (subbytes bstr end (+ end 1)) #">")
+                       end
+                       (loop (+ end 1))))
+                 #f))
+           (subbytes bstr 0 (if close-pos
+                                (+ close-pos 1)
+                                (car (car start))))]
+          [else
+           (define close-tag (regexp-match-positions (byte-regexp #"</svg>") bstr))
+           (subbytes bstr 0 (car (car close-tag)))]))
+  (define after (if end
+                    (subbytes bstr (cdr (car end)))
+                    #"</svg>"))
+  (define xmp-bstr
+    (bytes-append before
+                  (if start #"" #"<metadata>")
+                  (string->bytes/utf-8 xmp-str)
+                  #"</metadata>"
+                  after))
+  (with-output-to-file img
+    (λ ()
+      (display xmp-bstr))
+    #:mode 'binary
+    #:exists 'truncate/replace))
+
 ; retrieve the taglist from the XMP data
 (define/contract (get-embed-tags img)
   (embed-support? . -> . list?)
   (define embed-xmp
     (cond [(gif? img) (get-embed-gif img)]
           [(jpeg? img) (get-embed-jpeg img)]
-          [(png? img) (get-embed-png img)]))
+          [(png? img) (get-embed-png img)]
+          [(svg? img) (get-embed-svg img)]))
   (cond [(empty? embed-xmp) empty]
         [else
          ; turn the XMP string into an XEXPR
@@ -370,6 +433,32 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   ; due to "magic trailer", the last 258 bytes are garbage
                   (- (bytes-length (first filtered)) 258))))))
 
+(define (get-embed-svg svg)
+  (define bstr (if (bytes? svg)
+                   svg
+                   (file->bytes svg)))
+  (define in (open-input-bytes bstr))
+  (cond [(svg-has-tag? in #"<metadata?")
+         ; obtain the metadata text (sans tags)
+         (define start (regexp-match-positions (byte-regexp #"<metadata?") bstr))
+         ; find the closing > for the <metadata
+         (define close-pos
+           (cond [start
+                  (let loop ([end (cdr (car start))])
+                    (if (bytes=? (subbytes bstr end (+ end 1)) #">")
+                        end
+                        (loop (+ end 1))))]
+                 [else #f]))
+         (define end (regexp-match-positions (byte-regexp #"</metadata>") bstr))
+         (close-input-port in)
+         (list
+          (bytes->string/utf-8
+           (subbytes bstr (if close-pos
+                              (+ close-pos 1)
+                              (cdr (car start)))
+                     (car (car end)))))]
+        [else (close-input-port in) empty]))
+
 ; remove the tags in taglist from the image
 (define/contract (remove-embed! img taglist)
   (embed-support? list? . -> . void?)
@@ -380,8 +469,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
     (define new-taglist (remove* taglist embed-lst))
     (set-embed-tags! img new-taglist)))
 
-(define (is-dc:subject? x) (and (txexpr? x) (eq? 'dc:subject (get-tag x))))
-(define (is-rdf:li? x) (and (txexpr? x) (eq? 'rdf:li (get-tag x))))
+(define ((is-tag? sym) xexpr) (and (txexpr? xexpr) (eq? sym (get-tag xexpr))))
+(define is-dc:subject? (is-tag? 'dc:subject))
+(define is-rdf:li? (is-tag? 'rdf:li))
+(define is-rdf:Description? (is-tag? 'rdf:Description))
 
 ; take a list of tags and return a dc:subject entry
 (define/contract (list->dc:subject lst)
@@ -401,20 +492,43 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
       empty))
 
 ; takes an xexpr and replaces the dc:subject entry
-; with the one generated from taglist
+; with the one generated from taglist. if the xexpr
+; doesn't have a dc:subject entry, or is otherwise
+; incomplete, generate those bits and complete it
 (define/contract (set-dc:subject xexpr taglist)
   (txexpr? list? . -> . txexpr?)
   (define new-subs (list->dc:subject taglist))
   (define-values (new-xexpr old-subs)
     (splitf-txexpr xexpr is-dc:subject? (λ (x) new-subs)))
-  new-xexpr)
+  ; empty old-subs means it has no existing dc:subject
+  (cond [(empty? old-subs)
+         ; find the rdf:Description (if it has one)
+         (define-values (new-txexpr rdf:description)
+           (splitf-txexpr new-xexpr is-rdf:Description?))
+         (define maybe-incomplete
+           (if (txexpr? rdf:description)
+               (append new-txexpr (list rdf:description (list new-subs)))
+               (append new-xexpr
+                       `((rdf:Description
+                          ((rdf:about "")
+                           (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
+                           (xmlns:dc "http://purl.org/dc/elements/1.1/")
+                           (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
+                           (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/"))
+                          ,new-subs)))))
+         (if (eq? (get-tag maybe-incomplete) 'x:xmpmeta)
+             maybe-incomplete
+             (txexpr 'x:xmpmeta
+                     '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
+                     (list maybe-incomplete)))]
+        [else new-xexpr]))
 
 ; take a taglist and return a complete xexpr (sans header and footer)
 (define/contract (make-xmp-xexpr taglist)
   (list? . -> . txexpr?)
   (define dc:sub (list->dc:subject taglist))
   (txexpr 'x:xmpmeta
-          '((x:xmptk "XMP Core 4.4.0-Exiv2") (xmlns:x "adobe:ns:meta/"))
+          '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
           `((rdf:RDF
              ((xmlns:rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
              (rdf:Description
