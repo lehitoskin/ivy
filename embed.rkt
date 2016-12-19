@@ -16,9 +16,11 @@
          dc:subject->list
          embed-support?
          get-embed-tags
+         get-embed-xmp
          is-dc:subject?
          remove-embed!
-         set-embed-tags!)
+         set-embed-tags!
+         set-embed-xmp!)
 
 #|
 xmp packet comments
@@ -69,9 +71,9 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (any/c . -> . boolean?)
   (cond [(path-string? img)
          (define img-in (open-input-file img))
-         (define jpg? (jpeg-has-marker? img-in SOI))
+         (define byts (peek-bytes 2 0 img-in))
          (close-input-port img-in)
-         jpg?]
+         (bytes=? byts (bytes #xff SOI))]
         [(bytes? img)
          (define byts (subbytes img 0 2))
          (bytes=? byts (bytes #xff SOI))]
@@ -218,18 +220,17 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (set-embed-png! img taglist)]
         [(svg? img) (set-embed-svg! img taglist)]))
 
-; takes a sorted list of strings and embeds them into a valid PNG
-(define (set-embed-png! png taglist)
+(define/contract (set-embed-xmp! img xmp-str)
+  (embed-support? string? . -> . void?)
+  (cond [(gif? img) (set-xmp-gif! img xmp-str)]
+        [(jpeg? img) (set-xmp-jpeg! img xmp-str)]
+        [(png? img) (set-xmp-png! img xmp-str)]
+        [(svg? img) (set-xmp-svg! img xmp-str)]))
+
+; set the XMP data inside the image's iTXt chunk
+(define (set-xmp-png! png xmp-str)
   (define png-hash (png->hash png))
-  ; grab the old XMP data as an XEXPR
-  (define old-xmp (get-embed-png png-hash))
-  (define xexpr (if (empty? old-xmp)
-                    ; if the image has no XMP data, generate some
-                    (make-xmp-xexpr taglist)
-                    ; change the old dc:subject xexpr
-                    (set-dc:subject (string->xexpr old-xmp) taglist)))
-  (define str (xexpr->xmp xexpr))
-  (define itxt-bstr (make-itxt-chunk "XML:com.adobe.xmp" str))
+  (define itxt-bstr (make-itxt-chunk "XML:com.adobe.xmp" xmp-str))
   (define itxt-hash (make-itxt-hash itxt-bstr))
   (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
@@ -239,13 +240,24 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
     #:mode 'binary
     #:exists 'truncate/replace))
 
-; what a giant mess this is
-(define (set-embed-jpeg! jpeg taglist)
+; takes a list of strings and embeds them into a valid PNG
+(define (set-embed-png! png taglist)
+  (define png-hash (png->hash png))
+  ; grab the old XMP data as an XEXPR
+  (define old-xmp (get-embed-png png-hash))
+  (define xexpr (if (empty? old-xmp)
+                    ; if the image has no XMP data, generate some
+                    (make-xmp-xexpr taglist)
+                    ; change the old dc:subject xexpr
+                    (set-dc:subject (string->xexpr old-xmp) taglist)))
+  (define xmp-str (xexpr->xmp xexpr))
+  (set-xmp-png! png xmp-str))
+
+; mess upon mess!
+(define (set-xmp-jpeg! jpeg xmp-str)
   (define jpeg-bytes (file->bytes jpeg))
   (define positions (jpeg-goto-marker jpeg-bytes APP1))
   (define app1-lst (jpeg-get-app1 jpeg-bytes))
-  (define app1-xmp (filter bytes?
-                           (map (λ (bstr) (if (jpeg-xmp? bstr) bstr empty)) app1-lst)))
   (define filtered
     (filter pair?
             (for/list ([app1 (in-list app1-lst)]
@@ -266,19 +278,12 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define bstr-after (if (empty? filtered)
                          (subbytes jpeg-bytes 2)
                          (subbytes jpeg-bytes (+ (car pos) len 2))))
-  (define xmp-str
-    (cond [(empty? filtered) (xexpr->xmp (make-xmp-xexpr taglist))]
-          [else
-           (define bstr-before (subbytes jpeg-bytes 0 (- (car pos) 1)))
-           (define xmp-str
-             (bytes->string/utf-8 (subbytes (car app1-xmp) (+ 4 (bytes-length jpeg-XMP-id)))))
-           (define xexpr (set-dc:subject (string->xexpr xmp-str) taglist))
-           (xexpr->xmp xexpr)]))
   ; create the APP1 byte string
   (define app1-bstr
     (let ([xmp-bstr (string->bytes/utf-8 xmp-str)])
       (bytes-append (bytes #xff APP1)
-                    (number->bytes (+ 2 (bytes-length xmp-bstr) (bytes-length jpeg-XMP-id)))
+                    (number->bytes
+                     (+ 2 (bytes-length xmp-bstr) (bytes-length jpeg-XMP-id)))
                     jpeg-XMP-id
                     xmp-bstr)))
   (with-output-to-file jpeg
@@ -291,19 +296,36 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
     #:mode 'binary
     #:exists 'truncate/replace))
 
-; embed the taglist into the gif
-; application extension only available for GIF89a!
-(define (set-embed-gif! img taglist)
-  (define bstr (read-gif img))
-  ; grab the old XMP data (if available)
-  (define old-xmp (get-embed-gif bstr))
-  (define xexpr (if (empty? old-xmp)
-                    (make-xmp-xexpr taglist)
-                    (string->xexpr (first old-xmp))))
-  ; xmp string
-  (define xmp-str (if (empty? old-xmp)
-                      (xexpr->xmp xexpr)
-                      (xexpr->xmp (set-dc:subject xexpr taglist))))
+; what a giant mess this is
+(define (set-embed-jpeg! jpeg taglist)
+  (define jpeg-bytes (file->bytes jpeg))
+  (define positions (jpeg-goto-marker jpeg-bytes APP1))
+  (define app1-lst (jpeg-get-app1 jpeg-bytes))
+  (define app1-xmp (filter bytes?
+                           (map (λ (bstr) (if (jpeg-xmp? bstr) bstr empty)) app1-lst)))
+  (define filtered
+    (filter pair?
+            (for/list ([app1 (in-list app1-lst)]
+                       [i (in-range (length app1-lst))])
+              (if (jpeg-xmp? app1)
+                  (list-ref positions i)
+                  #f))))
+  (define pos (if (empty? filtered)
+                  empty
+                  (car filtered)))
+  (define xmp-str
+    (cond [(empty? filtered) (xexpr->xmp (make-xmp-xexpr taglist))]
+          [else
+           (define bstr-before (subbytes jpeg-bytes 0 (- (car pos) 1)))
+           (define xmp-str
+             (bytes->string/utf-8 (subbytes (car app1-xmp) (+ 4 (bytes-length jpeg-XMP-id)))))
+           (define xexpr (set-dc:subject (string->xexpr xmp-str) taglist))
+           (xexpr->xmp xexpr)]))
+  (set-xmp-jpeg! jpeg xmp-str))
+
+; embed the XMP string into the gif
+(define (set-xmp-gif! gif xmp-str)
+  (define bstr (read-gif gif))
   (define new-appn-xmp (make-xmp-appn (string->bytes/utf-8 xmp-str)))
   (define appn-pos (get-appn-pos bstr))
   ; find out which one is the xmp position
@@ -322,21 +344,29 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define after-bstr (if (empty? pos-pair)
                          (bytes #x3b)
                          (subbytes bstr (+ (first (first pos-pair)) (second (first pos-pair))))))
-  (with-output-to-file img
+  (with-output-to-file gif
     (λ ()
       (printf "~a~a~a" before-bstr new-appn-xmp after-bstr))
     #:mode 'binary
     #:exists 'truncate/replace))
 
-(define (set-embed-svg! img taglist)
-  (define bstr (file->bytes img))
-  (define old-xmp (get-embed-svg bstr))
+; embed the taglist into the gif
+; application extension only available for GIF89a!
+(define (set-embed-gif! gif taglist)
+  (define bstr (read-gif gif))
+  ; grab the old XMP data (if available)
+  (define old-xmp (get-embed-gif bstr))
   (define xexpr (if (empty? old-xmp)
                     (make-xmp-xexpr taglist)
                     (string->xexpr (first old-xmp))))
+  ; xmp string
   (define xmp-str (if (empty? old-xmp)
                       (xexpr->xmp xexpr)
                       (xexpr->xmp (set-dc:subject xexpr taglist))))
+  (set-xmp-gif! gif xmp-str))
+
+(define (set-xmp-svg! svg xmp-str)
+  (define bstr (file->bytes svg))
   (define start (regexp-match-positions (byte-regexp #"<metadata?") bstr))
   (define end (regexp-match-positions (byte-regexp #"</metadata>") bstr))
   (define before
@@ -364,20 +394,28 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   (string->bytes/utf-8 xmp-str)
                   #"</metadata>"
                   after))
-  (with-output-to-file img
+  (with-output-to-file svg
     (λ ()
       (display xmp-bstr))
     #:mode 'binary
     #:exists 'truncate/replace))
 
+(define/contract (set-embed-svg! img taglist)
+  ((and/c path-string? embed-support?) (listof string?) . -> . void?)
+  (define bstr (file->bytes img))
+  (define old-xmp (get-embed-svg bstr))
+  (define xexpr (if (empty? old-xmp)
+                    (make-xmp-xexpr taglist)
+                    (string->xexpr (first old-xmp))))
+  (define xmp-str (if (empty? old-xmp)
+                      (xexpr->xmp xexpr)
+                      (xexpr->xmp (set-dc:subject xexpr taglist))))
+  (set-xmp-svg! img xmp-str))
+
 ; retrieve the taglist from the XMP data
 (define/contract (get-embed-tags img)
   (embed-support? . -> . list?)
-  (define embed-xmp
-    (cond [(gif? img) (get-embed-gif img)]
-          [(jpeg? img) (get-embed-jpeg img)]
-          [(png? img) (get-embed-png img)]
-          [(svg? img) (get-embed-svg img)]))
+  (define embed-xmp (get-embed-xmp img))
   (cond [(empty? embed-xmp) empty]
         [else
          ; turn the XMP string into an XEXPR
@@ -388,6 +426,13 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
              ; grab the embedded tags
              (flatten (map dc:subject->list dc:sub-lst))
              empty)]))
+
+(define/contract (get-embed-xmp img)
+  (embed-support? . -> . list?)
+  (cond [(gif? img) (get-embed-gif img)]
+        [(jpeg? img) (get-embed-jpeg img)]
+        [(png? img) (get-embed-png img)]
+        [(svg? img) (get-embed-svg img)]))
 
 ; retrieve the XMP data located inside the iTXt block(s)
 (define (get-embed-png png)
@@ -407,7 +452,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
       empty
       itxt-lst))
 
-(define (get-embed-jpeg jpeg)
+(define/contract (get-embed-jpeg jpeg)
+  (jpeg? . -> . (listof string?))
   (define jpeg-bytes (if (bytes? jpeg)
                          jpeg
                          (file->bytes jpeg)))
@@ -420,7 +466,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         (subbytes (car xmp-lst) (+ 4 (bytes-length jpeg-XMP-id)))))))
 
 ; grab the taglist from the embedded XMP data
-(define (get-embed-gif img)
+(define/contract (get-embed-gif img)
+  (gif? . -> . (listof string?))
   (define bstr (read-gif img))
   (define appn-lst (gif-get-appn bstr))
   (define filtered (filter gif-appn-xmp? appn-lst))
@@ -433,7 +480,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   ; due to "magic trailer", the last 258 bytes are garbage
                   (- (bytes-length (first filtered)) 258))))))
 
-(define (get-embed-svg svg)
+(define/contract (get-embed-svg svg)
+  (svg? . -> . (listof string?))
   (define bstr (if (bytes? svg)
                    svg
                    (file->bytes svg)))

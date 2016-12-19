@@ -113,6 +113,12 @@ Sets the taglist of the image. ex: ivy -T "tag0, tag1, ..." /path/to/image ...
 ### -M, --move-image *[image(s) ... destination]*
 Moves the source file(s) to the destination, updating the database.
 
+### ---show-xmp *[imagelist]*
+Shows the XMP metadata for supported files.
+
+### ---set-xmp *[xmp string]* *[imagelist]*
+Sets the XMP metadata for supported files in imagelist.
+
 ## May be specified once each
 
 ### -e, --exact-search
