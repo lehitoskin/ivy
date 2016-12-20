@@ -265,8 +265,6 @@
         #:threaded? boolean?)
        (or/c void? thread?))
   (db-purge! #:db-conn db-conn img)
-  (add-tags! #:db-conn db-conn img tag-lst)
-  (set-embed-tags! img tag-lst)
   (if threaded?
       (thread (λ ()
                 (add-tags! #:db-conn db-conn img tag-lst)))
