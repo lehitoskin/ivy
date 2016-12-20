@@ -7,6 +7,8 @@
          racket/list
          racket/path
          racket/string
+         txexpr
+         xml
          "base.rkt"
          "db.rkt"
          "embed.rkt"
@@ -335,7 +337,18 @@
        (define xmp-str (first args))
        (for ([path (in-list absolute)])
          (when (embed-support? path)
-           (set-embed-xmp! path xmp-str)))])]
+           ; set the XMP data
+           (set-embed-xmp! path xmp-str)
+           ; grab the tag list and update the database
+           (define xexpr (string->xexpr xmp-str))
+           ; find the dc:subject info
+           (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
+           (define tags
+             (if dc:sub-lst
+                 ; grab the embedded tags
+                 (flatten (map dc:subject->list dc:sub-lst))
+                 empty))
+           (db-set! #:threaded? #f path (sort tags string<?))))])]
    ; moving an image in the database to another location
    [(moving?)
     (define len (length args))

@@ -272,9 +272,9 @@
                 (add-tags! #:db-conn db-conn img tag-lst)))
       (add-tags! #:db-conn db-conn img tag-lst)))
 
-; reconcile between the old tags and new tags
-; instead of a scorched earth approach like db-set!, only delete and add
-; the tags as necessary
+; reconcile between the old tags and new tags.
+; instead of a scorched earth approach like db-set!,
+; only delete and add the tags as necessary
 (define/contract (reconcile-tags! #:db-conn [db-conn sqlc] img tag-lst)
   (->* ([or/c string? data-object?]
         [listof string?])

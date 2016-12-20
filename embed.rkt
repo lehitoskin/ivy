@@ -54,7 +54,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (hex-string->bytes str))
 
 (define (jpeg-xmp? bstr)
-  (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id))
+  (and (>= (bytes-length bstr) (+ (bytes-length jpeg-XMP-id) 4))
+       (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id)))
 
 (define (jpeg-has-marker? in marker-byte)
   (and (regexp-try-match (byte-regexp (bytes #xff marker-byte)) in)
@@ -181,7 +182,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define xexpr (if (empty? old-xmp)
                     ; if the image has no XMP data, generate some
                     (make-xmp-xexpr taglist)
-                    (set-dc:subject (string->xexpr old-xmp) reconciled)))
+                    (set-dc:subject (string->xexpr (first old-xmp)) reconciled)))
   (define str (xexpr->xmp xexpr))
   (define itxt-bstr (make-itxt-chunk "XML:com.adobe.xmp" str))
   (define itxt-hash (make-itxt-hash itxt-bstr))
@@ -249,7 +250,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                     ; if the image has no XMP data, generate some
                     (make-xmp-xexpr taglist)
                     ; change the old dc:subject xexpr
-                    (set-dc:subject (string->xexpr old-xmp) taglist)))
+                    (set-dc:subject (string->xexpr (first old-xmp)) taglist)))
   (define xmp-str (xexpr->xmp xexpr))
   (set-xmp-png! png xmp-str))
 
