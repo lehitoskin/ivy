@@ -522,6 +522,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define is-dc:subject? (is-tag? 'dc:subject))
 (define is-rdf:li? (is-tag? 'rdf:li))
 (define is-rdf:Description? (is-tag? 'rdf:Description))
+(define is-rdf:RDF? (is-tag? 'rdf:RDF))
 
 ; take a list of tags and return a dc:subject entry
 (define/contract (list->dc:subject lst)
@@ -547,30 +548,43 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define/contract (set-dc:subject xexpr taglist)
   (txexpr? list? . -> . txexpr?)
   (define new-subs (list->dc:subject taglist))
-  (define-values (new-xexpr old-subs)
+  (define-values (no-dc:sub dc:sub)
+    ; if dc:subject is found, replace it with new-subs
     (splitf-txexpr xexpr is-dc:subject? (λ (x) new-subs)))
-  ; empty old-subs means it has no existing dc:subject
-  (cond [(empty? old-subs)
-         ; find the rdf:Description (if it has one)
-         (define-values (new-txexpr rdf:description)
-           (splitf-txexpr new-xexpr is-rdf:Description?))
-         (define maybe-incomplete
-           (if (txexpr? rdf:description)
-               (append new-txexpr (list rdf:description (list new-subs)))
-               (append new-xexpr
-                       `((rdf:Description
-                          ((rdf:about "")
-                           (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
-                           (xmlns:dc "http://purl.org/dc/elements/1.1/")
-                           (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
-                           (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/"))
-                          ,new-subs)))))
-         (if (eq? (get-tag maybe-incomplete) 'x:xmpmeta)
-             maybe-incomplete
-             (txexpr 'x:xmpmeta
-                     '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
-                     (list maybe-incomplete)))]
-        [else new-xexpr]))
+  (cond
+    ; empty dc:sub means it has no existing dc:subject
+    [(empty? dc:sub)
+     ; find the rdf:Description (if it has one)
+     (define-values (no-rdf:desc rdf:desc)
+       (splitf-txexpr no-dc:sub is-rdf:Description?))
+     (define maybe-incomplete
+       (cond
+         ; xexpr has existing rdf:Description, set it
+         [(and (not (= (length rdf:desc) 0))
+               (txexpr? (first rdf:desc)))
+          ; grab rdf:RDF
+          (define-values (no-rdf rdf:rdf) (splitf-txexpr no-rdf:desc is-rdf:RDF?))
+          (append no-rdf
+                  (list
+                   (append (first rdf:rdf)
+                           (list (append (first rdf:desc)
+                                         (list new-subs))))))]
+         ; xexpr does not have rdf:Description, make one
+         [else
+          (append no-dc:sub
+                  `((rdf:Description
+                     ((rdf:about "")
+                      (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
+                      (xmlns:dc "http://purl.org/dc/elements/1.1/")
+                      (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
+                      (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/"))
+                     ,new-subs)))]))
+     (if (eq? (get-tag maybe-incomplete) 'x:xmpmeta)
+         maybe-incomplete
+         (txexpr 'x:xmpmeta
+                 '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
+                 (list maybe-incomplete)))]
+    [else no-dc:sub]))
 
 ; take a taglist and return a complete xexpr (sans header and footer)
 (define/contract (make-xmp-xexpr taglist)
