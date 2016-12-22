@@ -261,6 +261,8 @@
                  (new image% [path absolute-path])))
            (when (verbose?)
              (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
+           (when (embed-support? img)
+             (add-embed-tags! img tags-to-add))
            (add-tags! img-obj tags-to-add)))])]
    [(delete-tags?)
     (cond
@@ -286,6 +288,8 @@
            (define img-obj (make-data-object sqlc image% absolute-path))
            (when (verbose?)
              (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
+           (when (embed-support? img)
+             (del-embed-tags! img tags-to-remove))
            (del-tags! img-obj tags-to-remove)))])]
    [(purging?)
     (for ([img (in-list args)])
@@ -320,7 +324,9 @@
          (unless (empty? tags-to-set)
            (when (verbose?)
              (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
-           (db-set! #:threaded? #f absolute-path tags-to-set)))])]
+           (reconcile-tags! absolute-path tags-to-set)
+           (when (embed-support? absolute-path)
+             (set-embed-tags! absolute-path tags-to-set))))])]
    ; set the XMP metadata for a file
    [(set-xmp?)
     (define len (length args))
@@ -348,7 +354,7 @@
                  ; grab the embedded tags
                  (flatten (map dc:subject->list dc:sub-lst))
                  empty))
-           (db-set! #:threaded? #f path (sort tags string<?))))])]
+           (reconcile-tags! path (sort tags string<?))))])]
    ; moving an image in the database to another location
    [(moving?)
     (define len (length args))
@@ -397,7 +403,7 @@
                 (delete-file old-thumb-name))
               (when (file-exists? new-thumb-name)
                 (delete-file new-thumb-name))
-              (db-set! #:threaded? #f new-path tags)
+              (reconcile-tags! new-path tags)
               (db-purge! old-path)]
              [else
               ; spit out an error message, but move anyway

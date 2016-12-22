@@ -13,6 +13,7 @@
          "db.rkt"
          "db-statistics.rkt"
          "files.rkt"
+         "meta-editor.rkt"
          "search-dialog.rkt"
          "tag-browser.rkt")
 (provide (all-defined-out))
@@ -295,6 +296,14 @@
        [help-string "Open the Tag Browser."]
        [callback (λ (i e)
                    (show-tag-browser))]))
+
+(define ivy-menu-bar-view-meta-editor
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Metadata Editor"]
+       [help-string "Open the metadata editor."]
+       [callback (λ (i e)
+                   (show-meta-frame))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%

@@ -3,56 +3,32 @@
 ; edit the XMP metadata of a file in more depth
 ; than just the dc:subject entries
 (require racket/class
-         racket/date
          racket/gui/base
          racket/list
          racket/string
-         (only-in srfi/13 string-null?)
          txexpr
+         xml
          "base.rkt"
          "embed.rkt"
          "files.rkt")
 (provide show-meta-frame)
 
+; these are actually located as attributes for rdf:Description
 (define xmp-base
-  '(; unordered list of properties edited outsite this program
-    ; rdf:Bag
-    "xmp:Advisory"
-    ; base URL for relative links contained within the resource
+  '(; base URL for relative links contained within the resource
     ; Text
     "xmp:BaseURL"
-    ; date and time the resource was originally created
-    ; Text
-    "xmp:CreateDate"
-    ; name of the first known tool used to create the resource
-    ; Text
-    "xmp:CreatorTool"
     ; unordered list of unique identifiers within a given context
+    ; (the "given context" is rdf:Description?)
     ; rdf:Bag
     "xmp:Identifier"
     ; short word or phrase that identifies a document as a member
     ; of a user-defined collection
     ; Text
     "xmp:Label"
-    ; the date and time that any metadata for this resource was last changed.
-    ; should be the same as or more recent than xmp:ModifyDate
-    ; Text
-    ; no point in editing this part, because it'll just get overwritten anyway
-    ;"xmp:MetadataDate"
-    ;
-    ; the date and time the resource was last modified (i.e. in GIMP)
-    ; Text
-    ; no point in editing this part either
-    ;"xmp:ModifyDate"
-    ; a short informal name for the resource
-    ; Text
-    "xmp:Nickname"
     ; a number that indicates a document's status relative to other documents
     ; Text
-    "xmp:Rating"
-    ; an alternative array of thumbnail images for a file
-    ; Text
-    "xmp:Thumbnails"))
+    "xmp:Rating"))
 
 (define dublin-core
   '(; contributors to the resource (other than the author)
@@ -101,21 +77,6 @@
 
 (define attrs '("" "xml:language"))
 
-#|(define (quotify str)
-  (define len (string-length str))
-  (define char0 (string-ref str 0))
-  (define charn (string-ref str (- len 1)))
-  (cond [(and (char=? char0 #\") (char=? charn #\")) str]
-        [(and (char=? char0 #\") (not (char=? charn #\")))
-         (string-append str "\"")]
-        [(and (not (char=? char0 #\")) (char=? charn #\"))
-         (string-append "\"" str)]
-        [else (string-append "\"" str "\"")]))
-
-(define is-dc?
-    (for/hash ([dc (in-list dublin-core)])
-      (values dc (is-tag? (string->symbol dc)))))|#
-
 (define (create-dc-meta type elems [attrs ""])
   (define attr-sel (send attr-choice get-string-selection))
   (define attr-lst
@@ -160,21 +121,26 @@
     [("dc:coverage" "dc:identifier" "dc:source")
      (if (string-null? attr-sel)
          (txexpr (string->symbol type) '() (list elems))
-         (txexpr (string->symbol type) attr-lst (list elems)))]))
+         (txexpr (string->symbol type) attr-lst (list elems)))]
+    [else empty]))
 
 (define (ok-callback)
   (define type (send dc-choice get-string-selection))
   (define elems (send dc-tfield get-value))
   (define attrs (send attr-tfield get-value))
-  (cond
-    ; if elem-tfield is empty, remove the values for that tag
-    [(string-null? elems)]
-    [else
-     (println (create-dc-meta type elems attrs))])
+  ; set the new information
+  (define setted
+    ((set-xmp-tag (string->symbol type))
+     (string->xexpr (first (get-embed-xmp (image-path))))
+     (create-dc-meta type elems attrs)))
+  (set-embed-xmp! (image-path) (xexpr->string setted))
+  (fields-defaults))
+
+(define (fields-defaults)
   ; set fields to defaults
   (send dc-tfield set-value "")
   (send attr-tfield set-value "")
-  (send dc-choice set-selection 0)
+  (send dc-choice set-selection 11)
   (send attr-choice set-selection 0))
 
 (define meta-frame
@@ -195,8 +161,46 @@
   (new choice%
        [parent dc-hpanel]
        [label "XMP Tags "]
-       [choices (append xmp-base dublin-core)]
-       [stretchable-height #f]))
+       [choices (append dublin-core xmp-base)]
+       [selection 11]
+       [stretchable-height #f]
+       [callback
+        (λ (choice evt)
+          (define sel (string->symbol (send choice get-string-selection)))
+          (define xmp (first (get-embed-xmp (image-path))))
+          (define xexpr (string->xexpr xmp))
+          (define found (findf*-txexpr xexpr (is-tag? sel)))
+          (cond [found
+                 (case sel
+                   ; all the rdf:Bag's and rdf:Seq's
+                   [(xmp:Identifier
+                     dc:contributor
+                     dc:creator
+                     dc:date
+                     dc:language
+                     dc:publisher
+                     dc:relation
+                     dc:subject
+                     dc:type)
+                    (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
+                    (define lst (flatten (map (λ (item) (get-elements item)) rdf:li)))
+                    (send dc-tfield set-value (string-join lst ", "))]
+                   [(xmp:BaseURL xmp:Label xmp:Rating)
+                    (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
+                    (when rdf-desc
+                      ; attr may be a number via xmp:Rating
+                      (define attr (attr-ref rdf-desc sel (λ _ "")))
+                      (define attr-str
+                        (if (number? attr)
+                            (number->string attr)
+                            attr))
+                      (send dc-tfield set-value attr-str))]
+                   ; everything else is just a single value
+                   [else
+                    (define lst (flatten (map (λ (item) (get-elements item)) found)))
+                    (send dc-tfield set-value (string-join lst ", "))])]
+                [else (send dc-tfield set-value "")])
+          (send dc-tfield refresh))]))
 
 (define dc-tfield
   (new text-field%
@@ -239,11 +243,7 @@
        [parent button-hpanel]
        [label "&Cancel"]
        [callback (λ (button event)
-                   ; set fields to defaults
-                   (send dc-tfield set-value "")
-                   (send attr-tfield set-value "")
-                   (send dc-choice set-selection 0)
-                   (send attr-choice set-selection 0)
+                   (fields-defaults)
                    (send meta-frame show #f))]))
 
 (define ok-button
@@ -253,6 +253,10 @@
        [callback (λ (button event) (ok-callback))]))
 
 (define (show-meta-frame)
-  ; send the xmp tags to dc-tfield
-  ; send the xmp attrs to attr-tfield
+  (fields-defaults)
+  (when (and (not (equal? (image-path) root-path))
+             (embed-support? (image-path)))
+    (define tags (get-embed-tags (image-path)))
+    (send dc-tfield set-value (string-join tags ", ")))
+  (send dc-tfield refresh)
   (send meta-frame show #t))
