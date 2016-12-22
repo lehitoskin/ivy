@@ -7,6 +7,7 @@
          (prefix-in gif: gif-image/gif-basics)
          png-image
          racket/contract
+         racket/date
          racket/file
          racket/format
          racket/list
@@ -18,6 +19,7 @@
          get-embed-tags
          get-embed-xmp
          is-dc:subject?
+         is-tag?
          remove-embed!
          set-embed-tags!
          set-embed-xmp!)
@@ -523,6 +525,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define is-rdf:li? (is-tag? 'rdf:li))
 (define is-rdf:Description? (is-tag? 'rdf:Description))
 (define is-rdf:RDF? (is-tag? 'rdf:RDF))
+(define is-xmp:MetaDate? (is-tag? 'xmp:MetadataDate))
 
 ; take a list of tags and return a dc:subject entry
 (define/contract (list->dc:subject lst)
@@ -554,37 +557,21 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (cond
     ; empty dc:sub means it has no existing dc:subject
     [(empty? dc:sub)
-     ; find the rdf:Description (if it has one)
-     (define-values (no-rdf:desc rdf:desc)
-       (splitf-txexpr no-dc:sub is-rdf:Description?))
-     (define maybe-incomplete
-       (cond
-         ; xexpr has existing rdf:Description, set it
-         [(and (not (= (length rdf:desc) 0))
-               (txexpr? (first rdf:desc)))
-          ; grab rdf:RDF
-          (define-values (no-rdf rdf:rdf) (splitf-txexpr no-rdf:desc is-rdf:RDF?))
-          (append no-rdf
-                  (list
-                   (append (first rdf:rdf)
-                           (list (append (first rdf:desc)
-                                         (list new-subs))))))]
-         ; xexpr does not have rdf:Description, make one
-         [else
-          (append no-dc:sub
-                  `((rdf:Description
-                     ((rdf:about "")
-                      (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
-                      (xmlns:dc "http://purl.org/dc/elements/1.1/")
-                      (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
-                      (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/"))
-                     ,new-subs)))]))
-     (if (eq? (get-tag maybe-incomplete) 'x:xmpmeta)
-         maybe-incomplete
-         (txexpr 'x:xmpmeta
-                 '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
-                 (list maybe-incomplete)))]
-    [else no-dc:sub]))
+     (define rdf:desc (findf-txexpr no-dc:sub is-rdf:Description?))
+     (define-values (desc-time desc)
+       (splitf-txexpr xexpr is-rdf:Description?
+                      (λ (x)
+                        (define old-desc (attr-set rdf:desc 'xmp:MetadataDate (get-time)))
+                        (append old-desc (list new-subs)))))
+     desc-time]
+    ; xexpr had an old dc:subject (which got replaced)
+    [else
+     ; set the xmp:MetadataDate
+     (define rdf:desc (findf-txexpr no-dc:sub is-rdf:Description?))
+     (define-values (replaced n)
+       (splitf-txexpr no-dc:sub is-rdf:Description?
+                      (λ (x) (attr-set rdf:desc 'xmp:MetadataDate (get-time)))))
+     replaced]))
 
 ; take a taglist and return a complete xexpr (sans header and footer)
 (define/contract (make-xmp-xexpr taglist)
@@ -599,7 +586,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
                (xmlns:dc "http://purl.org/dc/elements/1.1/")
                (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
-               (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/"))
+               (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")
+               (xmp:MetadataDate (get-time)))
               ,dc:sub)))))
 
 ; take the complete xexpr (possibly from make-xmp-xexpr) and
@@ -613,3 +601,27 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
    (xexpr->string xexpr)
    ; xmp packet footer
    "<?xpacket end=\"w\"?>"))
+
+(define (get-time)
+  (define cd (current-date))
+  (define tz (date-time-zone-offset cd))
+  (string-append
+   (number->string (date-year cd))
+   "-"
+   (~r (date-month cd) #:min-width 2 #:pad-string "0")
+   "-"
+   (~r (date-day cd) #:min-width 2 #:pad-string "0")
+   "T"
+   (~r (date-hour cd) #:min-width 2 #:pad-string "0")
+   ":"
+   (~r (date-minute cd) #:min-width 2 #:pad-string "0")
+   ":"
+   (~r (date-second cd) #:min-width 2 #:pad-string "0")
+   ; reports SECONDS, not HOURS adjustment
+   (~r (floor (/ tz 3600)) #:min-width 2 #:pad-string "0")
+   ; check for weird time zones
+   (case (modulo tz 3600)
+     [(0) ":00"]
+     [(900) ":15"]
+     [(1800) ":30"]
+     [(2700) ":45"])))
