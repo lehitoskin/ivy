@@ -120,7 +120,9 @@
          (txexpr (string->symbol type) attr-lst (list elems)))]
     ; attr stuff
     [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
-     (define xexpr (string->xexpr (image-xmp)))
+     (define xexpr (string->xexpr (if (empty? (image-xmp))
+                                      ""
+                                      (first (image-xmp)))))
      ; these go inside rdf:Description as attrs
      (define rdf:desc (findf-txexpr xexpr is-rdf:Description?))
      (attr-set rdf:desc (string->symbol type) elems)]
@@ -135,14 +137,18 @@
     (case type
       [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
        ((set-xmp-tag 'rdf:Description)
-        (string->xexpr (image-xmp))
+        (string->xexpr (if (empty? (image-xmp))
+                           ""
+                           (first (image-xmp))))
         (create-dc-meta type elems attrs))]
       [else
        ((set-xmp-tag (string->symbol type))
-        (string->xexpr (first (image-xmp)))
+        (string->xexpr (if (empty? (image-xmp))
+                           ""
+                           (first (image-xmp))))
         (create-dc-meta type elems attrs))]))
-  (image-xmp (xexpr->string setted))
-  (set-embed-xmp! (image-path) (image-xmp))
+  (image-xmp (list (xexpr->string setted)))
+  (set-embed-xmp! (image-path) (first (image-xmp)))
   (fields-defaults))
 
 (define (fields-defaults)
@@ -169,7 +175,7 @@
 (define dc-choice
   (new choice%
        [parent dc-hpanel]
-       [label "XMP Tags "]
+       [label "XMP Tags    "]
        [choices (append dublin-core xmp-base)]
        [selection 11]
        [stretchable-height #f]
@@ -177,7 +183,9 @@
         (λ (choice evt)
           ; when the choice is selected, fill the tfield with its contents
           (define sel (string->symbol (send choice get-string-selection)))
-          (define xexpr (string->xexpr (image-xmp)))
+          (define xexpr (string->xexpr (if (empty? (image-xmp))
+                                           ""
+                                           (first (image-xmp)))))
           (define found (findf*-txexpr xexpr (is-tag? sel)))
           (cond [found
                  (case sel
@@ -230,7 +238,7 @@
 (define attr-choice
   (new choice%
        [parent attr-hpanel]
-       [label "Attribute val   "]
+       [label "Attribute val "]
        [choices attrs]
        [selection 0]
        [stretchable-height #f]))

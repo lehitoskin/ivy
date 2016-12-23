@@ -13,6 +13,8 @@ tracked solely by the application.
 - [png-image](https://github.com/lehitoskin/png-image)
 - [racquel](https://github.com/brown131/racquel)
 - [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
+- [sugar](https://github.com/mbutterick/sugar)
+- [txexpr](https://github.com/mbutterick/txexpr)
 
 ### Compilation
 

@@ -46,7 +46,7 @@
 ; pict of the currently displayed image
 (define image-pict #f)
 ; the cached XMP metadata of the image
-(define image-xmp (make-parameter ""))
+(define image-xmp (make-parameter empty))
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time
@@ -519,7 +519,7 @@
             (unless (empty? embed-lst)
               ; the embedded tags may come back unsorted
               (incoming-tags (string-join (sort embed-lst string<?) ", ")))]
-           [else (image-xmp "")])
+           [else (image-xmp empty)])
             
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
