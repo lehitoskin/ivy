@@ -70,7 +70,24 @@
 
 ; contract for image scaling
 (define image-scale/c
-  (or/c 'default 'cmd 'larger 'wheel-larger 'smaller 'wheel-smaller 'same 'none))
+  (or/c 'default
+        'cmd
+        'larger
+        'wheel-larger
+        'smaller
+        'wheel-smaller
+        'same
+        'none
+        10
+        20
+        30
+        40
+        50
+        60
+        70
+        80
+        90
+        100))
 
 ; all image files contained within image-dir
 (define (path-files)
@@ -334,6 +351,9 @@
     [(smaller wheel-smaller)
      (scale-to-fit img (* img-width 0.9) (* img-height 0.9))]
     [(same) img]
+    [(10 20 30 40 50 60 70 80 90 100)
+     (define num (/ type 100))
+     (scale-to-fit img (* img-width num) (* img-height num))]
     [(none) (bitmap img)]))
 
 ; janky!
@@ -461,10 +481,9 @@
        [else
         ; make sure the bitmap loaded correctly
         (define load-success
-          (cond [(bytes=? (path-get-extension img) #".svg")
-                 (set! image-bmp-master (load-svg-from-file img))]
-                [else
-                 (send image-bmp-master load-file img 'unknown/alpha)]))
+          (if (bytes=? (path-get-extension img) #".svg")
+              (and (set! image-bmp-master (load-svg-from-file img)) #t)
+              (send image-bmp-master load-file img 'unknown/alpha)))
         (cond [load-success
                (send (send canvas get-parent) set-label (path->string name))
                (set! image-pict (scale-image image-bmp-master scale))

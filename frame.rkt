@@ -306,6 +306,20 @@
        [callback (λ (i e)
                    (show-meta-frame))]))
 
+(define ivy-menu-bar-view-zoom-to
+  (new menu%
+       [parent ivy-menu-bar-view]
+       [label "Zoom To"]
+       [help-string "Zoom the image to a specified percentage."]))
+
+
+(for ([n (in-range 10 110 10)])
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom-to]
+       [label (format "~a%" n)]
+       [callback (λ (i e)
+                   (load-image (bitmap image-bmp-master) n))]))
+
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
        [parent ivy-menu-bar-view]

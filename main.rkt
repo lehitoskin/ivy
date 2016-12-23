@@ -14,7 +14,7 @@
          "embed.rkt"
          "frame.rkt")
 
-(define ivy-version 1.3)
+(define ivy-version 2.0)
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
