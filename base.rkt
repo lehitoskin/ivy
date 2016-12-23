@@ -495,7 +495,7 @@
      ; and use them instead of what's in the DB
      ; because it may be out of date
      (cond [(embed-support? img-str)
-            (image-xmp (first (get-embed-xmp img-str)))
+            (image-xmp (get-embed-xmp img-str))
             (define embed-lst (get-embed-tags img-str))
             (unless (empty? embed-lst)
               ; the embedded tags may come back unsorted

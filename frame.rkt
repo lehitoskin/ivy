@@ -12,6 +12,7 @@
          "base.rkt"
          "db.rkt"
          "db-statistics.rkt"
+         "embed.rkt"
          "files.rkt"
          "meta-editor.rkt"
          "search-dialog.rkt"
@@ -504,6 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (define tag-lst (tfield->list tf))
                          ; add/remove tags as necessary
                          (reconcile-tags! img-str tag-lst)])
+                  (when (embed-support? img-str)
+                    (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                    (image-xmp (get-embed-xmp img-str)))
                   (send tf set-field-background color-spring-green)
                   (send (ivy-canvas) focus)]
                  [else
@@ -533,6 +537,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (define tag-lst (tfield->list (ivy-tag-tfield)))
                    ; add/remove tags as necessary
                    (reconcile-tags! img-str tag-lst)])
+            (when (embed-support? img-str)
+              (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+              (image-xmp (get-embed-xmp img-str)))
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)
