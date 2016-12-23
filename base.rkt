@@ -16,7 +16,10 @@
          (only-in srfi/13
                   string-contains-ci
                   string-null?)
+         txexpr
+         xml
          "db.rkt"
+         "embed.rkt"
          "files.rkt")
 (provide (all-defined-out)
          string-null?
@@ -42,13 +45,15 @@
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
 (define image-pict #f)
+; the cached XMP metadata of the image
+(define image-xmp (make-parameter ""))
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time
 (define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".jpg" ".png" ".svg"))
+(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".JPEG" ".jpg" ".JPG" ".png" ".svg"))
 (define exact-search? (make-parameter #f))
 (define color-white (make-object color% "white"))
 (define color-black (make-object color% "black"))
@@ -65,7 +70,24 @@
 
 ; contract for image scaling
 (define image-scale/c
-  (or/c 'default 'cmd 'larger 'wheel-larger 'smaller 'wheel-smaller 'same 'none))
+  (or/c 'default
+        'cmd
+        'larger
+        'wheel-larger
+        'smaller
+        'wheel-smaller
+        'same
+        'none
+        10
+        20
+        30
+        40
+        50
+        60
+        70
+        80
+        90
+        100))
 
 ; all image files contained within image-dir
 (define (path-files)
@@ -329,6 +351,9 @@
     [(smaller wheel-smaller)
      (scale-to-fit img (* img-width 0.9) (* img-height 0.9))]
     [(same) img]
+    [(10 20 30 40 50 60 70 80 90 100)
+     (define num (/ type 100))
+     (scale-to-fit img (* img-width num) (* img-height num))]
     [(none) (bitmap img)]))
 
 ; janky!
@@ -398,7 +423,8 @@
 ; the position message
 (define/contract (load-image img [scale 'default])
   (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
-       (image-scale/c) void?)
+       (image-scale/c)
+       void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
   (define sbd (status-bar-dimensions))
@@ -455,10 +481,9 @@
        [else
         ; make sure the bitmap loaded correctly
         (define load-success
-          (cond [(bytes=? (path-get-extension img) #".svg")
-                 (set! image-bmp-master (load-svg-from-file img))]
-                [else
-                 (send image-bmp-master load-file img 'unknown/alpha)]))
+          (if (bytes=? (path-get-extension img) #".svg")
+              (and (set! image-bmp-master (load-svg-from-file img)) #t)
+              (send image-bmp-master load-file img 'unknown/alpha)))
         (cond [load-success
                (send (send canvas get-parent) set-label (path->string name))
                (set! image-pict (scale-image image-bmp-master scale))
@@ -485,6 +510,17 @@
             (define tags (send img-obj get-tags))
             (incoming-tags (string-join tags ", "))]
            [else (incoming-tags "")])
+     ; check to see if the image has embedded tags
+     ; and use them instead of what's in the DB
+     ; because it may be out of date
+     (cond [(embed-support? img-str)
+            (image-xmp (get-embed-xmp img-str))
+            (define embed-lst (get-embed-tags img-str))
+            (unless (empty? embed-lst)
+              ; the embedded tags may come back unsorted
+              (incoming-tags (string-join (sort embed-lst string<?) ", ")))]
+           [else (image-xmp "")])
+            
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
      ; ensure the text-field displays the changes we just made

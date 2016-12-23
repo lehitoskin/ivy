@@ -187,6 +187,7 @@
     ; add the image to each tag% object
     (send tag-obj add-img img)
     (save-data-object db-conn tag-obj))
+  (define img-path (get-column path img-obj))
   (save-data-object db-conn img-obj))
 
 ; remove the tags from the img entry
@@ -204,6 +205,7 @@
   (when img-obj
     ; remove the tags from the image
     (send img-obj del-tag tag-lst)
+    (define img-path (get-column path img-obj))
     ; if the image has no tags, remove from database
     (if (empty? (send img-obj get-tags))
         (delete-data-object db-conn img-obj)
@@ -256,15 +258,14 @@
         #:threaded? boolean?)
        (or/c void? thread?))
   (db-purge! #:db-conn db-conn img)
-  (add-tags! #:db-conn db-conn img tag-lst)
   (if threaded?
       (thread (λ ()
                 (add-tags! #:db-conn db-conn img tag-lst)))
       (add-tags! #:db-conn db-conn img tag-lst)))
 
-; reconcile between the old tags and new tags
-; instead of a scorched earth approach like db-set!, only delete and add
-; the tags as necessary
+; reconcile between the old tags and new tags.
+; instead of a scorched earth approach like db-set!,
+; only delete and add the tags as necessary
 (define/contract (reconcile-tags! #:db-conn [db-conn sqlc] img tag-lst)
   (->* ([or/c string? data-object?]
         [listof string?])
@@ -311,24 +312,13 @@
 ; counted more than once, so a final sort and remove-duplicates
 ; (how ironic) is possibly necessary.
 (define (keep-duplicates lst [dups empty])
-  (define sorted (sort lst equal?))
-  (define len (length sorted))
+  (define len (length lst))
   (cond [(< len 2) (remove-duplicates dups)]
         [(>= len 2)
+         (define sorted (sort lst (if (string? (first lst)) string<? path<?)))
          (if (equal? (first sorted) (second sorted))
              (keep-duplicates (rest sorted) (cons (first sorted) dups))
              (keep-duplicates (rest sorted) dups))]))
-
-(define (keep-duplicates-refined lst-lst)
-  (for/fold ([accum empty])
-            ([lst (in-list lst-lst)])
-    ; search-db-exact has a list of strings (from the db)
-    ; search-db-inexact has a list of paths (auto-converted by in-table-pairs)
-    (define cmp? (if (path? (first lst)) path<? string<?))
-    (define sorted (sort (append accum lst) cmp?))
-    (if (empty? accum)
-        sorted
-        (keep-duplicates sorted))))
 
 ; list the tags associated with the image
 (define/contract (image-taglist #:db-conn [db-conn sqlc] img)
@@ -357,59 +347,49 @@
                           (string-replace str "'" "''"))) tag-lst))
          (define results
            ; loop over the tags we're searching through
-           (map (λ (tag-obj)
-                  (send tag-obj get-images))
-                (select-data-objects db-conn tag% (where (in label lst-quotes)))))
+           (flatten
+            (map (λ (tag-obj)
+                   (send tag-obj get-images))
+                 (select-data-objects db-conn tag% (where (in label lst-quotes))))))
          (case type
            ; turn all the strings into paths, remove duplicate items
            [(or)
-            (define sorted (sort (flatten results) string<?))
+            (define sorted (sort results string<?))
             (map string->path (remove-duplicates sorted))]
            ; turn all the strings in paths, keep only duplicate items
            [(and)
             (cond [(= (length lst-quotes) 1)
-                   (define sorted (sort (flatten results) string<?))
+                   (define sorted (sort results string<?))
                    (map string->path (remove-duplicates sorted))]
                   [else
-                   (map string->path (keep-duplicates-refined results))])])]))
+                   (map string->path (keep-duplicates results))])])]))
 
-; returns a list of paths or empty
+; return a list of paths or empty
 (define/contract (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
   (->* ([or/c 'or 'and]
         [listof string?])
        (#:db-conn connection?)
        (or/c (listof path?) empty?))
-  (cond [(zero? (length tag-lst)) empty]
+  (cond [(= (length tag-lst) 0) empty]
         [else
+         ; search the database
          (define results
-           ; populate accum for each of the tags we're looking for
-           ; will become a list of lists
-           ;
-           ; allow in-table-pairs to be calculated only once,
-           ; to save on querying the db so many times
-           (let ([itp-sequence (in-table-pairs #:db-conn db-conn 'images)])
-             (for/fold ([accum empty])
-                       ([tag (in-list tag-lst)])
-               (define imgs-in-tag
-                 ; loop for each item in the database
-                 (for/list ([img-pair itp-sequence])
-                   (define img-tags (second img-pair))
-                   (define hit-or-miss
-                     (for/list ([img-tag (in-list img-tags)])
-                       (if (string-contains-ci img-tag tag)
-                           (first img-pair)
-                           #f)))
-                   ; remove any #f that we've found
-                   (filter path? hit-or-miss)))
-               ; flatten the list of length-1 lists,
-               ; then add it to the accumulator
-               (cons (flatten imgs-in-tag) accum))))
-         (cond [(or (= (length tag-lst) 1) (eq? type 'or))
-                ; remove any duplicates
-                (remove-duplicates (flatten results))]
-               [else
-                ; keep any duplicates
-                (keep-duplicates-refined results)])]))
+           ; iterate over the tags and see if any of them
+           ; match our tag-lst
+           (for/fold ([db-accum empty])
+                     ([db-pair (in-table-pairs #:db-conn db-conn 'tags)])
+             (define search
+               (for/fold ([tag-accum empty])
+                         ([tag (in-list tag-lst)])
+                 (if (string-contains-ci (first db-pair) tag)
+                     (append tag-accum (second db-pair))
+                     tag-accum)))
+             (if (empty? search)
+                 db-accum
+                 (append db-accum search))))
+         (if (or (= (length tag-lst) 1) (eq? type 'or))
+             (remove-duplicates results)
+             (keep-duplicates results))]))
 
 ; returns a list of paths or empty
 (define/contract (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)

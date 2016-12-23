@@ -21,6 +21,8 @@
 <p>From the tag browser it is also possible to delete entire tag categories or rename them. Also, it is possible to edit the taglist of an image by clicking on an image path and selecting &quot;Edit Tags&quot; from the menu.</p>
 <h2 id="animated-gif-support">Animated GIF Support</h2>
 <p>Animated GIF support is currently marked as experimental. To animate a GIF, select View -&gt; GIF Animation. Due to the unstable natue of the related code, know that some GIF's may not load properly or at all.</p>
+<h2 id="embedding-tags-as-xmp-metadata">Embedding Tags as XMP metadata</h2>
+<p>Ivy embeds the taglist as XMP metadata in the file itself (if that file supports XMP metadata). That way if you move your images around, the tags will stay the same. However, the information in the database will then be out of date, so it is recommended that if you move files around, utilize Ivy's command-line interface with the switch <code>-M</code> to ensure the changes are tracked.</p>
 <h1 id="options">OPTIONS</h1>
 <h2 id="mutually-exclusive-options">Mutually exclusive options</h2>
 <h3 id="v---version">-V, --version</h3>
@@ -41,6 +43,10 @@
 <p>Sets the taglist of the image. ex: ivy -T &quot;tag0, tag1, ...&quot; /path/to/image ...</p>
 <h3 id="m---move-image-images-...-destination">-M, --move-image <em>[image(s) ... destination]</em></h3>
 <p>Moves the source file(s) to the destination, updating the database.</p>
+<h3 id="show-xmp-imagelist">---show-xmp <em>[imagelist]</em></h3>
+<p>Shows the XMP metadata for supported files.</p>
+<h3 id="set-xmp-xmp-string-imagelist">---set-xmp <em>[xmp string]</em> <em>[imagelist]</em></h3>
+<p>Sets the XMP metadata for supported files in imagelist.</p>
 <h2 id="may-be-specified-once-each">May be specified once each</h2>
 <h3 id="e---exact-search">-e, --exact-search</h3>
 <p>Search the tags database for exact matches.</p>

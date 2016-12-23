@@ -12,7 +12,9 @@
          "base.rkt"
          "db.rkt"
          "db-statistics.rkt"
+         "embed.rkt"
          "files.rkt"
+         "meta-editor.rkt"
          "search-dialog.rkt"
          "tag-browser.rkt")
 (provide (all-defined-out))
@@ -296,6 +298,28 @@
        [callback (λ (i e)
                    (show-tag-browser))]))
 
+(define ivy-menu-bar-view-meta-editor
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Metadata Editor"]
+       [help-string "Open the metadata editor."]
+       [callback (λ (i e)
+                   (show-meta-frame))]))
+
+(define ivy-menu-bar-view-zoom-to
+  (new menu%
+       [parent ivy-menu-bar-view]
+       [label "Zoom To"]
+       [help-string "Zoom the image to a specified percentage."]))
+
+
+(for ([n (in-range 10 110 10)])
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom-to]
+       [label (format "~a%" n)]
+       [callback (λ (i e)
+                   (load-image (bitmap image-bmp-master) n))]))
+
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
        [parent ivy-menu-bar-view]
@@ -495,6 +519,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (define tag-lst (tfield->list tf))
                          ; add/remove tags as necessary
                          (reconcile-tags! img-str tag-lst)])
+                  (when (embed-support? img-str)
+                    (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                    (image-xmp (get-embed-xmp img-str)))
                   (send tf set-field-background color-spring-green)
                   (send (ivy-canvas) focus)]
                  [else
@@ -524,6 +551,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (define tag-lst (tfield->list (ivy-tag-tfield)))
                    ; add/remove tags as necessary
                    (reconcile-tags! img-str tag-lst)])
+            (when (embed-support? img-str)
+              (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+              (image-xmp (get-embed-xmp img-str)))
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)

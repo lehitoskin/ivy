@@ -74,6 +74,14 @@ Animated GIF support is currently marked as experimental. To animate a GIF,
 select View -> GIF Animation. Due to the unstable natue of the related code,
 know that some GIF's may not load properly or at all.
 
+## Embedding Tags as XMP metadata
+
+Ivy embeds the taglist as XMP metadata in the file itself (if that file supports
+XMP metadata). That way if you move your images around, the tags will stay the
+same. However, the information in the database will then be out of date, so it
+is recommended that if you move files around, utilize Ivy's command-line
+interface with the switch `-M` to ensure the changes are tracked.
+
 # OPTIONS
 
 ## Mutually exclusive options
@@ -104,6 +112,12 @@ Sets the taglist of the image. ex: ivy -T "tag0, tag1, ..." /path/to/image ...
 
 ### -M, --move-image *[image(s) ... destination]*
 Moves the source file(s) to the destination, updating the database.
+
+### ---show-xmp *[imagelist]*
+Shows the XMP metadata for supported files.
+
+### ---set-xmp *[xmp string]* *[imagelist]*
+Sets the XMP metadata for supported files in imagelist.
 
 ## May be specified once each
 

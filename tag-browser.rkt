@@ -6,6 +6,7 @@
          racket/string
          "base.rkt"
          "db.rkt"
+         "embed.rkt"
          "files.rkt")
 (provide show-tag-browser)
 
@@ -89,7 +90,10 @@
          (define imagelist (map path->string (search-db-exact 'or (list old-tag-label))))
          (for ([img (in-list imagelist)])
            (add-tags! img (list new-tag-label))
-           (del-tags! img (list old-tag-label)))
+           (del-tags! img (list old-tag-label))
+           (when (embed-support? img)
+             (add-embed-tags! img (list new-tag-label))
+             (del-embed-tags! img (list old-tag-label))))
          (send rename-dialog show #f)
          (update-tag-browser)]))
 
@@ -128,7 +132,9 @@
                    (define imagelist
                      (map path->string (search-db-exact 'or (list tag-label))))
                    (for ([img (in-list imagelist)])
-                     (del-tags! img (list tag-label)))
+                     (del-tags! img (list tag-label))
+                     (when (embed-support? img)
+                       (del-embed-tags! img (list tag-label))))
                    (update-tag-browser))]
                 [else (err-mbox)]))]))
 
@@ -164,9 +170,14 @@
                           [value #t]
                           [callback
                            (λ (button evt)
-                             (if (send button get-value)
-                                 (add-tags! img-label tag)
-                                 (del-tags! img-label (list tag))))])))
+                             (cond [(send button get-value)
+                                    (add-tags! img-label tag)
+                                    (when (embed-support? img-label)
+                                      (add-embed-tags! img-label tag))]
+                                   [else
+                                    (del-tags! img-label (list tag))
+                                    (when (embed-support? img-label)
+                                      (del-embed-tags! img-label tag))]))])))
                  (send edit-tags-dialog show #t)]
                 [else (err-mbox)]))]))
 
@@ -193,6 +204,8 @@
     ; turn the string of tag(s) into a list then sort it
     (define tag-lst (sort (tfield->list tfield) string<?))
     (add-tags! img tag-lst)
+    (when (embed-support? img)
+      (add-embed-tags! img tag-lst))
     (send tfield set-value ""))
   (send edit-tags-dialog show #f))
 

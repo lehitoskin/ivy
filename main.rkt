@@ -7,11 +7,14 @@
          racket/list
          racket/path
          racket/string
+         txexpr
+         xml
          "base.rkt"
          "db.rkt"
+         "embed.rkt"
          "frame.rkt")
 
-(define ivy-version 1.3)
+(define ivy-version 2.0)
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
@@ -19,12 +22,14 @@
 (define tags-to-exclude (make-parameter empty))
 (define null-flag (make-parameter #f))
 (define verbose? (make-parameter #f))
-(define listing? (make-parameter #f))
-(define adding? (make-parameter #f))
-(define deleting? (make-parameter #f))
-(define setting? (make-parameter #f))
+(define list-tags? (make-parameter #f))
+(define add-tags? (make-parameter #f))
+(define delete-tags? (make-parameter #f))
+(define set-tags? (make-parameter #f))
 (define moving? (make-parameter #f))
 (define purging? (make-parameter #f))
+(define show-xmp? (make-parameter #f))
+(define set-xmp? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
 (define (relative->absolute path)
@@ -72,15 +77,15 @@
  [("-L" "--list-tags")
   "Lists the tags for the image(s)."
   (show-frame? #f)
-  (listing? #t)]
+  (list-tags? #t)]
  [("-A" "--add-tags")
   "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (adding? #t)]
+  (add-tags? #t)]
  [("-D" "--delete-tags")
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (deleting? #t)]
+  (delete-tags? #t)]
  [("-P" "--purge")
   "Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ..."
   (show-frame? #f)
@@ -88,7 +93,7 @@
  [("-T" "--set-tags")
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (setting? #t)]
+  (set-tags? #t)]
  [("-M" "--move-image")
   "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
@@ -114,6 +119,14 @@
   "Search result items are terminated by a null character instead of by whitespace."
   (show-frame? #f)
   (null-flag #t)]
+ [("--show-xmp")
+  "Extract the embedded XMP in supported images."
+  (show-frame? #f)
+  (show-xmp? #t)]
+ [("--set-xmp")
+  "Set the embedded XMP in supported images."
+  (show-frame? #f)
+  (set-xmp? #t)]
  [("-v" "--verbose")
   "Display verbose information for certain operations."
   (show-frame? #f)
@@ -204,7 +217,7 @@
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
                      (length exclude-sorted) (tags-to-search) (tags-to-exclude)))])]
-   [(listing?)
+   [(list-tags?)
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
       (when (db-has-key? 'images absolute-path)
@@ -213,7 +226,16 @@
           (if (null-flag)
               (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
               (printf "~a~n" tag)))))]
-   [(adding?)
+   [(show-xmp?)
+    (for ([img (in-list args)])
+      (define absolute-path (path->string (relative->absolute img)))
+      (when (embed-support? absolute-path)
+        (define xmp (get-embed-xmp absolute-path))
+        (for ([str (in-list xmp)])
+          (if (null-flag)
+              (printf "~a" (bytes-append (string->bytes/utf-8 str) #"\0"))
+              (printf "~a~n" str)))))]
+   [(add-tags?)
     (cond
       [(< (length args) 2)
        (raise-argument-error 'add-tags "2 or more arguments" (length args))
@@ -239,8 +261,10 @@
                  (new image% [path absolute-path])))
            (when (verbose?)
              (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
+           (when (embed-support? img)
+             (add-embed-tags! img tags-to-add))
            (add-tags! img-obj tags-to-add)))])]
-   [(deleting?)
+   [(delete-tags?)
     (cond
       [(< (length args) 2)
        (raise-argument-error 'delete-tags "2 or more arguments" (length args))
@@ -264,6 +288,8 @@
            (define img-obj (make-data-object sqlc image% absolute-path))
            (when (verbose?)
              (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
+           (when (embed-support? img)
+             (del-embed-tags! img tags-to-remove))
            (del-tags! img-obj tags-to-remove)))])]
    [(purging?)
     (for ([img (in-list args)])
@@ -276,7 +302,7 @@
       ; remove the old thumbnail
       (when (file-exists? thumb-name)
         (delete-file thumb-name)))]
-   [(setting?)
+   [(set-tags?)
     (cond
       [(< (length args) 2)
        (raise-argument-error 'set-tags "2 or more arguments" (length args))
@@ -298,7 +324,37 @@
          (unless (empty? tags-to-set)
            (when (verbose?)
              (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
-           (db-set! #:threaded? #f absolute-path tags-to-set)))])]
+           (reconcile-tags! absolute-path tags-to-set)
+           (when (embed-support? absolute-path)
+             (set-embed-tags! absolute-path tags-to-set))))])]
+   ; set the XMP metadata for a file
+   [(set-xmp?)
+    (define len (length args))
+    (cond
+      [(< len 2)
+       (raise-argument-error 'set-xmp "2 or more arguments" len)
+       (disconnect sqlc)
+       (exit)]
+      [(not (string? (first args)))
+       (raise-argument-error 'set-xmp "First argument must be a string" (first args))]
+      [else
+       ; make sure the paths are absolute
+       (define absolute (map (λ (ri) (relative->absolute ri)) (rest args)))
+       (define xmp-str (first args))
+       (for ([path (in-list absolute)])
+         (when (embed-support? path)
+           ; set the XMP data
+           (set-embed-xmp! path xmp-str)
+           ; grab the tag list and update the database
+           (define xexpr (string->xexpr xmp-str))
+           ; find the dc:subject info
+           (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
+           (define tags
+             (if dc:sub-lst
+                 ; grab the embedded tags
+                 (flatten (map dc:subject->list dc:sub-lst))
+                 empty))
+           (reconcile-tags! path (sort tags string<?))))])]
    ; moving an image in the database to another location
    [(moving?)
     (define len (length args))
@@ -347,7 +403,7 @@
                 (delete-file old-thumb-name))
               (when (file-exists? new-thumb-name)
                 (delete-file new-thumb-name))
-              (db-set! #:threaded? #f new-path tags)
+              (reconcile-tags! new-path tags)
               (db-purge! old-path)]
              [else
               ; spit out an error message, but move anyway
