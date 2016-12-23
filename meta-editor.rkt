@@ -18,10 +18,6 @@
   '(; base URL for relative links contained within the resource
     ; Text
     "xmp:BaseURL"
-    ; unordered list of unique identifiers within a given context
-    ; (the "given context" is rdf:Description?)
-    ; rdf:Bag
-    "xmp:Identifier"
     ; short word or phrase that identifies a document as a member
     ; of a user-defined collection
     ; Text
@@ -186,8 +182,7 @@
           (cond [found
                  (case sel
                    ; all the Bag's, Seq's, and Alt's
-                   [(xmp:Identifier
-                     dc:contributor
+                   [(dc:contributor
                      dc:creator
                      dc:date
                      dc:language
