@@ -19,6 +19,7 @@
          get-embed-tags
          get-embed-xmp
          is-dc:subject?
+         is-rdf:Description?
          is-rdf:li?
          is-tag?
          del-embed-tags!

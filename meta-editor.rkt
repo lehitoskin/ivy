@@ -122,6 +122,12 @@
      (if (string-null? attr-sel)
          (txexpr (string->symbol type) '() (list elems))
          (txexpr (string->symbol type) attr-lst (list elems)))]
+    ; attr stuff
+    [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
+     (define xexpr (string->xexpr (image-xmp)))
+     ; these go inside rdf:Description as attrs
+     (define rdf:desc (findf-txexpr xexpr is-rdf:Description?))
+     (attr-set rdf:desc (string->symbol type) elems)]
     [else empty]))
 
 (define (ok-callback)
@@ -130,10 +136,17 @@
   (define attrs (send attr-tfield get-value))
   ; set the new information
   (define setted
-    ((set-xmp-tag (string->symbol type))
-     (string->xexpr (first (get-embed-xmp (image-path))))
-     (create-dc-meta type elems attrs)))
-  (set-embed-xmp! (image-path) (xexpr->string setted))
+    (case type
+      [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
+       ((set-xmp-tag 'rdf:Description)
+        (string->xexpr (image-xmp))
+        (create-dc-meta type elems attrs))]
+      [else
+       ((set-xmp-tag (string->symbol type))
+        (string->xexpr (first (image-xmp)))
+        (create-dc-meta type elems attrs))]))
+  (image-xmp (xexpr->string setted))
+  (set-embed-xmp! (image-path) (image-xmp))
   (fields-defaults))
 
 (define (fields-defaults)
@@ -166,13 +179,13 @@
        [stretchable-height #f]
        [callback
         (λ (choice evt)
+          ; when the choice is selected, fill the tfield with its contents
           (define sel (string->symbol (send choice get-string-selection)))
-          (define xmp (first (get-embed-xmp (image-path))))
-          (define xexpr (string->xexpr xmp))
+          (define xexpr (string->xexpr (image-xmp)))
           (define found (findf*-txexpr xexpr (is-tag? sel)))
           (cond [found
                  (case sel
-                   ; all the rdf:Bag's and rdf:Seq's
+                   ; all the Bag's, Seq's, and Alt's
                    [(xmp:Identifier
                      dc:contributor
                      dc:creator
@@ -180,7 +193,9 @@
                      dc:language
                      dc:publisher
                      dc:relation
+                     dc:rights
                      dc:subject
+                     dc:title
                      dc:type)
                     (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
                     (define lst (flatten (map (λ (item) (get-elements item)) rdf:li)))
