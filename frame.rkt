@@ -203,7 +203,7 @@
           (send (ivy-tag-tfield) set-field-background color-white)
           (send (status-bar-dimensions) set-label "0 x 0")
           (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0)
-          (thread (λ () (collect-garbage))))]))
+          (collect-garbage 'incremental))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%

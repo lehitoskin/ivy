@@ -335,8 +335,6 @@
        (raise-argument-error 'set-xmp "2 or more arguments" len)
        (disconnect sqlc)
        (exit)]
-      [(not (string? (first args)))
-       (raise-argument-error 'set-xmp "First argument must be a string" (first args))]
       [else
        ; make sure the paths are absolute
        (define absolute (map (λ (ri) (relative->absolute ri)) (rest args)))
@@ -354,7 +352,7 @@
                  ; grab the embedded tags
                  (flatten (map dc:subject->list dc:sub-lst))
                  empty))
-           (reconcile-tags! path (sort tags string<?))))])]
+           (reconcile-tags! (path->string path) (sort tags string<?))))])]
    ; moving an image in the database to another location
    [(moving?)
     (define len (length args))
