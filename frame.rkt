@@ -131,6 +131,7 @@
                    (pfs (path-files))])
             (send (ivy-tag-tfield) set-field-background color-white)
             (image-path img-path)
+            (collect-garbage 'incremental)
             (load-image img-path)))]))
 
 (define ivy-menu-bar-file-append
@@ -165,6 +166,7 @@
                (image-dir base)
                (pfs paths)
                (image-path img-path)
+               (collect-garbage 'incremental)
                (load-image img-path)]
               ; collection has images; appending to collection
               [else
@@ -200,7 +202,8 @@
           (send (ivy-tag-tfield) set-value "")
           (send (ivy-tag-tfield) set-field-background color-white)
           (send (status-bar-dimensions) set-label "0 x 0")
-          (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0))]))
+          (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0)
+          (thread (λ () (collect-garbage))))]))
 
 (define ivy-menu-bar-search-tag
   (new menu-item%
@@ -287,6 +290,7 @@
                    (when (and (not (equal? (image-path) root-path))
                               (gif? (image-path))
                               (gif-animated? (image-path)))
+                     (collect-garbage 'incremental)
                      (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
@@ -318,6 +322,7 @@
        [parent ivy-menu-bar-view-zoom-to]
        [label (format "~a%" n)]
        [callback (λ (i e)
+                   (collect-garbage 'incremental)
                    (load-image (bitmap image-bmp-master) n))]))
 
 (define ivy-menu-bar-view-rotate-left
@@ -326,6 +331,7 @@
        [label "Rotate left"]
        [help-string "Rotate the image left."]
        [callback (λ (i e)
+                   (collect-garbage 'incremental)
                    (load-image (rotate image-pict (/ pi 2)) 'same))]))
 
 (define ivy-menu-bar-view-rotate-right
@@ -334,6 +340,7 @@
        [label "Rotate right"]
        [help-string "Rotate the image right."]
        [callback (λ (i e)
+                   (collect-garbage 'incremental)
                    (load-image (rotate image-pict (- (/ pi 2))) 'same))]))
 
 (define ivy-menu-bar-view-flip-horizontal
@@ -344,6 +351,7 @@
        [callback (λ (i e)
                    (define flo
                      (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
+                   (collect-garbage 'incremental)
                    (load-image (bitmap (flomap->bitmap flo)) 'same))]))
 
 (define ivy-menu-bar-view-flip-vertical
@@ -354,6 +362,7 @@
        [callback (λ (i e)
                    (define flo
                      (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
+                   (collect-garbage 'incremental)
                    (load-image (bitmap (flomap->bitmap flo)) 'same))]))
 
 ;; Window menu items ;;
@@ -434,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
                      (if (and image-pict
                               (empty? gif-lst))
                          (load-image image-pict 'larger)
@@ -446,6 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
                      (if (and image-pict
                               (empty? gif-lst))
                          (load-image image-pict 'smaller)
@@ -458,6 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
                      (if (empty? gif-lst)
                          (load-image image-bmp-master 'none)
                          (load-image (image-path) 'none))))]))
@@ -469,6 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
                      (if (empty? gif-lst)
                          (load-image image-bmp-master)
                          (load-image (image-path)))))]))
@@ -509,6 +522,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
                   (define tags (send tf get-value))
                   (send ivy-frame set-label name-str)
+                  (when (embed-support? img-str)
+                    ; put this into a new thread to speed things up
+                    (thread (λ ()
+                              (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                              (image-xmp (get-embed-xmp img-str)))))
                   (cond [(string-null? tags)
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
@@ -519,9 +537,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (define tag-lst (tfield->list tf))
                          ; add/remove tags as necessary
                          (reconcile-tags! img-str tag-lst)])
-                  (when (embed-support? img-str)
-                    (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
-                    (image-xmp (get-embed-xmp img-str)))
                   (send tf set-field-background color-spring-green)
                   (send (ivy-canvas) focus)]
                  [else
@@ -541,6 +556,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
             (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
             (send (ivy-tag-tfield) set-field-background color-spring-green)
+            (when (embed-support? img-str)
+              ; put this into a new thread to speed things up
+              (thread (λ ()
+                        (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                        (image-xmp (get-embed-xmp img-str)))))
             ; empty tag string means delete the entry
             (cond [(string-null? tags)
                    ; no failure if key doesn't exist
@@ -551,9 +571,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (define tag-lst (tfield->list (ivy-tag-tfield)))
                    ; add/remove tags as necessary
                    (reconcile-tags! img-str tag-lst)])
-            (when (embed-support? img-str)
-              (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
-              (image-xmp (get-embed-xmp img-str)))
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)
@@ -593,6 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
          (image-dir base)
          (pfs (list pathname))
          (image-path pathname)
+         (collect-garbage 'incremental)
          (load-image pathname)]
         ; collection has images; appending to collection
         [else
@@ -619,6 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
         [(wheel-down)
          ; do nothing if we've pressed ctrl+n
          (unless (equal? (image-path) root-path)
+           (collect-garbage 'incremental)
            (if (and image-pict
                     (empty? gif-lst))
                (load-image image-pict 'wheel-smaller)
@@ -626,6 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
          (unless (equal? (image-path) root-path)
+           (collect-garbage 'incremental)
            (if (and image-pict
                     (empty? gif-lst))
                (load-image image-pict 'wheel-larger)

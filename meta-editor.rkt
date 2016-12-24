@@ -148,8 +148,7 @@
                            (first (image-xmp))))
         (create-dc-meta type elems attrs))]))
   (image-xmp (list (xexpr->string setted)))
-  (set-embed-xmp! (image-path) (first (image-xmp)))
-  (fields-defaults))
+  (set-embed-xmp! (image-path) (first (image-xmp))))
 
 (define (fields-defaults)
   ; set fields to defaults
@@ -267,7 +266,7 @@
 (define ok-button
   (new button%
        [parent button-hpanel]
-       [label "&Ok"]
+       [label "&Set"]
        [callback (λ (button event) (ok-callback))]))
 
 (define (show-meta-frame)
