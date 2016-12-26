@@ -148,7 +148,8 @@
                            (first (image-xmp))))
         (create-dc-meta type elems attrs))]))
   (image-xmp (list (xexpr->string setted)))
-  (set-embed-xmp! (image-path) (first (image-xmp))))
+  (set-embed-xmp! (image-path) (first (image-xmp)))
+  (send meta-frame show #f))
 
 (define (fields-defaults)
   ; set fields to defaults

@@ -547,29 +547,41 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
       (flatten (map (λ (item) (get-elements item)) found))
       empty))
 
-; takes an xexpr and replaces the dc:subject entry
-; with the one generated from taglist. if the xexpr
-; doesn't have a dc:subject entry, or is otherwise
-; incomplete, generate those bits and complete it
-(define/contract (set-dc:subject xexpr taglist)
-  (txexpr? list? . -> . txexpr?)
-  (define dc:sub (list->dc:subject taglist))
-  (define-values (replaced-sub old-sub)
-    ; if dc:subject is found, replace it with new-subs
-    (splitf-txexpr xexpr is-dc:subject? (λ (x) dc:sub)))
+; set the tag inside xexpr with the contents of tx.
+; if xexpr doesn't have tag, generate the missing
+; parts so it has a coherent structure.
+(define/contract ((set-xmp-tag tag) xexpr tx)
+  (symbol? . -> . (txexpr? txexpr? . -> . txexpr?))
+  (define-values (replaced-tx old-tx)
+    ; if tag is found, replace it with tx
+    (splitf-txexpr xexpr (is-tag? tag) (λ (x) tx)))
   (cond
-    ; empty dc:sub means it has no existing dc:subject
-    [(empty? old-sub)
-     (define rdf:desc (findf-txexpr replaced-sub is-rdf:Description?))
+    ; empty old-tx means it has no existing tx
+    [(empty? old-tx)
+     (define rdf:desc (findf-txexpr replaced-tx is-rdf:Description?))
      (cond
        ; xexpr has existing rdf:Description
        [rdf:desc
-        (define-values (desc-time desc)
-          (splitf-txexpr xexpr is-rdf:Description?
-                         (λ (x)
-                           (define old-desc (attr-set rdf:desc 'xmp:MetadataDate (get-time)))
-                           (append old-desc (list dc:sub)))))
-        desc-time]
+        (define-values (without-rdf:desc old-desc)
+          (splitf-txexpr xexpr is-rdf:Description?))
+        ; if there's more than one rdf:Description, merge them
+        (define new-desc
+          (for/fold ([accum (first old-desc)])
+                    ([r:d (in-list (rest old-desc))]
+                     [i (in-naturals)])
+            (define attrs (get-attrs r:d))
+            (define elems (get-elements r:d))
+            (for/fold ([xpr (append accum elems)])
+                      ([attr-pair (in-list attrs)])
+              (attr-set xpr (first attr-pair) (second attr-pair)))))
+        ; build the xexpr with the new tx
+        (define-values (without-rdf:rdf old-rdf:rdf) (splitf-txexpr without-rdf:desc is-rdf:RDF?))
+        (append
+         without-rdf:rdf
+         (list
+          (append (first old-rdf:rdf)
+                  (list
+                   (append (attr-set new-desc 'xmp:MetadataDate (get-time)) (list tx))))))]
        ; xexpr has no existing rdf:Description
        [else
         (define-values (without-rdf:rdf old-rdf:rdf) (splitf-txexpr xexpr is-rdf:RDF?))
@@ -584,38 +596,20 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                       (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
                       (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")
                       (xmp:MetadataDate ,(get-time)))
-                     ,dc:sub)))))])]
-    ; xexpr has an old dc:subject (which got replaced)
-    [else
-     ; set the xmp:MetadataDate
-     (define rdf:desc (findf-txexpr replaced-sub is-rdf:Description?))
-     (define-values (replaced-desc old-desc)
-       (splitf-txexpr replaced-sub is-rdf:Description?
-                      (λ (x) (attr-set rdf:desc 'xmp:MetadataDate (get-time)))))
-     replaced-desc]))
-
-(define ((set-xmp-tag tag) xexpr tx)
-  (define-values (replaced-tx old-tx)
-    ; if tag is found, replace it with tx
-    (splitf-txexpr xexpr (is-tag? tag) (λ (x) tx)))
-  (cond
-    ; empty dc:sub means it has no existing dc:subject
-    [(empty? old-tx)
-     (define rdf:desc (findf-txexpr replaced-tx is-rdf:Description?))
-     (define-values (desc-time desc)
-       (splitf-txexpr xexpr is-rdf:Description?
-                      (λ (x)
-                        (define old-desc (attr-set rdf:desc 'xmp:MetadataDate (get-time)))
-                        (append old-desc (list tx)))))
-     desc-time]
-    ; xexpr had an old dc:subject (which got replaced)
+                     ,tx)))))])]
+    ; xexpr had an old tx (which got replaced)
     [else
      ; set the xmp:MetadataDate
      (define rdf:desc (findf-txexpr replaced-tx is-rdf:Description?))
      (define-values (replaced-desc old-desc)
        (splitf-txexpr replaced-tx is-rdf:Description?
-                      (λ (x) (attr-set rdf:desc 'xmp:MetadataDate (get-time)))))
+                      (λ (x) (attr-set x 'xmp:MetadataDate (get-time)))))
      replaced-desc]))
+
+(define/contract (set-dc:subject xexpr lst)
+  (txexpr? (listof string?) . -> . txexpr?)
+  (define dc:sub (list->dc:subject lst))
+  ((set-xmp-tag 'dc:subject) xexpr dc:sub))
 
 ; take a taglist and return a complete xexpr (sans header and footer)
 (define/contract (make-xmp-xexpr taglist)
