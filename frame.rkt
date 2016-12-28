@@ -13,6 +13,7 @@
          "db.rkt"
          "db-statistics.rkt"
          "embed.rkt"
+         "error-log.rkt"
          "files.rkt"
          "meta-editor.rkt"
          "search-dialog.rkt"
@@ -98,6 +99,11 @@
 
 ;; File menu items ;;
 
+; eliminate Gtk-Message message errors
+(define open-dialog
+  (new dialog%
+       [label "Ivy - Choose A File"]))
+
 ; opening a single image will have the current directory
 ; contents be the collection
 (define ivy-menu-bar-file-open
@@ -111,7 +117,7 @@
           (define paths
             (get-file-list
              "Select an image or images to view."
-             #f
+             open-dialog
              (image-dir)
              #f
              #f
@@ -146,7 +152,7 @@
           (define paths
             (get-file-list
              "Select an image or images to view."
-             #f
+             open-dialog
              (image-dir)
              #f
              #f
@@ -412,6 +418,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [callback (λ (i e)
                    (update-stats)
                    (send stats-frame show #t))]))
+
+(define ivy-menu-bar-help-log
+  (new menu-item%
+       [parent ivy-menu-bar-help]
+       [label "&Error Log"]
+       [help-string "Display the error log."]
+       [callback (λ (i e)
+                   (send log-frame show #t))]))
 
 ;; main window layout ;;
 
