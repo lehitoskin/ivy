@@ -323,7 +323,9 @@
        [label (format "~a%" n)]
        [callback (λ (i e)
                    (collect-garbage 'incremental)
-                   (load-image (bitmap image-bmp-master) n))]))
+                   (if (empty? master-gif)
+                       (load-image (bitmap image-bmp-master) n)
+                       (load-image master-gif n)))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%

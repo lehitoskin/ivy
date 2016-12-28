@@ -2,6 +2,7 @@
 ; base.rkt
 ; base file for ivy, the taggable image viewer
 (require file/convertible
+         file/sha1
          gif-image
          pict
          racket/bool
@@ -17,7 +18,6 @@
                   string-contains-ci
                   string-null?)
          txexpr
-         xml
          "db.rkt"
          "embed.rkt"
          "files.rkt")
@@ -62,6 +62,7 @@
 
 ; animated gif stuff
 ; listof pict?
+(define master-gif empty)
 (define gif-lst empty)
 ; listof real?
 (define gif-lst-timings empty)
@@ -378,6 +379,25 @@
   (define canvas-center-y (/ canvas-y 2))
   
   (define len (length lst))
+
+  ; the left and top offsets for each frame in the gif,
+  ; just in case the frames are of varying sizes
+  (define left/top
+    (for/list ([bit-frame (gif-images (image-path))]
+               [master-frame (in-list master-gif)]
+               [gif-frame (in-list gif-lst)])
+      (define master-width (pict-width master-frame))
+      (define master-height (pict-height master-frame))
+      (define gif-width (pict-width gif-frame))
+      (define gif-height (pict-height gif-frame))
+      ; grab the frame's image descriptor
+      ; starting with the graphics control extension
+      (define matched (car (regexp-match-positions (byte-regexp (bytes #x21 #xf9)) bit-frame)))
+      (define lengths (subbytes bit-frame (+ (car matched) 9) (+ (car matched) 13)))
+      (define left (bytes (bytes-ref lengths 1) (bytes-ref lengths 0)))
+      (define top (bytes (bytes-ref lengths 3) (bytes-ref lengths 2)))
+      (list (* (string->number (bytes->hex-string left) 16) (/ gif-width master-width))
+            (* (string->number (bytes->hex-string top) 16) (/ gif-height master-height)))))
   
   ; determine x and y placement as well as
   ; modify the scrollbars outside the animation loop
@@ -390,7 +410,7 @@
      ; x-loc and y-loc are already 0
      (send canvas show-scrollbars #t #t)]
     ; if the image is wider than the canvas, place it at (0,y)
-    [(> gif-y canvas-x)
+    [(> gif-x canvas-x)
      (send canvas show-scrollbars #t #f)
      ; x-loc is already 0
      (set! y-loc (- canvas-center-y gif-center-y))]
@@ -404,19 +424,20 @@
      (send canvas show-scrollbars #f #f)
      (set! x-loc (- canvas-center-x gif-center-x))
      (set! y-loc (- canvas-center-y gif-center-y))])
-
+  
   ; actual animation loop
   ; runs until gif-thread is killed
   (let loop ([gif-frame (first lst)]
              [timing (first gif-lst-timings)]
+             [offsets (first left/top)]
              [i 0])
     ; remove any previous frames from the canvas
     (unless (cumulative?) (send dc clear))
-    (draw-pict gif-frame dc x-loc y-loc)
+    (draw-pict gif-frame dc (+ x-loc (first offsets)) (+ y-loc (second offsets)))
     (sleep timing)
     (if (>= i len)
-        (loop (first lst) (first gif-lst-timings) 0)
-        (loop (list-ref lst i) (list-ref gif-lst-timings i) (add1 i)))))
+        (loop (first lst) (first gif-lst-timings) (first left/top) 0)
+        (loop (list-ref lst i) (list-ref gif-lst-timings i) (list-ref left/top i) (add1 i)))))
 
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
@@ -447,7 +468,7 @@
         ; set the new frame label
         (send (send canvas get-parent) set-label (path->string name))
         ; make a list of picts
-        (set! gif-lst
+        (set! master-gif
               (with-handlers
                   ([exn:fail? (λ (e)
                                 (eprintf "Error loading animated gif ~v: ~v\n"
@@ -458,15 +479,16 @@
                                               (string-truncate (path->string name) 30)))
                                 (for/list ([frame (gif-images img)])
                                   (if load-success
-                                      (scale-image image-bmp-master scale)
-                                      (scale-image (make-object bitmap% 50 50) scale))))])
+                                      (bitmap image-bmp-master)
+                                      (blank 50 50))))])
                 (cumulative? (gif-cumulative? img))
                 (for/list ([bits (gif-images img)])
                   (define bmp-in-port (open-input-bytes bits))
                   (define bmp (make-object bitmap% 50 50))
                   (send bmp load-file bmp-in-port 'gif/alpha)
                   (close-input-port bmp-in-port)
-                  (scale-image bmp scale))))
+                  (bitmap bmp))))
+        (set! gif-lst (map (λ (gif-frame) (scale-image gif-frame scale)) master-gif))
         (set! gif-lst-timings (gif-timings img))
         (set! image-pict #f)
         (send sbd set-label
@@ -530,6 +552,7 @@
      (set! gif-lst (map (λ (pct) (scale-image pct scale)) img))]
     [else
      ; we already have the image loaded
+     (set! master-gif empty)
      (set! gif-lst empty)
      (set! gif-lst-timings empty)
      (set! image-pict (scale-image img scale))
