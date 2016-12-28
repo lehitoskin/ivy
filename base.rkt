@@ -20,6 +20,7 @@
          txexpr
          "db.rkt"
          "embed.rkt"
+         "error-log.rkt"
          "files.rkt")
 (provide (all-defined-out)
          string-null?
@@ -468,29 +469,35 @@
         ; set the new frame label
         (send (send canvas get-parent) set-label (path->string name))
         ; make a list of picts
-        (set! master-gif
-              (with-handlers
-                  ([exn:fail? (λ (e)
-                                (eprintf "Error loading animated gif ~v: ~v\n"
-                                         (path->string name)
-                                         (exn-message e))
-                                (send sbe set-label
-                                      (format "Error loading file ~v"
-                                              (string-truncate (path->string name) 30)))
-                                (for/list ([frame (gif-images img)])
-                                  (if load-success
-                                      (bitmap image-bmp-master)
-                                      (blank 50 50))))])
-                (cumulative? (gif-cumulative? img))
-                (for/list ([bits (gif-images img)])
-                  (define bmp-in-port (open-input-bytes bits))
-                  (define bmp (make-object bitmap% 50 50))
-                  (send bmp load-file bmp-in-port 'gif/alpha)
-                  (close-input-port bmp-in-port)
-                  (bitmap bmp))))
-        (set! gif-lst (map (λ (gif-frame) (scale-image gif-frame scale)) master-gif))
-        (set! gif-lst-timings (gif-timings img))
-        (set! image-pict #f)
+        (with-handlers
+            ([exn:fail? (λ (e)
+                          (define str
+                            (format "Error loading animated gif ~v: ~a\n"
+                                    (path->string name)
+                                    (exn-message e)))
+                          (eprintf str)
+                          (error-log str)
+                          (send sbe set-label
+                                (format "Error loading file ~v"
+                                        (string-truncate (path->string name) 30)))
+                          ; set the gifs to defaults
+                          (set! master-gif empty)
+                          (set! gif-lst empty)
+                          (set! gif-lst-timings empty)
+                          ; just load the static image instead
+                          (load-image (bitmap img)))])
+          (cumulative? (gif-cumulative? img))
+          (define lst
+            (for/list ([bits (gif-images img)])
+              (define bmp-in-port (open-input-bytes bits))
+              (define bmp (make-object bitmap% 50 50))
+              (send bmp load-file bmp-in-port 'gif/alpha)
+              (close-input-port bmp-in-port)
+              (bitmap bmp)))
+          (set! master-gif lst)
+          (set! gif-lst (map (λ (gif-frame) (scale-image gif-frame scale)) lst))
+          (set! gif-lst-timings (gif-timings img))
+          (set! image-pict #f))
         (send sbd set-label
               (format "~a x ~a pixels"
                       (send image-bmp-master get-width)
@@ -521,7 +528,9 @@
                (set! gif-lst empty)
                (set! gif-lst-timings empty)]
               [else
-               (eprintf "Error loading file ~v~n" img)
+               (define str (format "Error loading file ~v~n" img))
+               (eprintf str)
+               (error-log str)
                (send sbe set-label
                      (format "Error loading file ~v"
                              (string-truncate (path->string name) 30)))])])
