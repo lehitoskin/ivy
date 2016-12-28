@@ -221,6 +221,8 @@
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
       (when (db-has-key? 'images absolute-path)
+        (when (verbose?)
+          (printf "~a:~n" absolute-path))
         (define taglist (image-taglist absolute-path))
         (for ([tag (in-list taglist)])
           (if (null-flag)
@@ -230,6 +232,8 @@
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
       (when (embed-support? absolute-path)
+        (when (verbose?)
+          (printf "~a:~n" absolute-path))
         (define xmp (get-embed-xmp absolute-path))
         (for ([str (in-list xmp)])
           (if (null-flag)
@@ -352,6 +356,8 @@
                  ; grab the embedded tags
                  (flatten (map dc:subject->list dc:sub-lst))
                  empty))
+           (when (verbose?)
+             (printf "Setting the XMP of ~a...~n"))
            (reconcile-tags! (path->string path) (sort tags string<?))))])]
    ; moving an image in the database to another location
    [(moving?)
