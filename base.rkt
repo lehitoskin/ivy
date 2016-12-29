@@ -48,6 +48,7 @@
 (define image-pict #f)
 ; the cached XMP metadata of the image
 (define image-xmp (make-parameter empty))
+(define xmp-threads (make-parameter (hash)))
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time

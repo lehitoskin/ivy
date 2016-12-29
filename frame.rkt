@@ -234,6 +234,14 @@
                        ; kill the gif thread, if applicable
                        (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
                          (kill-thread (gif-thread)))
+                       ; wait for any xmp threads to finish before exiting
+                       (unless (zero? (hash-count (xmp-threads)))
+                         (for ([pair (in-hash-pairs (xmp-threads))])
+                           (let loop ()
+                             (unless (thread-dead? (cdr pair))
+                               (printf "Waiting for thread ~a to finish...\n" (car pair))
+                               (sleep 1/4)
+                               (loop)))))
                        (disconnect sqlc)
                        (exit))])))
 
@@ -540,9 +548,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                   (send ivy-frame set-label name-str)
                   (when (embed-support? img-str)
                     ; put this into a new thread to speed things up
-                    (thread (λ ()
-                              (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
-                              (image-xmp (get-embed-xmp img-str)))))
+                    (define time (current-seconds))
+                    (if (zero? (hash-count (xmp-threads)))
+                        (xmp-threads
+                         (hash time
+                               (thread (λ ()
+                                         (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                         (image-xmp (get-embed-xmp img-str))
+                                         (xmp-threads (hash-remove (xmp-threads) time))))))
+                        (xmp-threads
+                         (hash-set (xmp-threads)
+                                   time
+                                   (thread (λ ()
+                                             (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                             (image-xmp (get-embed-xmp img-str))
+                                             (xmp-threads (hash-remove (xmp-threads) time))))))))
                   (cond [(string-null? tags)
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
@@ -574,9 +594,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
             (send (ivy-tag-tfield) set-field-background color-spring-green)
             (when (embed-support? img-str)
               ; put this into a new thread to speed things up
-              (thread (λ ()
-                        (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
-                        (image-xmp (get-embed-xmp img-str)))))
+              (define time (current-seconds))
+              (if (zero? (hash-count (xmp-threads)))
+                  (xmp-threads
+                   (hash time
+                         (thread (λ ()
+                                   (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                   (image-xmp (get-embed-xmp img-str))
+                                   (xmp-threads (hash-remove (xmp-threads) time))))))
+                  (xmp-threads
+                   (hash-set (xmp-threads)
+                             time
+                             (thread (λ ()
+                                       (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                       (image-xmp (get-embed-xmp img-str))
+                                       (xmp-threads (hash-remove (xmp-threads) time))))))))
             ; empty tag string means delete the entry
             (cond [(string-null? tags)
                    ; no failure if key doesn't exist

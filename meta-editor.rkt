@@ -155,8 +155,8 @@
   ; set fields to defaults
   (send dc-tfield set-value "")
   (send attr-tfield set-value "")
-  (send dc-choice set-selection 11)
-  (send attr-choice set-selection 0))
+  (send dc-choice set-string-selection "dc:subject")
+  (send attr-choice set-string-selection ""))
 
 (define meta-frame
   (new frame%
