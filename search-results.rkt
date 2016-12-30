@@ -9,7 +9,9 @@
          racket/path
          "base.rkt"
          "files.rkt")
-(provide results-frame display-tags display-nil-results-alert)
+(provide results-frame
+         display-tags
+         display-nil-results-alert)
 
 (define searched-images empty)
 

@@ -32,10 +32,10 @@
          (send search-tag-dialog show #t)]
         [else
          (if (empty? exclude-tags)
-             (display-tags imgs)
+             (display-tags (sort imgs path<?))
              (if (exact-search?)
-                 (display-tags (exclude-search-exact imgs exclude-tags))
-                 (display-tags (exclude-search-inexact imgs exclude-tags))))]))
+                 (display-tags (sort (exclude-search-exact imgs exclude-tags) path<?))
+                 (display-tags (sort (exclude-search-inexact imgs exclude-tags) path<?))))]))
 
 (define search-tag-dialog
   (new dialog%
