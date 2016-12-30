@@ -47,7 +47,7 @@
 (define search-tfield
   (new text-field%
        [parent search-tag-dialog]
-       [label "Search tags:  "]
+       [label "Search tags:   "]
        [callback
         (λ (tf evt)
           (when (and

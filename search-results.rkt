@@ -1,6 +1,8 @@
 #lang racket/base
 ; search-results.rkt
-(require pict
+(require embedded-gui
+         file/convertible
+         pict
          racket/class
          racket/gui/base
          racket/list
@@ -74,7 +76,40 @@
        [callback (λ (button event)
                    (send results-frame show #f))]))
 
-(define txt (new text% [auto-wrap #t]))
+(define btext%
+  (class text%
+    (super-new)
+    
+    (define (get-snip)
+      (define pos (box 0))
+      (send this get-position pos)
+      (send this find-snip (unbox pos) 'after-or-none))
+    
+    ; ignore key presses
+    (define/override (on-char evt)
+      (void))
+    
+    ; only worry about left clicks
+    (define/override (on-event evt)
+      (define type (send evt get-event-type))
+      (case type
+        [(left-down)
+         (send this on-default-event evt)]
+        [(left-up)
+         (define snp (get-snip))
+         (when snp
+           (send this on-default-event evt)
+           (send snp do-callback evt))]))))
+
+(define bsnip%
+  (class button-snip%
+    (inherit-field image callback)
+    (super-new)
+    
+    (define/public (do-callback evt)
+      (callback this evt))))
+
+(define txt (new btext% [auto-wrap #t]))
 
 (define ecanvas
   (new editor-canvas%
@@ -128,14 +163,21 @@
                         path-str))))
          
          (for ([thumb-str (in-list thumbs-path)]
+               [img-path (in-list imgs)]
                [img-str (in-list imgs-str)])
            (define img-name (path->string (file-name-from-path img-str)))
            (define thumb+name
              (pict->bitmap
               (vc-append
                (bitmap thumb-str)
-               (text img-name (list color-white)))))
-           (send txt insert (make-object image-snip% thumb+name)))
+               (text img-name (list color-black)))))
+           (define in (open-input-bytes (convert thumb+name 'png-bytes)))
+           (send txt insert (new bsnip%
+                                 [images (cons in in)]
+                                 [callback (λ (snp evt)
+                                             (pfs imgs)
+                                             (load-image img-path))]))
+           (close-input-port in))
          
          ; scroll back to the top of the window
          (send txt scroll-to-position 0)
