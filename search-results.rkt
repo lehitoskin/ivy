@@ -141,51 +141,54 @@
 
 ; search for the tags and display everything
 (define (display-tags imgs)
-  (cond [(empty? imgs)
-         (display-nil-results-alert)]
-        [else
-         (send prep-notification show #t)
-         ; remove everything from the text so we can reuse it
-         (send txt erase)
+  (cond
+    [(empty? imgs)
+     (display-nil-results-alert)]
+    [else
+     (send prep-notification show #t)
+     ; remove everything from the text so we can reuse it
+     (send txt erase)
          
-         (define imgs-str (sort (map path->string imgs) string<?))
-         (set! searched-images imgs)
+     (define imgs-str (sort (map path->string imgs) string<?))
+     (set! searched-images imgs)
          
-         (define thumbs-path
-           (for/list ([path-str (in-list imgs-str)])
-             (path->thumb-path path-str)))
+     (define thumbs-path
+       (for/list ([path-str (in-list imgs-str)])
+         (path->thumb-path path-str)))
          
-         ; generate the thumbnail in case it does not exist
-         (generate-thumbnails
-          (filter path-string?
-                  (for/list ([thumb (in-list thumbs-path)]
-                             [path-str (in-list imgs-str)])
-                    (if (file-exists? thumb)
-                        #f
-                        path-str))))
+     ; generate the thumbnail in case it does not exist
+     (generate-thumbnails
+      (filter path-string?
+              (for/list ([thumb (in-list thumbs-path)]
+                         [path-str (in-list imgs-str)])
+                (if (file-exists? thumb)
+                    #f
+                    path-str))))
          
-         (for ([thumb-str (in-list thumbs-path)]
-               [img-path (in-list imgs)]
-               [img-str (in-list imgs-str)])
-           (define img-name (path->string (file-name-from-path img-str)))
-           (define thumb+name
-             (pict->bitmap
-              (vc-append
-               (bitmap thumb-str)
-               (text img-name (list color-black)))))
-           (define in (open-input-bytes (convert thumb+name 'png-bytes)))
-           (send txt insert (new bsnip%
-                                 [images (cons in in)]
-                                 [callback (λ (snp evt)
-                                             (pfs imgs)
-                                             (load-image img-path))]))
-           (close-input-port in))
+     (for ([thumb-str (in-list thumbs-path)]
+           [img-path (in-list imgs)]
+           [img-str (in-list imgs-str)])
+       (define img-name (path->string (file-name-from-path img-str)))
+       (define thumb+name
+         (pict->bitmap
+          (vc-append
+           (bitmap thumb-str)
+           (text img-name (list color-black)))))
+       (define in (open-input-bytes (convert thumb+name 'png-bytes)))
+       (send txt insert (new bsnip%
+                             [images (cons in in)]
+                             [callback
+                              (λ (snp evt)
+                                (pfs imgs)
+                                (send (ivy-tag-tfield) set-field-background color-white)
+                                (load-image img-path))]))
+       (close-input-port in))
          
-         ; scroll back to the top of the window
-         (send txt scroll-to-position 0)
+     ; scroll back to the top of the window
+     (send txt scroll-to-position 0)
          
-         (send prep-notification show #f)
+     (send prep-notification show #f)
          
-         ; make sure the displayed images reflect any new searches
-         (send ecanvas refresh)
-         (send results-frame show #t)]))
+     ; make sure the displayed images reflect any new searches
+     (send ecanvas refresh)
+     (send results-frame show #t)]))
