@@ -6,19 +6,18 @@ RACO = raco
 RFLAGS = --vv --gui
 
 MAIN = main.rkt
-SOURCES = $(MAIN) base.rkt db.rkt db-statistics.rkt files.rkt frame.rkt search-dialog.rkt search-results.rkt
+SOURCES = $(MAIN) base.rkt db.rkt db-statistics.rkt embed.rkt error-log.rkt files.rkt frame.rkt meta-editor.rkt search-dialog.rkt search-results.rkt tag-browser.rkt
+BINARY = ivy
 IMAGES = img/ivy-logo-128px.png img/ivy-logo-256px.png img/ivy-logo-48px.png  img/ivy-logo-64px.png img/ivy-logo-16px.png  img/ivy-logo-32px.png  img/ivy-logo-512px.png
 DOCS = doc/ivy.html doc/ivy.md README.md
 MANPAGES = doc/ivy.1.bz2
 
 all: ivy-bin
 
-ivy: ivy-bin
-
 ivy-bin: $(SOURCES)
-	${RACO} exe $(RFLAGS) -o ivy $(MAIN)
+	${RACO} exe $(RFLAGS) -o $(BINARY) $(MAIN)
 
-install: ivy ivy-image-viewer.desktop $(IMAGES) $(MANPAGES)
+install: $(BINARY) ivy-image-viewer.desktop $(IMAGES) $(MANPAGES)
 	mkdir -pv $(DESTDIR)/bin
 	mkdir -pv $(DESTDIR)/share/icons/hicolor/{16x16,32x32,48x48,64x64,128x128,256x256,512x512,scalable}/apps
 	mkdir -pv $(DESTDIR)/share/applications
