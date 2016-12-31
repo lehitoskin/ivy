@@ -183,12 +183,18 @@
                                 (send (ivy-tag-tfield) set-field-background color-white)
                                 (load-image img-path))]))
        (close-input-port in))
-         
-     ; scroll back to the top of the window
-     (send txt scroll-to-position 0)
-         
+
+     ; collect garbage that we've made from generating
+     ; the search results
+     (collect-garbage 'major)
+
      (send prep-notification show #f)
-         
+
+     ; set the cursor position to the very beginning
+     (send txt set-position 0 'same #f #t)
+     ; and scroll back to the top of the window
+     (send txt scroll-to-position 0)
+
      ; make sure the displayed images reflect any new searches
      (send ecanvas refresh)
      (send results-frame show #t)]))
