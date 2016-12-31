@@ -8,6 +8,7 @@
          racket/bool
          racket/class
          racket/contract
+         racket/format
          racket/function
          racket/gui/base
          racket/list
@@ -365,6 +366,7 @@
 (define status-bar-dimensions (make-parameter #f))
 (define status-bar-error (make-parameter #f))
 (define status-bar-position (make-parameter #f))
+(define status-bar-size (make-parameter #f))
 (define incoming-tags (make-parameter ""))
 (define want-animation? (make-parameter #f))
 
@@ -499,10 +501,21 @@
           (set! gif-lst (map (λ (gif-frame) (scale-image gif-frame scale)) lst))
           (set! gif-lst-timings (gif-timings img))
           (set! image-pict #f))
+        (define size (file-size (image-path)))
         (send sbd set-label
-              (format "~a x ~a pixels"
+              (format "~a x ~a pixels  ~a"
                       (send image-bmp-master get-width)
-                      (send image-bmp-master get-height)))
+                      (send image-bmp-master get-height)
+                      (cond [(>= size (expt 2 20))
+                             (format "~a MiB"
+                                     (~r (exact->inexact (/ size (expt 2 20)))
+                                         #:precision 1))]
+                            [(>= size (expt 2 10))
+                             (format "~a KiB"
+                                     (~r (exact->inexact (/ size (expt 2 10)))
+                                         #:precision 1))]
+                            [else
+                             (format "~a B" size)])))
         (send sbp set-label
               (format "~a / ~a"
                       (+ (get-index img (pfs)) 1)
@@ -518,10 +531,21 @@
                (send (send canvas get-parent) set-label (path->string name))
                (set! image-pict (scale-image image-bmp-master scale))
                (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))
+               (define size (file-size (image-path)))
                (send sbd set-label
-                     (format "~a x ~a pixels"
+                     (format "~a x ~a pixels  ~a"
                              (send image-bmp-master get-width)
-                             (send image-bmp-master get-height)))
+                             (send image-bmp-master get-height)
+                             (cond [(>= size (expt 2 20))
+                                    (format "~a MiB"
+                                            (~r (exact->inexact (/ size (expt 2 20)))
+                                                #:precision 1))]
+                                   [(>= size (expt 2 10))
+                                    (format "~a KiB"
+                                            (~r (exact->inexact (/ size (expt 2 10)))
+                                                #:precision 1))]
+                                   [else
+                                    (format "~a B" size)])))
                (send sbp set-label
                      (format "~a / ~a"
                              (+ (get-index img (pfs)) 1)

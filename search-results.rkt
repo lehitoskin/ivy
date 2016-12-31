@@ -105,7 +105,7 @@
 
 (define bsnip%
   (class button-snip%
-    (inherit-field image callback)
+    (inherit-field callback)
     (super-new)
     
     (define/public (do-callback evt)

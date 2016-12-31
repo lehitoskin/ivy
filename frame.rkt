@@ -745,9 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
 (status-bar-dimensions
  (new message%
       [parent dimensions-hpanel]
-      [label (format "~a x ~a pixels"
-                     (send image-bmp-master get-width)
-                     (send image-bmp-master get-height))]
+      [label ""]
       [auto-resize #t]))
 
 (status-bar-error
@@ -759,5 +757,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
 (status-bar-position
  (new message%
       [parent position-hpanel]
-      [label "0 / 0"]
+      [label ""]
       [auto-resize #t]))
