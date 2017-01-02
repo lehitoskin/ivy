@@ -25,7 +25,7 @@ Cmd-.
 
 - Once you have loaded an image, you can view all the other images in the same
   folder, cycling through the image files by either clicking on the arrow
-  buttons or hitting the arrow keys. Pressing the home or end keys will take you
+  buttons or hitting the arrow keys. Pressing the Home or End keys will take you
   to the first and last images available respectively.
 
 - If you want to view images from disparate locations, Ivy can also create
@@ -45,8 +45,8 @@ Cmd-.
   the canvas and they will be appeneded to the collection.
 
 - To add a tag or list of tags to an image, simply enter them into the tag text
-  field, separated by a comma and a space. E.g., *flower, beach, roller
-  coaster* and then press the "Set" button or the Enter key.
+  field, separated by a comma. E.g., *flower, beach, roller coaster* and then
+  press the "Set" button or the Enter key.
 
 - If you are currently editing tags and wish to revert any unsaved changes, simply
   hit the Esc key. Hitting Esc when there's no pending changes
@@ -59,7 +59,7 @@ Cmd-.
 ## Tag Browser
 
 Ivy comes with a tag browser mode (available from the `View` menu or with
-<kbd>Ctrl</kbd>-<kbd>b</kbd>) so that you may view every tag category and its
+<kbd>Ctrl</kbd>-<kbd>B</kbd>) so that you may view every tag category and its
 contents. Clicking on a tag will show the images you have tagged. Clicking on
 the image will show a thumbnail preview which is itself clickable. Clicking on
 the thumbnail button will tell Ivy to load the source image for further viewing.
@@ -71,7 +71,7 @@ an image path and selecting "Edit Tags" from the menu.
 ## Animated GIF Support
 
 Animated GIF support is currently marked as experimental. To animate a GIF,
-select View -> GIF Animation. Due to the unstable natue of the related code,
+select View -> GIF Animation. Due to the unstable nature of the related code,
 know that some GIF's may not load properly or at all.
 
 ## Embedding Tags as XMP metadata
