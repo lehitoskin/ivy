@@ -477,7 +477,6 @@
                           (eprintf "Error loading animated gif ~v: ~a\n"
                                    (path->string name)
                                    (exn-message e))
-                          (update-error-log)
                           ; set the gifs to defaults
                           (set! master-gif empty)
                           (set! gif-lst empty)
@@ -551,8 +550,7 @@
                (set! gif-lst empty)
                (set! gif-lst-timings empty)]
               [else
-               (eprintf "Error loading file ~v~n" img)
-               (update-error-log)
+               (eprintf "Error loading file ~v\n" img)
                (send sbe set-label
                      (format "Error loading file ~v"
                              (string-truncate (path->string name) 30)))])])

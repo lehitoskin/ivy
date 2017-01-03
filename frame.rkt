@@ -433,7 +433,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label "&Error Log"]
        [help-string "Display the error log."]
        [callback (λ (i e)
-                   (update-error-log)
                    (send log-frame show #t))]))
 
 ;; main window layout ;;
