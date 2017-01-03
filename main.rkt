@@ -12,6 +12,7 @@
          "base.rkt"
          "db.rkt"
          "embed.rkt"
+         "error-log.rkt"
          "frame.rkt")
 
 (define ivy-version 2.1)
@@ -160,7 +161,9 @@
    ; we aren't search for tags on the cmdline, open frame
    [(show-frame?)
     (send (ivy-canvas) focus)
-    (send ivy-frame show #t)]
+    (send ivy-frame show #t)
+    ; only change the error port if we're opening the GUI
+    (current-error-port err-port)]
    ; only searching for tags
    [(and (not (empty? (tags-to-search)))
          (empty? (tags-to-exclude)))

@@ -3,7 +3,9 @@
 (require racket/class
          racket/gui/base
          "files.rkt")
-(provide error-log log-frame)
+(provide err-port log-frame update-error-log)
+
+(define err-port (open-output-string))
 
 (define log-frame
   (new frame%
@@ -42,6 +44,8 @@
                    ; select all text
                    (send log-text copy #f (send evt get-time-stamp) 0 'end))]))
 
-(define (error-log str)
-  (send log-text insert (string-append str "\n"))
+(define (update-error-log)
+  (define str (get-output-string err-port))
+  (send log-text erase)
+  (send log-text insert str)
   (send log-ecanvas refresh))

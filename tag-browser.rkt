@@ -8,7 +8,7 @@
          "db.rkt"
          "embed.rkt"
          "files.rkt")
-(provide show-tag-browser)
+(provide browser-frame show-tag-browser)
 
 (define browser-frame
   (new frame%
@@ -195,9 +195,9 @@
   (new horizontal-panel%
        [parent edit-tags-dialog]))
 
-(define (edit-tags-callback tfield)
-  (define sel (send img-lbox get-selection))
-  (define img (send img-lbox get-string sel))
+(define (edit-tags-callback lbox tfield)
+  (define sel (send lbox get-selection))
+  (define img (send lbox get-string sel))
   (define tags (send tfield get-value))
   ; empty tag string means add no new tags
   (unless (string-null? tags)
@@ -207,7 +207,8 @@
     (when (embed-support? img)
       (add-embed-tags! img tag-lst))
     (send tfield set-value ""))
-  (send edit-tags-dialog show #f))
+  (send edit-tags-dialog show #f)
+  (update-tag-browser))
 
 (define edit-tags-tfield
   (new text-field%
@@ -215,14 +216,14 @@
        [label "New tag(s): "]
        [callback (λ (tfield evt)
                    (when (eq? (send evt get-event-type) 'text-field-enter)
-                     (edit-tags-callback tfield)))]))
+                     (edit-tags-callback img-lbox tfield)))]))
 
 (define edit-tags-button
   (new button%
        [parent edit-tags-new-hpanel]
        [label "Ok"]
        [callback (λ (button evt)
-                   (edit-tags-callback edit-tags-tfield))]))
+                   (edit-tags-callback img-lbox edit-tags-tfield))]))
 
 ; end menu bar definitions
 
@@ -327,4 +328,5 @@
 
 (define (show-tag-browser)
   (update-tag-browser)
-  (send browser-frame show #t))
+  (unless (send browser-frame is-shown?)
+    (send browser-frame show #t)))

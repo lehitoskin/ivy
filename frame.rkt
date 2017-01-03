@@ -433,6 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label "&Error Log"]
        [help-string "Display the error log."]
        [callback (λ (i e)
+                   (update-error-log)
                    (send log-frame show #t))]))
 
 ;; main window layout ;;
@@ -574,6 +575,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          ; add/remove tags as necessary
                          (reconcile-tags! img-str tag-lst)])
                   (send tf set-field-background color-spring-green)
+                  (when (send browser-frame is-shown?)
+                    (show-tag-browser))
                   (send (ivy-canvas) focus)]
                  [else
                   (send ivy-frame set-label (string-append "* " name-str))
@@ -619,6 +622,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                    (define tag-lst (tfield->list (ivy-tag-tfield)))
                    ; add/remove tags as necessary
                    (reconcile-tags! img-str tag-lst)])
+            (when (send browser-frame is-shown?)
+              (show-tag-browser))
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)

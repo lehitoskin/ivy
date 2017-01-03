@@ -474,21 +474,19 @@
         ; make a list of picts
         (with-handlers
             ([exn:fail? (λ (e)
-                          (define str
-                            (format "Error loading animated gif ~v: ~a\n"
-                                    (path->string name)
-                                    (exn-message e)))
-                          (eprintf str)
-                          (error-log str)
-                          (send sbe set-label
-                                (format "Error loading file ~v"
-                                        (string-truncate (path->string name) 30)))
+                          (eprintf "Error loading animated gif ~v: ~a\n"
+                                   (path->string name)
+                                   (exn-message e))
+                          (update-error-log)
                           ; set the gifs to defaults
                           (set! master-gif empty)
                           (set! gif-lst empty)
                           (set! gif-lst-timings empty)
                           ; just load the static image instead
-                          (load-image (bitmap img)))])
+                          (load-image (bitmap img))
+                          (send sbe set-label
+                                (format "Error loading file ~v"
+                                        (string-truncate (path->string name) 30))))])
           (cumulative? (gif-cumulative? img))
           (define lst
             (for/list ([bits (gif-images img)])
@@ -553,9 +551,8 @@
                (set! gif-lst empty)
                (set! gif-lst-timings empty)]
               [else
-               (define str (format "Error loading file ~v~n" img))
-               (eprintf str)
-               (error-log str)
+               (eprintf "Error loading file ~v~n" img)
+               (update-error-log)
                (send sbe set-label
                      (format "Error loading file ~v"
                              (string-truncate (path->string name) 30)))])])
