@@ -5,12 +5,15 @@
          "files.rkt")
 (provide err-port log-frame)
 
+(define old-err (current-error-port))
+
 (define err-port
   (make-output-port
    'error-port-custom
    always-evt
    (λ (s start end non-block? breakable?)
      (define str (bytes->string/utf-8 s #\?))
+     (fprintf old-err str)
      (send log-text insert str)
      (- end start))
    void))
