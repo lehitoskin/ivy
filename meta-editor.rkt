@@ -159,19 +159,6 @@
   (send xmp-lbox set-string-selection "dc:subject")
   (send attr-choice set-string-selection ""))
 
-(define (xmp-elements)
-  (define xexpr (if (empty? (image-xmp))
-                    empty
-                    (string->xexpr (first (image-xmp)))))
-  (cond [(empty? xexpr) empty]
-        [else
-         (for/fold ([lst empty])
-                   ([tag (in-list (append dublin-core xmp-base))])
-           (define found (findf*-txexpr xexpr (is-tag? (string->symbol tag))))
-           (if found
-               (append lst (list tag))
-               lst))]))
-
 (define (langs-hash found)
   (define elem+attrs (map (λ (tx) (findf-txexpr tx is-rdf:li?)) found))
   (for/hash ([tx (in-list elem+attrs)])
@@ -195,7 +182,7 @@
   (new tab-panel%
        [parent meta-frame]
        [choices '("default")]
-       [style '(no-border)]
+       [style '(no-border deleted)]
        [callback (λ (tpanel evt)
                    (define sel (string->symbol (send xmp-lbox get-string-selection)))
                    (case sel
@@ -215,12 +202,10 @@
                         (send attr-tfield set-value tab-label)
                         (send dc-tfield set-value (hash-ref langs tab-label)))]))]))
 
-(define lbox-hpanel (new horizontal-panel% [parent tab-panel]))
-
 (define xmp-lbox
   (new list-box%
        [label "XMP Tags"]
-       [parent lbox-hpanel]
+       [parent tab-panel]
        [style '(single vertical-label)]
        [choices (append dublin-core xmp-base)]
        [selection 11]
@@ -356,4 +341,7 @@
     (define tags (get-embed-tags (image-path)))
     (send dc-tfield set-value (string-join tags ", ")))
   (send dc-tfield refresh)
-  (send meta-frame show #t))
+  (send meta-frame show #t)
+  ; eliminate Gtk-WARNING messages
+  (when (empty? (send meta-frame get-children))
+    (send meta-frame add-child tab-panel)))
