@@ -14,6 +14,7 @@
 (provide show-meta-frame)
 
 ; these are actually located as attributes for rdf:Description
+; but may also be regular tags
 (define xmp-base
   '(; base URL for relative links contained within the resource
     ; Text
@@ -110,38 +111,55 @@
      (if (string-null? attr-sel)
          (txexpr (string->symbol type) '() (list elems))
          (txexpr (string->symbol type) attr-lst (list elems)))]
-    ; attr stuff
+    ; attr stuff - may also be represented as tags
     [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
      (define xexpr (string->xexpr (if (empty? (image-xmp))
                                       ""
                                       (first (image-xmp)))))
-     ; these go inside rdf:Description as attrs
-     (define rdf:desc (findf-txexpr xexpr is-rdf:Description?))
-     (attr-set rdf:desc (string->symbol type) elems)]
+     (define type-sym (string->symbol type))
+     ; if the tag exists as an element, replace it
+     (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
+     (cond [xmp (txexpr type-sym '() elems)]
+           [else
+            ; these go inside rdf:Description as attrs
+            (define rdf:desc (findf-txexpr xexpr is-rdf:Description?))
+            (attr-set rdf:desc (string->symbol type) elems)])]
     [else empty]))
 
 (define (ok-callback)
   (define type (send xmp-lbox get-string-selection))
-  (define elems (send dc-tfield get-value))
-  (define attrs (send attr-tfield get-value))
-  ; set the new information
-  (define setted
-    (case type
-      [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
-       ((set-xmp-tag 'rdf:Description)
-        (string->xexpr (if (empty? (image-xmp))
-                           ""
-                           (first (image-xmp))))
-        (create-dc-meta type elems attrs))]
-      [else
-       ((set-xmp-tag (string->symbol type))
-        (string->xexpr (if (empty? (image-xmp))
-                           ""
-                           (first (image-xmp))))
-        (create-dc-meta type elems attrs))]))
-  (image-xmp (list (xexpr->string setted)))
-  (set-embed-xmp! (image-path) (first (image-xmp)))
-  (send meta-frame show #f))
+  (when type
+    (define elems (send dc-tfield get-value))
+    (define attrs (send attr-tfield get-value))
+    ; set the new information
+    (define setted
+      (case type
+        [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
+         (define type-sym (string->symbol type))
+         (define xexpr (string->xexpr (if (empty? (image-xmp))
+                                          ""
+                                          (first (image-xmp)))))
+         (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
+         ; if the tag exists as an element, replace it
+         (cond
+           [xmp
+            ((set-xmp-tag type-sym)
+             xexpr
+             (create-dc-meta type elems attrs))]
+           ; otherwise set it as an attr
+           [else
+            ((set-xmp-tag 'rdf:Description)
+             xexpr
+             (create-dc-meta type elems attrs))])]
+        [else
+         ((set-xmp-tag (string->symbol type))
+          (string->xexpr (if (empty? (image-xmp))
+                             ""
+                             (first (image-xmp))))
+          (create-dc-meta type elems attrs))]))
+    (image-xmp (list (xexpr->string setted)))
+    (set-embed-xmp! (image-path) (first (image-xmp)))
+    (send meta-frame show #f)))
 
 (define (fields-defaults)
   ; set tabs to default
@@ -211,7 +229,8 @@
        [selection 11]
        [callback (λ (lbox evt)
                    (define str (send lbox get-string-selection))
-                   (define sel (string->symbol str))
+                   ; just in case get-string-selection returns #f
+                   (define sel (string->symbol (if str str "")))
                    (define xexpr (string->xexpr (if (empty? (image-xmp))
                                                     ""
                                                     (first (image-xmp)))))
@@ -227,10 +246,12 @@
                             (for ([tab (in-range (- num 1))])
                               (send tab-panel delete 1))
                             (send tab-panel set-item-label 0 "default")]))
-                   (when found
-                     (case sel
-                       ; all the Alt's
-                       [(dc:description dc:rights dc:title)
+                   (case sel
+                     ; just in case get-string-selection returns #f
+                     [(||) (void)]
+                     ; all the Alt's
+                     [(dc:description dc:rights dc:title)
+                      (when found
                         ; set the tabs in the tab-panel
                         (define langs (langs-hash found))
                         (define langs-lst
@@ -245,33 +266,39 @@
                         (define tab-label (send tab-panel get-item-label 0))
                         (send attr-choice set-selection 1)
                         (send attr-tfield set-value tab-label)
-                        (send dc-tfield set-value (hash-ref langs tab-label))]
-                       ; all the Bag's and Seq's
-                       [(dc:contributor
-                         dc:creator
-                         dc:date
-                         dc:language
-                         dc:publisher
-                         dc:relation
-                         dc:subject
-                         dc:type)
+                        (send dc-tfield set-value (hash-ref langs tab-label)))]
+                     ; all the Bag's and Seq's
+                     [(dc:contributor
+                       dc:creator
+                       dc:date
+                       dc:language
+                       dc:publisher
+                       dc:relation
+                       dc:subject
+                       dc:type)
+                      (when found
                         (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
                         (define lst (flatten (map (λ (item) (get-elements item)) rdf:li)))
-                        (send dc-tfield set-value (string-join lst ", "))]
-                       [(xmp:BaseURL xmp:Label xmp:Rating)
-                        (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
-                        (when rdf-desc
-                          ; attr may be a number via xmp:Rating
-                          (define attr (attr-ref rdf-desc sel (λ _ "")))
-                          (define attr-str
-                            (if (number? attr)
-                                (number->string attr)
-                                attr))
-                          (send dc-tfield set-value attr-str))]
-                       ; everything else is just a single value
-                       [else
+                        (send dc-tfield set-value (string-join lst ", ")))]
+                     ; grab the attrs from rdf:Description
+                     [(xmp:BaseURL xmp:Label xmp:Rating)
+                      (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
+                      (when rdf-desc
+                        ; attr may be a number via xmp:Rating
+                        (define attr (attr-ref rdf-desc sel (λ _ "")))
+                        (define attr-str
+                          (if (number? attr)
+                              (number->string attr)
+                              attr))
+                        ; if it doesn't exist as an attr, check if it's an element
+                        (if (and found (string-null? attr-str))
+                            (send dc-tfield set-value (get-elements found))
+                            (send dc-tfield set-value attr-str)))]
+                     ; everything else is just a single value
+                     [else
+                      (when found
                         (define lst (flatten (map (λ (item) (get-elements item)) found)))
-                        (send dc-tfield set-value (string-join lst ", "))])))]))
+                        (send dc-tfield set-value (string-join lst ", ")))]))]))
                           
 
 (define dc-vpanel
@@ -338,6 +365,14 @@
   (fields-defaults)
   (when (and (not (equal? (image-path) root-path))
              (embed-support? (image-path)))
+    ; wait for any previous xmp-threads to complete
+    (unless (zero? (hash-count (xmp-threads)))
+      (for ([pair (in-hash-pairs (xmp-threads))])
+        (let loop ()
+          (unless (thread-dead? (cdr pair))
+            (printf "Waiting for thread ~a to finish...\n" (car pair))
+            (sleep 1/4)
+            (loop)))))
     (define tags (get-embed-tags (image-path)))
     (send dc-tfield set-value (string-join tags ", ")))
   (send dc-tfield refresh)

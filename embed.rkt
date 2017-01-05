@@ -595,7 +595,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                       (xmlns:dc "http://purl.org/dc/elements/1.1/")
                       (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
                       (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")
-                      (xmp:MetadataDate ,(get-time)))
+                      (xmp:MetadataDate ,(get-time))
+                      (xmp:Rating "0"))
                      ,tx)))))])]
     ; xexpr had an old tx (which got replaced)
     [else
@@ -625,7 +626,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                (xmlns:dc "http://purl.org/dc/elements/1.1/")
                (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
                (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")
-               (xmp:MetadataDate ,(get-time)))
+               (xmp:MetadataDate ,(get-time))
+               (xmp:Rating "0"))
               ,dc:sub)))))
 
 ; take the complete xexpr (possibly from make-xmp-xexpr) and

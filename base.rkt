@@ -191,8 +191,14 @@
       [(> remainder-x 0)
        (if (> remainder-y 0)
            (if (> remainder-y 10)
-               (filled-rectangle remainder-x (- remainder-y 10) #:color dgray-color #:draw-border? #f)
-               (filled-rectangle remainder-x remainder-y #:color dgray-color #:draw-border? #f))
+               (filled-rectangle remainder-x
+                                 (- remainder-y 10)
+                                 #:color dgray-color
+                                 #:draw-border? #f)
+               (filled-rectangle remainder-x
+                                 remainder-y
+                                 #:color dgray-color
+                                 #:draw-border? #f))
            #f)]
       [else #f]))
   (define rlsquare-xy
@@ -800,9 +806,12 @@
   
   (send km add-function "delete-forward-char"
         (lambda (editor kev)
-          (send editor delete
-                (send editor get-start-position)
-                (+ (send editor get-end-position) 1))))
+          (define start (send editor get-start-position))
+          (define end (send editor get-end-position))
+          ; if we have something selected, only delete that part
+          (send editor delete start (if (= start end)
+                                        (+ end 1)
+                                        end))))
   
   (send km add-function "backward-char"
         (lambda (editor kev)

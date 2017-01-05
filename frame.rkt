@@ -560,7 +560,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (hash-set (xmp-threads)
                                    time
                                    (thread (λ ()
-                                             (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                             (set-embed-tags! img-str
+                                                              (tfield->list (ivy-tag-tfield)))
                                              (image-xmp (get-embed-xmp img-str))
                                              (xmp-threads (hash-remove (xmp-threads) time))))))))
                   (cond [(string-null? tags)
