@@ -54,6 +54,16 @@ Cmd-.
 
 - To remove any set tags, simply delete the contents in the tag text field,
   press the "Set" button or Enter key, and the entry for that image will be
+ 
+- To set a rating for an image, simply select a number (with a neat unicode
+  shining star) from the choice selection drop-down menu. 0 (the default)
+  means the picture hasn't yet been rated, -1 means the image should be rejected
+  from the rating system, and numbers 1 through 5 mean how you rate this image
+  against its peers (with 1 being the lowest and 5 being the highest). This
+  rating is also available from the Metadata Editor under the tag "xmp:Rating".
+
+- Sorting a collection may now be done from the View menu. Available sorting
+  methods are by alphabetical name (the default), by the highest image rating,
   deleted.
 
 ## Tag Browser

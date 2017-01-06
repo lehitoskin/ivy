@@ -25,7 +25,8 @@
          del-embed-tags!
          set-embed-tags!
          set-embed-xmp!
-         set-xmp-tag)
+         set-xmp-tag
+         xmp-rating)
 
 #|
 xmp packet comments
@@ -665,3 +666,20 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
      [(900) ":15"]
      [(1800) ":30"]
      [(2700) ":45"])))
+
+(define (xmp-rating xmp)
+  (define xexpr (string->xexpr xmp))
+  (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
+  (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
+  (when rdf-desc
+    ; attr may be a number via xmp:Rating
+    (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
+    (define attr-str
+      (if (number? attr)
+          (number->string attr)
+          attr))
+    ; if it doesn't exist as an attr, check if it's an element
+    (cond [(and found (string=? attr-str "")) (get-elements found)]
+          ; does not have xmp:Rating (yet)
+          [(and (not found) (string=? attr-str "")) "0"]
+          [else attr-str])))

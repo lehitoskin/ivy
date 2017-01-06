@@ -18,8 +18,6 @@
          (only-in srfi/13
                   string-contains-ci
                   string-null?)
-         txexpr
-         xml
          "db.rkt"
          "embed.rkt"
          "error-log.rkt"
@@ -581,26 +579,12 @@
               (incoming-tags (string-join (sort embed-lst string<?) ", ")))
             ; set the label of ivy-actions-rating to the rating of the
             ; image (if applicable)
-            (define xexpr (string->xexpr (first (image-xmp))))
-            (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
-            (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
-            (when rdf-desc
-              ; attr may be a number via xmp:Rating
-              (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
-              (define attr-str
-                (if (number? attr)
-                    (number->string attr)
-                    attr))
-              ; if it doesn't exist as an attr, check if it's an element
-              (cond [(and found (string-null? attr-str))
-                     (send iar set-string-selection (get-elements found))]
-                    ; does not have xmp:Rating (yet)
-                    [(and (not found) (string-null? attr-str))
-                     (send iar set-string-selection "0")]
-                    [else
-                     (send iar set-string-selection attr-str)]))]
+            (define rating (if (empty? (image-xmp))
+                               "0"
+                               (xmp-rating (first (image-xmp)))))
+            (send iar set-string-selection (string-append rating " 🌟"))]
            [else (image-xmp empty)])
-            
+
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
      ; ensure the text-field displays the changes we just made

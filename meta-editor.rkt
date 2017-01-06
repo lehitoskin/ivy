@@ -84,20 +84,16 @@
      (define lst
        (for/fold ([bag '(rdf:Bag ())])
                  ([v (string-split elems ",")])
-         (if (string-null? attr-sel)
-             (append bag `((rdf:li () ,(string-trim v))))
-             (append bag `((rdf:li ,attr-lst ,(string-trim v)))))))
+         (append bag `((rdf:li () ,(string-trim v))))))
      (txexpr (string->symbol type) '() (list lst))]
     ; seq - sorted number of entries
     [("dc:creator" "dc:date")
      (define lst
        (for/fold ([seq '(rdf:Seq ())])
                  ([v (string-split elems ",")])
-         (if (string-null? attr-sel)
-             (append seq `((rdf:li () ,(string-trim v))))
-             (append seq `((rdf:li ,attr-lst ,(string-trim v)))))))
+         (append seq `((rdf:li () ,(string-trim v))))))
      (txexpr (string->symbol type) '() (list lst))]
-    ; alt
+    ; alt - may have xml:lang attr
     [("dc:description" "dc:rights" "dc:title")
      (define lst
        (for/fold ([alt '(rdf:Alt ())])
@@ -108,10 +104,8 @@
      (txexpr (string->symbol type) '() (list lst))]
     ; text - single string entry
     [("dc:coverage" "dc:identifier" "dc:source")
-     (if (string-null? attr-sel)
-         (txexpr (string->symbol type) '() (list elems))
-         (txexpr (string->symbol type) attr-lst (list elems)))]
-    ; attr stuff - may also be represented as tags
+     (txexpr (string->symbol type) '() (list elems))]
+    ; tags as attrs - may also be represented as elements
     [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
      (define xexpr (string->xexpr (if (empty? (image-xmp))
                                       ""

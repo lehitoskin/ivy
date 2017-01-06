@@ -206,6 +206,7 @@
                   (send canvas set-canvas-background color-black)))
           (send (ivy-canvas) refresh)
           (send ivy-frame set-label "Ivy Image Viewer")
+          (send (ivy-actions-rating) set-string-label "0 🌟")
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
           (send (ivy-tag-tfield) set-field-background color-white)
@@ -338,10 +339,11 @@
        [parent ivy-menu-bar-view-zoom-to]
        [label (format "~a%" n)]
        [callback (λ (i e)
-                   (collect-garbage 'incremental)
-                   (if (empty? master-gif)
-                       (load-image (bitmap image-bmp-master) n)
-                       (load-image master-gif n)))]))
+                   (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
+                     (if (empty? master-gif)
+                         (load-image (bitmap image-bmp-master) n)
+                         (load-image master-gif n))))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
@@ -349,8 +351,9 @@
        [label "Rotate left"]
        [help-string "Rotate the image left."]
        [callback (λ (i e)
-                   (collect-garbage 'incremental)
-                   (load-image (rotate image-pict (/ pi 2)) 'same))]))
+                   (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
+                     (load-image (rotate image-pict (/ pi 2)) 'same)))]))
 
 (define ivy-menu-bar-view-rotate-right
   (new menu-item%
@@ -358,8 +361,9 @@
        [label "Rotate right"]
        [help-string "Rotate the image right."]
        [callback (λ (i e)
-                   (collect-garbage 'incremental)
-                   (load-image (rotate image-pict (- (/ pi 2))) 'same))]))
+                   (unless (equal? (image-path) root-path)
+                     (collect-garbage 'incremental)
+                     (load-image (rotate image-pict (- (/ pi 2))) 'same)))]))
 
 (define ivy-menu-bar-view-flip-horizontal
   (new menu-item%
@@ -367,10 +371,11 @@
        [label "Flip horizontal"]
        [help-string "Flip the image horizontally."]
        [callback (λ (i e)
-                   (define flo
-                     (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
-                   (collect-garbage 'incremental)
-                   (load-image (bitmap (flomap->bitmap flo)) 'same))]))
+                   (unless (equal? (image-path) root-path)
+                     (define flo
+                       (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
+                     (collect-garbage 'incremental)
+                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
 
 (define ivy-menu-bar-view-flip-vertical
   (new menu-item%
@@ -378,10 +383,90 @@
        [label "Flip vertical"]
        [help-string "Flip the image vertically."]
        [callback (λ (i e)
-                   (define flo
-                     (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
-                   (collect-garbage 'incremental)
-                   (load-image (bitmap (flomap->bitmap flo)) 'same))]))
+                   (unless (equal? (image-path) root-path)
+                     (define flo
+                       (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
+                     (collect-garbage 'incremental)
+                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
+
+(define ivy-menu-bar-view-sort-alpha
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Sort Alphabetically"]
+       [help-string "Sort the current collection alphabetically."]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) root-path)
+                     (define new-pfs (sort (pfs) path<?))
+                     (pfs new-pfs)
+                     (send (status-bar-position)
+                           set-label
+                           (format "~a / ~a"
+                                   (+ (get-index (image-path) (pfs)) 1)
+                                   (length (pfs))))))]))
+
+(define ivy-menu-bar-view-sort-rating-high
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Sort by High Rating"]
+       [help-string "Sort the current collection by highest Rating."]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) root-path)
+                     (define new-pfs
+                       (sort (pfs)
+                             (λ (a b)
+                               (define a-rating
+                                 (cond [(embed-support? a)
+                                        (define xmp (get-embed-xmp a))
+                                        (if (empty? xmp)
+                                            "0"
+                                            (xmp-rating (first xmp)))]
+                                       [else "0"]))
+                               (define b-rating
+                                 (cond [(embed-support? b)
+                                        (define xmp (get-embed-xmp b))
+                                        (if (empty? xmp)
+                                            "0"
+                                            (xmp-rating (first xmp)))]
+                                       [else "0"]))
+                               (string>? a-rating b-rating))))
+                     (pfs new-pfs)
+                     (send (status-bar-position)
+                           set-label
+                           (format "~a / ~a"
+                                   (+ (get-index (image-path) (pfs)) 1)
+                                   (length (pfs))))))]))
+
+(define ivy-menu-bar-view-sort-rating-low
+  (new menu-item%
+       [parent ivy-menu-bar-view]
+       [label "Sort by Low Rating"]
+       [help-string "Sort the current collection by lowest Rating."]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) root-path)
+                     (define new-pfs
+                       (sort (pfs)
+                             (λ (a b)
+                               (define a-rating
+                                 (cond [(embed-support? a)
+                                        (define xmp (get-embed-xmp a))
+                                        (if (empty? xmp)
+                                            "0"
+                                            (xmp-rating (first xmp)))]
+                                       [else "0"]))
+                               (define b-rating
+                                 (cond [(embed-support? b)
+                                        (define xmp (get-embed-xmp b))
+                                        (if (empty? xmp)
+                                            "0"
+                                            (xmp-rating (first xmp)))]
+                                       [else "0"]))
+                               (string<? a-rating b-rating))))
+                     (pfs new-pfs)
+                     (send (status-bar-position)
+                           set-label
+                           (format "~a / ~a"
+                                   (+ (get-index (image-path) (pfs)) 1)
+                                   (length (pfs))))))]))
 
 ;; Window menu items ;;
 
@@ -517,7 +602,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
  (new choice%
       [parent ivy-toolbar-hpanel]
       [label ""]
-      [choices '("5" "4" "3" "2" "1" "0" "-1")]
+      [choices (for/list ([n (in-range 5 -2 -1)])
+                 (string-append (number->string n) " 🌟"))]
       [selection 5] ; "0"
       [stretchable-width #f]
       [stretchable-height #f]
@@ -531,23 +617,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                     (define (set-xmp:rating!)
                       (define type "xmp:Rating")
                       (define type-sym 'xmp:Rating)
-                      (define elems (send choice get-string-selection))
+                      (define sel (send choice get-string-selection))
+                      (define elems (substring sel 0 (- (string-length sel) 2)))
                       (define attrs "")
                       (define xexpr (string->xexpr (if (empty? (image-xmp))
                                                        ""
                                                        (first (image-xmp)))))
                       (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
                       ; if the tag exists as an element, replace it
-                      (cond
-                        [xmp
-                         ((set-xmp-tag type-sym)
-                          xexpr
-                          (create-dc-meta type elems attrs))]
-                        ; otherwise set it as an attr
-                        [else
-                         ((set-xmp-tag 'rdf:Description)
-                          xexpr
-                          (create-dc-meta type elems attrs))]))
+                      (define setted
+                        (cond
+                          [xmp
+                           ((set-xmp-tag type-sym)
+                            xexpr
+                            (create-dc-meta type elems attrs))]
+                          ; otherwise set it as an attr
+                          [else
+                           ((set-xmp-tag 'rdf:Description)
+                            xexpr
+                            (create-dc-meta type elems attrs))]))
+                      (image-xmp (list (xexpr->string setted)))
+                      (set-embed-xmp! img (first (image-xmp))))
                      
                     (cond [(hash-empty? (xmp-threads))
                            (xmp-threads (hash img (thread set-xmp:rating!)))]
