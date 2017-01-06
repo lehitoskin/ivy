@@ -19,6 +19,7 @@
                   string-contains-ci
                   string-null?)
          txexpr
+         xml
          "db.rkt"
          "embed.rkt"
          "error-log.rkt"
@@ -369,6 +370,7 @@
 ; janky!
 (define ivy-canvas (make-parameter #f))
 (define ivy-tag-tfield (make-parameter #f))
+(define ivy-actions-rating (make-parameter #f))
 (define status-bar-dimensions (make-parameter #f))
 (define status-bar-error (make-parameter #f))
 (define status-bar-position (make-parameter #f))
@@ -458,6 +460,7 @@
        void?)
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
+  (define iar (ivy-actions-rating))
   (define sbd (status-bar-dimensions))
   (define sbe (status-bar-error))
   (define sbp (status-bar-position))
@@ -575,7 +578,27 @@
             (define embed-lst (get-embed-tags img-str))
             (unless (empty? embed-lst)
               ; the embedded tags may come back unsorted
-              (incoming-tags (string-join (sort embed-lst string<?) ", ")))]
+              (incoming-tags (string-join (sort embed-lst string<?) ", ")))
+            ; set the label of ivy-actions-rating to the rating of the
+            ; image (if applicable)
+            (define xexpr (string->xexpr (first (image-xmp))))
+            (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
+            (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
+            (when rdf-desc
+              ; attr may be a number via xmp:Rating
+              (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
+              (define attr-str
+                (if (number? attr)
+                    (number->string attr)
+                    attr))
+              ; if it doesn't exist as an attr, check if it's an element
+              (cond [(and found (string-null? attr-str))
+                     (send iar set-string-selection (get-elements found))]
+                    ; does not have xmp:Rating (yet)
+                    [(and (not found) (string-null? attr-str))
+                     (send iar set-string-selection "0")]
+                    [else
+                     (send iar set-string-selection attr-str)]))]
            [else (image-xmp empty)])
             
      ; ...put them in the tfield

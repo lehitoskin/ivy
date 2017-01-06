@@ -9,6 +9,8 @@
          racket/list
          racket/math
          racket/string
+         txexpr
+         xml
          "base.rkt"
          "db.rkt"
          "db-statistics.rkt"
@@ -510,6 +512,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                          (load-image image-bmp-master)
                          (load-image (image-path)))))]))
 
+
+(ivy-actions-rating
+ (new choice%
+      [parent ivy-toolbar-hpanel]
+      [label ""]
+      [choices '("5" "4" "3" "2" "1" "0" "-1")]
+      [selection 5] ; "0"
+      [stretchable-width #f]
+      [stretchable-height #f]
+      [callback (λ (choice evt)
+                  ; do nothing if we've pressed ctrl+n or if the
+                  ; image cannot embed metadata
+                  (unless (or (equal? (image-path) root-path)
+                              (not (embed-support? (image-path))))
+                    (define img (image-path))
+
+                    (define (set-xmp:rating!)
+                      (define type "xmp:Rating")
+                      (define type-sym 'xmp:Rating)
+                      (define elems (send choice get-string-selection))
+                      (define attrs "")
+                      (define xexpr (string->xexpr (if (empty? (image-xmp))
+                                                       ""
+                                                       (first (image-xmp)))))
+                      (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
+                      ; if the tag exists as an element, replace it
+                      (cond
+                        [xmp
+                         ((set-xmp-tag type-sym)
+                          xexpr
+                          (create-dc-meta type elems attrs))]
+                        ; otherwise set it as an attr
+                        [else
+                         ((set-xmp-tag 'rdf:Description)
+                          xexpr
+                          (create-dc-meta type elems attrs))]))
+                     
+                    (cond [(hash-empty? (xmp-threads))
+                           (xmp-threads (hash img (thread set-xmp:rating!)))]
+                          [else
+                           ; wait for any xmp-threads to finish before continuing
+                           (when (hash-has-key? (xmp-threads) img)
+                             (let loop ()
+                               (unless (thread-dead? (hash-ref (xmp-threads) img))
+                                 (printf "Waiting for thread ~a to finish...\n" img)
+                                 (sleep 1/4)
+                                 (loop))))
+                           (xmp-threads
+                            (hash-set (xmp-threads)
+                                      img
+                                      (thread set-xmp:rating!)))])))]))
+
 (define (on-escape-key tfield)
   (unless (equal? (image-path) root-path)
     (send tfield set-field-background color-white)
@@ -540,30 +594,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
       [callback
        (λ (tf evt)
          (unless (equal? (image-path) root-path)
-           (define img-str (path->string (image-path)))
-           (define-values (base name-path must-be-dir?) (split-path (image-path)))
+           (define img (image-path))
+           (define img-str (path->string img))
+           (define-values (base name-path must-be-dir?) (split-path img))
            (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
                   (define tags (send tf get-value))
                   (send ivy-frame set-label name-str)
                   (when (embed-support? img-str)
                     ; put this into a new thread to speed things up
-                    (define time (current-seconds))
-                    (if (zero? (hash-count (xmp-threads)))
-                        (xmp-threads
-                         (hash time
-                               (thread (λ ()
-                                         (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
-                                         (image-xmp (get-embed-xmp img-str))
-                                         (xmp-threads (hash-remove (xmp-threads) time))))))
-                        (xmp-threads
-                         (hash-set (xmp-threads)
-                                   time
-                                   (thread (λ ()
-                                             (set-embed-tags! img-str
-                                                              (tfield->list (ivy-tag-tfield)))
-                                             (image-xmp (get-embed-xmp img-str))
-                                             (xmp-threads (hash-remove (xmp-threads) time))))))))
+                    (cond
+                      [(hash-empty? (xmp-threads))
+                       (xmp-threads
+                        (hash img
+                              (thread (λ ()
+                                        (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
+                                        (image-xmp (get-embed-xmp img-str))
+                                        (xmp-threads (hash-remove (xmp-threads) img))))))]
+                      [else
+                       (when (hash-has-key? (xmp-threads) img)
+                         (let loop ()
+                           (unless (thread-dead? (hash-ref (xmp-threads) img))
+                             (printf "Waiting for thread ~a to finish...\n" img)
+                             (sleep 1/4)
+                             (loop))))
+                       (xmp-threads
+                        (hash-set (xmp-threads)
+                                  img
+                                  (thread (λ ()
+                                            (set-embed-tags! img-str
+                                                             (tfield->list (ivy-tag-tfield)))
+                                            (image-xmp (get-embed-xmp img-str))
+                                            (xmp-threads (hash-remove (xmp-threads) img))))))]))
                   (cond [(string-null? tags)
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist

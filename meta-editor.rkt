@@ -11,7 +11,7 @@
          "base.rkt"
          "embed.rkt"
          "files.rkt")
-(provide show-meta-frame)
+(provide create-dc-meta show-meta-frame)
 
 ; these are actually located as attributes for rdf:Description
 ; but may also be regular tags
