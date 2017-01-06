@@ -107,9 +107,9 @@
      (txexpr (string->symbol type) '() (list elems))]
     ; tags as attrs - may also be represented as elements
     [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
-     (define xexpr (string->xexpr (if (empty? (image-xmp))
-                                      ""
-                                      (first (image-xmp)))))
+     (define xexpr (if (empty? (unbox image-xmp))
+                       (make-xmp-xexpr empty)
+                       (string->xexpr (first (unbox image-xmp)))))
      (define type-sym (string->symbol type))
      ; if the tag exists as an element, replace it
      (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
@@ -130,9 +130,9 @@
       (case type
         [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
          (define type-sym (string->symbol type))
-         (define xexpr (string->xexpr (if (empty? (image-xmp))
-                                          ""
-                                          (first (image-xmp)))))
+         (define xexpr (if (empty? (unbox image-xmp))
+                           (make-xmp-xexpr empty)
+                           (string->xexpr (first (unbox image-xmp)))))
          (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
          ; if the tag exists as an element, replace it
          (cond
@@ -147,12 +147,12 @@
              (create-dc-meta type elems attrs))])]
         [else
          ((set-xmp-tag (string->symbol type))
-          (string->xexpr (if (empty? (image-xmp))
-                             ""
-                             (first (image-xmp))))
+          (if (empty? (unbox image-xmp))
+              (make-xmp-xexpr empty)
+              (string->xexpr (first (unbox image-xmp))))
           (create-dc-meta type elems attrs))]))
-    (image-xmp (list (xexpr->string setted)))
-    (set-embed-xmp! (image-path) (first (image-xmp)))
+    (set-box! image-xmp (list (xexpr->string setted)))
+    (set-embed-xmp! (image-path) (first (unbox image-xmp)))
     (send meta-frame show #f)))
 
 (define (fields-defaults)
@@ -200,9 +200,9 @@
                    (case sel
                      ; all the Alt's
                      [(dc:description dc:rights dc:title)
-                      (define xexpr (string->xexpr (if (empty? (image-xmp))
-                                                       ""
-                                                       (first (image-xmp)))))
+                      (define xexpr (if (empty? (unbox image-xmp))
+                                        (make-xmp-xexpr empty)
+                                        (string->xexpr (first (unbox image-xmp)))))
                       (define found (findf*-txexpr xexpr (is-tag? sel)))
                       (when found
                         (define elem+attrs (map (λ (tx) (findf-txexpr tx is-rdf:li?)) found))
@@ -225,9 +225,9 @@
                    (define str (send lbox get-string-selection))
                    ; just in case get-string-selection returns #f
                    (define sel (string->symbol (if str str "")))
-                   (define xexpr (string->xexpr (if (empty? (image-xmp))
-                                                    ""
-                                                    (first (image-xmp)))))
+                   (define xexpr (if (empty? (unbox image-xmp))
+                                     (make-xmp-xexpr empty)
+                                     (string->xexpr (first (unbox image-xmp)))))
                    (define found (findf*-txexpr xexpr (is-tag? sel)))
                    (unless found
                      (send dc-tfield set-value ""))
@@ -357,17 +357,17 @@
 
 (define (show-meta-frame)
   (fields-defaults)
-  (when (and (not (equal? (image-path) root-path))
-             (embed-support? (image-path)))
+  (define img (image-path))
+  (when (and (not (equal? img root-path))
+             (embed-support? img))
     ; wait for any previous xmp-threads to complete
-    (unless (zero? (hash-count (xmp-threads)))
-      (for ([pair (in-hash-pairs (xmp-threads))])
-        (let loop ()
-          (unless (thread-dead? (cdr pair))
-            (printf "Waiting for thread ~a to finish...\n" (car pair))
-            (sleep 1/4)
-            (loop)))))
-    (define tags (get-embed-tags (image-path)))
+    (let loop ()
+      (unless (or (not (hash-has-key? xmp-threads img))
+                  (thread-dead? (hash-ref xmp-threads img)))
+        (printf "Waiting for thread ~a to finish...\n" img)
+        (sleep 1/4)
+        (loop)))
+    (define tags (get-embed-tags img))
     (send dc-tfield set-value (string-join tags ", ")))
   (send dc-tfield refresh)
   (send meta-frame show #t)

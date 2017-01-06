@@ -47,8 +47,8 @@
 ; pict of the currently displayed image
 (define image-pict #f)
 ; the cached XMP metadata of the image
-(define image-xmp (make-parameter empty))
-(define xmp-threads (make-parameter (hash)))
+(define image-xmp (box empty))
+(define xmp-threads (make-hash))
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time
@@ -572,18 +572,18 @@
      ; and use them instead of what's in the DB
      ; because it may be out of date
      (cond [(embed-support? img-str)
-            (image-xmp (get-embed-xmp img-str))
+            (set-box! image-xmp (get-embed-xmp img-str))
             (define embed-lst (get-embed-tags img-str))
             (unless (empty? embed-lst)
               ; the embedded tags may come back unsorted
               (incoming-tags (string-join (sort embed-lst string<?) ", ")))
             ; set the label of ivy-actions-rating to the rating of the
             ; image (if applicable)
-            (define rating (if (empty? (image-xmp))
+            (define rating (if (empty? (unbox image-xmp))
                                "0"
-                               (xmp-rating (first (image-xmp)))))
+                               (xmp-rating (first (unbox image-xmp)))))
             (send iar set-string-selection (string-append rating " 🌟"))]
-           [else (image-xmp empty)])
+           [else (set-box! image-xmp empty)])
 
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))

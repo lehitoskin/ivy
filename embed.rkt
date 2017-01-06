@@ -15,6 +15,7 @@
          xml)
 (provide add-embed-tags!
          dc:subject->list
+         del-embed-tags!
          embed-support?
          get-embed-tags
          get-embed-xmp
@@ -22,7 +23,7 @@
          is-rdf:Description?
          is-rdf:li?
          is-tag?
-         del-embed-tags!
+         make-xmp-xexpr
          set-embed-tags!
          set-embed-xmp!
          set-xmp-tag
