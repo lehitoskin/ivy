@@ -206,7 +206,7 @@
                   (send canvas set-canvas-background color-black)))
           (send (ivy-canvas) refresh)
           (send ivy-frame set-label "Ivy Image Viewer")
-          (send (ivy-actions-rating) set-string-label "0 🌟")
+          (send (ivy-actions-rating) set-string-selection "0 🌟")
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
           (send (ivy-tag-tfield) set-field-background color-white)
