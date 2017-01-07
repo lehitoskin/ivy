@@ -636,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                            ((set-xmp-tag 'rdf:Description)
                             xexpr
                             (create-dc-meta type elems attrs))]))
-                      (set-box! image-xmp (list (xexpr->string setted)))
+                      (set-box! image-xmp (list (xexpr->xmp setted)))
                       (set-embed-xmp! img (first (unbox image-xmp)))
                       ; remove this thread from the tracked threads
                       (hash-remove! xmp-threads img))
@@ -701,7 +701,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                         (printf "Waiting for thread ~a to finish...\n" img)
                         (sleep 1/4)
                         (loop)))
-                    (hash-set! xmp-threads img
+                    (hash-set! xmp-threads
+                               img
                                (thread (λ ()
                                          (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
                                          (set-box! image-xmp (get-embed-xmp img-str))
@@ -740,7 +741,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
             (send (ivy-tag-tfield) set-field-background color-spring-green)
             (when (embed-support? img-str)
               ; put this into a new thread to speed things up
-              (hash-set! xmp-threads img
+              (let loop ()
+                (unless (or (not (hash-has-key? xmp-threads img))
+                            (thread-dead? (hash-ref xmp-threads img)))
+                  (printf "Waiting for thread ~a to finish...\n" img)
+                  (sleep 1/4)
+                  (loop)))
+              (hash-set! xmp-threads
+                         img
                          (thread (λ ()
                                    (set-embed-tags! img-str (tfield->list (ivy-tag-tfield)))
                                    (set-box! image-xmp (get-embed-xmp img-str))

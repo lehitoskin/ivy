@@ -27,6 +27,7 @@
          set-embed-tags!
          set-embed-xmp!
          set-xmp-tag
+         xexpr->xmp
          xmp-rating)
 
 #|

@@ -151,7 +151,7 @@
               (make-xmp-xexpr empty)
               (string->xexpr (first (unbox image-xmp))))
           (create-dc-meta type elems attrs))]))
-    (set-box! image-xmp (list (xexpr->string setted)))
+    (set-box! image-xmp (list (xexpr->xmp setted)))
     (set-embed-xmp! (image-path) (first (unbox image-xmp)))
     (send meta-frame show #f)))
 
