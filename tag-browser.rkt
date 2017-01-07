@@ -18,7 +18,7 @@
 
 ; set the icon for the frame
 (unless (macosx?)
-  (send browser-frame set-icon (read-bitmap logo)))
+  (void (send browser-frame set-icon logo-bmp)))
 
 ; begin menu bar definitions
 

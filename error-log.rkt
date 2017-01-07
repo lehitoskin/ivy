@@ -23,7 +23,7 @@
        [label "Ivy - Error Log"]
        [width 600]
        [height 500]))
-(void (send log-frame set-icon (read-bitmap logo)))
+(void (send log-frame set-icon logo-bmp))
 
 (define log-text (new text% [auto-wrap #f]))
 

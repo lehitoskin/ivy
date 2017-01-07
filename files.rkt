@@ -1,6 +1,7 @@
 #lang racket/base
 ; files.rkt
 ; definitions of file paths that ivy uses
+(require images/compile-time (for-syntax racket/base racket/draw))
 (provide (all-defined-out))
 
 ; base directory where ivy will put all of its files
@@ -26,15 +27,18 @@
 ; path for cached thumbnails
 (define thumbnails-path (build-path ivy-path "thumbnails"))
 
-(define logo
-  (if (eq? (system-type) 'unix)
-      (let* ([base "share/icons/hicolor/128x128/apps/ivy-logo-128px.png"]
-             [uls (build-path "/usr/local" base)]
-             [us (build-path "/usr" base)])
-        (cond [(file-exists? uls) uls]
-              [(file-exists? us) us]
-              [else (build-path "img/ivy-logo-128px.png")]))
-      (build-path "img/ivy-logo-128px.png")))
+(begin-for-syntax
+  (define logo
+    (if (eq? (system-type) 'unix)
+        (let* ([base "share/icons/hicolor/128x128/apps/ivy-logo-128px.png"]
+               [uls (build-path "/usr/local" base)]
+               [us (build-path "/usr" base)])
+          (cond [(file-exists? uls) uls]
+                [(file-exists? us) us]
+                [else (build-path "img/ivy-logo-128px.png")]))
+        (build-path "img/ivy-logo-128px.png"))))
+
+(define logo-bmp (compiled-bitmap (read-bitmap logo)))
 
 ; create the config directory
 (unless (directory-exists? ivy-path)

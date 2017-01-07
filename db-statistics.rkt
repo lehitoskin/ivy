@@ -15,7 +15,7 @@
                          [height 100]))
 
 (unless (macosx?)
-  (send stats-frame set-icon (read-bitmap logo)))
+  (void (send stats-frame set-icon logo-bmp)))
 
 (define stats-vpanel
   (new vertical-panel%

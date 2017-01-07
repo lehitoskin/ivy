@@ -31,7 +31,7 @@
 
 ; set the icon for the frame
 (unless (macosx?)
-  (send ivy-frame set-icon (read-bitmap logo)))
+  (void (send ivy-frame set-icon logo-bmp)))
 
 (define ivy-menu-bar
   (new menu-bar%

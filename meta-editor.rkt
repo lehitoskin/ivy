@@ -188,7 +188,9 @@
        [label "Ivy Metadata Editor"]
        [width 600]
        [height 400]))
-(void (send meta-frame set-icon (read-bitmap logo)))
+
+(unless (macosx?)
+  (void (send meta-frame set-icon logo-bmp)))
 
 (define tab-panel
   (new tab-panel%

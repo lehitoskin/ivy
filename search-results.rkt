@@ -23,7 +23,7 @@
 
 ; set the icon for the frame
 (unless (macosx?)
-  (send results-frame set-icon (read-bitmap logo)))
+  (void (send results-frame set-icon logo-bmp)))
 
 (define results-menu-bar (new menu-bar% [parent results-frame]))
 
