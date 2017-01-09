@@ -2,11 +2,14 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require racket/class
+(require pict
+         racket/class
          racket/cmdline
+         racket/gui/base
          racket/list
          racket/path
          racket/string
+         rsvg
          txexpr
          xml
          "base.rkt"
@@ -155,15 +158,59 @@
           (image-dir base)
           (pfs (path-files))])
    (image-path (first absolute-paths))
-   (load-image (image-path) 'cmd))
+   ; resize ivy-frame so that the image isn't horrible squished if it's large
+   ; determine the monitor dimensions
+   (define-values (monitor-width monitor-height) (get-display-size))
+   (define ext (path-get-extension (image-path)))
+   (when (member (bytes->string/utf-8 ext) supported-extensions)
+     (define pct (if (bytes=? ext #".svg")
+                     (svg-file->pict (image-path))
+                     (bitmap (image-path))))
+     (define pct-width (pict-width pct))
+     (define pct-height (pict-height pct))
+     ; approximate canvas offset
+     (define offset 84)
+     (cond
+       ; all good, let's resize the frame
+       [(and (<= pct-width monitor-width)
+             (<= pct-height monitor-height))
+        (define y (if (<= pct-height (- monitor-height offset))
+                      (+ pct-height offset)
+                      pct-height))
+        (send ivy-frame resize (inexact->exact (floor pct-width)) (inexact->exact (floor y)))]
+       ; wide image
+       [(and (>= pct-width monitor-width)
+             (<= pct-height monitor-height))
+        (define resized (scale-to-fit pct
+                                      monitor-width
+                                      pct-height))
+        (send ivy-frame resize
+              (inexact->exact (floor (pict-width resized)))
+              (inexact->exact (floor (pict-height resized))))]
+       ; tall image
+       [(and (<= pct-width monitor-width)
+             (>= pct-height monitor-height))
+        (define resized (scale-to-fit pct
+                                      pct-width
+                                      (- monitor-height offset)))
+        (send ivy-frame resize
+              (inexact->exact (floor (pict-width resized)))
+              (inexact->exact (floor (pict-height resized))))]
+       ; both wide and tall
+       [(and (>= pct-width monitor-width)
+             (>= pct-height monitor-height))
+        (send ivy-frame resize monitor-width monitor-height)])
+     (load-image (image-path))))
  
  (cond
    ; we aren't search for tags on the cmdline, open frame
    [(show-frame?)
-    (send (ivy-canvas) focus)
-    (send ivy-frame show #t)
     ; only change the error port if we're opening the GUI
-    (current-error-port err-port)]
+    (current-error-port err-port)
+    (send (ivy-canvas) focus)
+    ; center the frame
+    (send ivy-frame center 'both)
+    (send ivy-frame show #t)]
    ; only searching for tags
    [(and (not (empty? (tags-to-search)))
          (empty? (tags-to-exclude)))

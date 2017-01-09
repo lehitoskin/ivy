@@ -223,6 +223,7 @@
        [callback (λ (i e)
                    (send search-tfield focus)
                    (send (send search-tfield get-editor) select-all)
+                   (send search-tag-dialog center 'both)
                    (send search-tag-dialog show #t))]))
 
 (define ivy-menu-bar-file-quit
@@ -512,6 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [help-string "Display database statistics."]
        [callback (λ (i e)
                    (update-stats)
+                   (send stats-frame center 'both)
                    (send stats-frame show #t))]))
 
 (define ivy-menu-bar-help-log
@@ -520,6 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
        [label "&Error Log"]
        [help-string "Display the error log."]
        [callback (λ (i e)
+                   (send log-frame center 'both)
                    (send log-frame show #t))]))
 
 ;; main window layout ;;
@@ -646,12 +649,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
                                       (thread set-xmp:rating!))]
                           [else
                            ; wait for any xmp-threads to finish before continuing
-                           (when (hash-has-key? xmp-threads img)
-                             (let loop ()
-                               (unless (thread-dead? (hash-ref xmp-threads img))
-                                 (printf "Waiting for thread ~a to finish...\n" img)
-                                 (sleep 1/4)
-                                 (loop))))
+                           (let loop ()
+                             (unless (or (not (hash-has-key? xmp-threads img))
+                                         (thread-dead? (hash-ref xmp-threads img)))
+                               (printf "Waiting for thread ~a to finish...\n" img)
+                               (sleep 1/4)
+                               (loop)))
                            (hash-set! xmp-threads
                                       img
                                       (thread set-xmp:rating!))])))]))

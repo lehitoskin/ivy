@@ -62,6 +62,7 @@
                           (send dialog-tfield set-value tag-label)
                           (send dialog-tfield refresh)
                           (send dialog-tfield focus)
+                          (send rename-dialog center 'both)
                           (send rename-dialog show #t)]
                          [else (err-mbox)]))]))
 
@@ -178,6 +179,7 @@
                                     (del-tags! img-label (list tag))
                                     (when (embed-support? img-label)
                                       (del-embed-tags! img-label tag))]))])))
+                 (send edit-tags-dialog center 'both)
                  (send edit-tags-dialog show #t)]
                 [else (err-mbox)]))]))
 
@@ -290,7 +292,9 @@
                     (image-path img-path)
                     (load-image img-path)
                     (define ivy-frame (send (ivy-canvas) get-parent))
-                    (send ivy-frame show #t))])))]))
+                    (unless (send ivy-frame is-shown?)
+                      (send ivy-frame center 'both)
+                      (send ivy-frame show #t)))])))]))
 
 (define thumb-vpanel
   (new vertical-panel%
@@ -313,6 +317,7 @@
        [label "Updating Tag Browser..."]))
 
 (define (update-tag-browser)
+  (send updating-frame center 'both)
   (send updating-frame show #t)
   ; remove the "" we put as a placeholder
   (send tag-lbox clear)
@@ -329,4 +334,5 @@
 (define (show-tag-browser)
   (update-tag-browser)
   (unless (send browser-frame is-shown?)
+    (send browser-frame center 'both)
     (send browser-frame show #t)))

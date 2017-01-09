@@ -372,6 +372,7 @@
     (define tags (get-embed-tags img))
     (send dc-tfield set-value (string-join tags ", ")))
   (send dc-tfield refresh)
+  (send meta-frame center 'both)
   (send meta-frame show #t)
   ; eliminate Gtk-WARNING messages
   (when (empty? (send meta-frame get-children))

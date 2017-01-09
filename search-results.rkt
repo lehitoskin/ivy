@@ -145,6 +145,7 @@
     [(empty? imgs)
      (display-nil-results-alert)]
     [else
+     (send prep-notification center 'both)
      (send prep-notification show #t)
      ; remove everything from the text so we can reuse it
      (send txt erase)
@@ -197,4 +198,5 @@
 
      ; make sure the displayed images reflect any new searches
      (send ecanvas refresh)
+     (send results-frame center 'both)
      (send results-frame show #t)]))
