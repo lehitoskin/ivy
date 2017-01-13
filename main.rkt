@@ -18,7 +18,7 @@
          "error-log.rkt"
          "frame.rkt")
 
-(define ivy-version 2.1)
+(define ivy-version "2.1.1")
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
