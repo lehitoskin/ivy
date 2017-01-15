@@ -9,7 +9,6 @@
          racket/list
          racket/path
          racket/string
-         rsvg
          txexpr
          xml
          "base.rkt"
@@ -36,8 +35,7 @@
 (define set-xmp? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
-(define (relative->absolute path)
-  (simple-form-path (expand-user-path path)))
+(define relative->absolute (compose1 simple-form-path expand-user-path))
 
 ; accept command-line path to load image
 (command-line
