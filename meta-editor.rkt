@@ -343,19 +343,32 @@
        [parent dc-vpanel]
        [alignment '(right center)]))
 
-(define cancel-button
-  (new button%
-       [parent button-hpanel]
-       [label "&Cancel"]
-       [callback (λ (button event)
-                   (fields-defaults)
-                   (send meta-frame show #f))]))
-
-(define ok-button
-  (new button%
-       [parent button-hpanel]
-       [label "&Set"]
-       [callback (λ (button event) (ok-callback))]))
+; make the button position consistent with the host system
+; e.g. A Windows host will have the Ok button before Cancel
+; while on *NIX it will be the other way around
+(void
+ (cond [(system-position-ok-before-cancel?)
+        (new button%
+             [parent button-hpanel]
+             [label "&Set"]
+             [callback (λ (button event) (ok-callback))])
+        (new button%
+             [parent button-hpanel]
+             [label "&Cancel"]
+             [callback (λ (button event)
+                         (fields-defaults)
+                         (send meta-frame show #f))])]
+       [else
+        (new button%
+             [parent button-hpanel]
+             [label "&Cancel"]
+             [callback (λ (button event)
+                         (fields-defaults)
+                         (send meta-frame show #f))])
+        (new button%
+             [parent button-hpanel]
+             [label "&Set"]
+             [callback (λ (button event) (ok-callback))])]))
 
 (define (show-meta-frame)
   (fields-defaults)

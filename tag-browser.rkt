@@ -290,11 +290,7 @@
                     (pfs (path-files))
                     (send (ivy-tag-tfield) set-field-background color-white)
                     (image-path img-path)
-                    (load-image img-path)
-                    (define ivy-frame (send (ivy-canvas) get-parent))
-                    (unless (send ivy-frame is-shown?)
-                      (send ivy-frame center 'both)
-                      (send ivy-frame show #t)))])))]))
+                    (load-image img-path))])))]))
 
 (define thumb-vpanel
   (new vertical-panel%

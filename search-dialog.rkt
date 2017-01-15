@@ -104,18 +104,33 @@
        [alignment '(right center)]
        [stretchable-height #f]))
 
-(define cancel-button
-  (new button%
-       [parent button-hpanel]
-       [label "&Cancel"]
-       [callback (λ (button event)
-                   (send search-tag-dialog show #f))]))
-
-(define ok-button
-  (new button%
-       [parent button-hpanel]
-       [label "&Ok"]
-       [callback
-        (λ (button event)
-          (unless (string-null? (send search-tfield get-value))
-            (ok-callback)))]))
+; make the button position consistent with the host system
+; e.g. A Windows host will have the Ok button before Cancel
+; while on *NIX it will be the other way around
+(void
+ (cond [(system-position-ok-before-cancel?)
+        (new button%
+             [parent button-hpanel]
+             [label "&Ok"]
+             [callback
+              (λ (button event)
+                (unless (string-null? (send search-tfield get-value))
+                  (ok-callback)))])
+        (new button%
+             [parent button-hpanel]
+             [label "&Cancel"]
+             [callback (λ (button event)
+                         (send search-tag-dialog show #f))])]
+       [else
+        (new button%
+             [parent button-hpanel]
+             [label "&Cancel"]
+             [callback (λ (button event)
+                         (send search-tag-dialog show #f))])
+        (new button%
+             [parent button-hpanel]
+             [label "&Ok"]
+             [callback
+              (λ (button event)
+                (unless (string-null? (send search-tfield get-value))
+                  (ok-callback)))])]))

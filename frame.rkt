@@ -1,7 +1,8 @@
 #lang racket/base
 ; frame.rkt
 ; main frame file for ivy, the taggable image viewer
-(require images/flomap
+(require framework
+         images/flomap
          pict
          racket/bool
          racket/class
@@ -22,8 +23,34 @@
          "tag-browser.rkt")
 (provide (all-defined-out))
 
+; framework stuff
+(application:current-app-name "Ivy")
+(application-quit-handler exit:exit)
+(void
+ (exit:insert-on-callback
+  (λ ()
+    ; kill the gif thread, if applicable
+    (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+      (kill-thread (gif-thread)))
+    ; wait for any xmp threads to finish before exiting
+    (unless (hash-empty? xmp-threads)
+      (for ([pair (in-list (hash->list xmp-threads))])
+        (let loop ()
+          (unless (thread-dead? (cdr pair))
+            (printf "Waiting for thread ~a to finish...\n" (car pair))
+            (sleep 1/4)
+            (loop)))))
+   (disconnect sqlc))))
+
+(define closer-frame%
+  (class frame%
+    (super-new)
+    ; clean up and exit the program
+    (define (on-close) (exit:exit))
+    (augment on-close)))
+
 (define ivy-frame
-  (new frame%
+  (new closer-frame%
        [label "Ivy Image Viewer"]
        [style '(fullscreen-button)]
        [width 800]
@@ -234,20 +261,7 @@
            [label "&Quit"]
            [shortcut #\Q]
            [help-string "Quit the program."]
-           [callback (λ (i e)
-                       ; kill the gif thread, if applicable
-                       (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-                         (kill-thread (gif-thread)))
-                       ; wait for any xmp threads to finish before exiting
-                       (unless (hash-empty? xmp-threads)
-                         (for ([pair (in-list (hash->list xmp-threads))])
-                           (let loop ()
-                             (unless (thread-dead? (cdr pair))
-                               (printf "Waiting for thread ~a to finish...\n" (car pair))
-                               (sleep 1/4)
-                               (loop)))))
-                       (disconnect sqlc)
-                       (exit))])))
+           [callback (λ (i e) (exit:exit))])))
 
 ;; Navigation menu items ;;
 
