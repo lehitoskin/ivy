@@ -27,6 +27,8 @@
          gif?
          gif-animated?)
 
+(define ivy-version "2.1.1")
+
 (define (path->symbol p)
   (string->symbol (path->string p)))
 

@@ -504,7 +504,7 @@
        [callback
         (λ (i e)
           (message-box "Ivy - About"
-                       "Ivy, the Taggable Image Viewer
+                       (format "Ivy ~a, the Taggable Image Viewer
 Copyright (C) 2016  Lehi Toskin
 
 This program is free software: you can redistribute it and/or modify
@@ -518,7 +518,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>."))]))
+along with this program.  If not, see <http://www.gnu.org/licenses/>."
+                               ivy-version)))]))
 
 (define ivy-menu-bar-help-statistics
   (new menu-item%

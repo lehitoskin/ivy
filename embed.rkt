@@ -620,7 +620,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (list? . -> . txexpr?)
   (define dc:sub (list->dc:subject taglist))
   (txexpr 'x:xmpmeta
-          '((x:xmptk "Ivy Image Viewer 2.0") (xmlns:x "adobe:ns:meta/"))
+          '((x:xmptk (format "Ivy Image Viewer ~a" ivy-version)) (xmlns:x "adobe:ns:meta/"))
           `((rdf:RDF
              ((xmlns:rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
              (rdf:Description
