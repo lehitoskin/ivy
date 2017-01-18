@@ -15,7 +15,8 @@
          "db.rkt"
          "embed.rkt"
          "error-log.rkt"
-         "frame.rkt")
+         "frame.rkt"
+         (only-in "files.rkt" ivy-version))
 
 (define show-frame? (make-parameter #t))
 (define tags-to-search (make-parameter empty))
@@ -488,6 +489,12 @@
               (when (file-exists? new-thumb-name)
                 (delete-file new-thumb-name))
               (reconcile-tags! new-path tags)
+              ; preserve the old rating, if we can
+              (define old-rating
+                (if (db-has-key? 'ratings old-path)
+                    (image-rating old-path)
+                    0))
+              (set-image-rating! new-path old-rating)
               (db-purge! old-path)]
              [else
               ; spit out an error message, but move anyway

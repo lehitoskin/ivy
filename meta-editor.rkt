@@ -9,6 +9,7 @@
          txexpr
          xml
          "base.rkt"
+         (only-in "db.rkt" set-image-rating!)
          "embed.rkt"
          "files.rkt")
 (provide create-dc-meta show-meta-frame)
@@ -151,6 +152,9 @@
               (make-xmp-xexpr empty)
               (string->xexpr (first (unbox image-xmp))))
           (create-dc-meta type elems attrs))]))
+    ; set the rating in the database
+    (when (eq? (string->symbol type) 'xmp:Rating)
+      (set-image-rating! (path->string (image-path)) (string->number elems)))
     (set-box! image-xmp (list (xexpr->xmp setted)))
     (set-embed-xmp! (image-path) (first (unbox image-xmp)))
     (send meta-frame show #f)))

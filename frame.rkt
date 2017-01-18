@@ -40,7 +40,7 @@
             (printf "Waiting for thread ~a to finish...\n" (car pair))
             (sleep 1/4)
             (loop)))))
-   (disconnect sqlc))))
+    (disconnect sqlc))))
 
 (define closer-frame%
   (class frame%
@@ -253,6 +253,50 @@
                    (send search-tag-dialog center 'both)
                    (send search-tag-dialog show #t))]))
 
+(define ivy-menu-bar-sync-db
+  (new menu-item%
+       [parent ivy-menu-bar-file]
+       [label "Sync XMP Database"]
+       [help-string "Sync the database with the embedded XMP."]
+       [callback (λ (i e)
+                   (define pairs (table-pairs 'images))
+                   (define pairs-len (length pairs))
+                   (clean-db!)
+                   (display "Checking database: ")
+                   (define (worker-loop imgs)
+                     (for ([pair (in-list pairs)])
+                       (define img-str (path->string (first pair)))
+                       (when (embed-support? img-str)
+                         (define embed-lst (get-embed-tags img-str))
+                         (unless (equal? (sort (second pair) string<?) (sort embed-lst string<?))
+                           (printf "Updating tags for ~a\n" img-str)
+                           (reconcile-tags! img-str embed-lst))
+                         (define ir
+                           (cond [(db-has-key? 'ratings img-str)
+                                  (number->string (image-rating img-str))]
+                                 [else
+                                  (set-image-rating! img-str 0)
+                                  "0"]))
+                         (define xr
+                           (let ([embed (get-embed-xmp img-str)])
+                             (if (empty? embed)
+                                 "0"
+                                 (xmp-rating (first embed)))))
+                         (unless (string=? ir xr)
+                           (printf "Updating rating for ~a\n" img-str)
+                           (set-image-rating! img-str (string->number xr)))
+                         (sleep 0.1))))
+                   (define division (inexact->exact (floor (/ pairs-len 4))))
+                   ; if we're dealing with few items, don't make many workers
+                   (cond [(<= pairs-len 16)
+                          (worker-loop pairs)]
+                         [else
+                          (define grid (grid-list pairs division))
+                          (displayln "Spawning workers...")
+                          (for ([g (in-list grid)])
+                            (thread (λ () (worker-loop g))))])
+                   (displayln "Done."))]))
+
 (define ivy-menu-bar-file-quit
   (if (macosx?)
       #f
@@ -426,25 +470,18 @@
        [help-string "Sort the current collection by highest Rating."]
        [callback (λ (i e)
                    (unless (equal? (image-path) root-path)
+                     ; read the database entries for ratings
+                     (define ratings
+                       (for/list ([img (in-list (map path->string (pfs)))])
+                         (define rating (if (db-has-key? 'ratings img)
+                                            (image-rating img)
+                                            0))
+                         (cons (string->path img) rating)))
                      (define new-pfs
-                       (sort (pfs)
+                       (sort ratings
                              (λ (a b)
-                               (define a-rating
-                                 (cond [(embed-support? a)
-                                        (define xmp (get-embed-xmp a))
-                                        (if (empty? xmp)
-                                            "0"
-                                            (xmp-rating (first xmp)))]
-                                       [else "0"]))
-                               (define b-rating
-                                 (cond [(embed-support? b)
-                                        (define xmp (get-embed-xmp b))
-                                        (if (empty? xmp)
-                                            "0"
-                                            (xmp-rating (first xmp)))]
-                                       [else "0"]))
-                               (string>? a-rating b-rating))))
-                     (pfs new-pfs)
+                               (> (cdr a) (cdr b)))))
+                     (pfs (map car new-pfs))
                      (send (status-bar-position)
                            set-label
                            (format "~a / ~a"
@@ -458,25 +495,18 @@
        [help-string "Sort the current collection by lowest Rating."]
        [callback (λ (i e)
                    (unless (equal? (image-path) root-path)
+                     ; read the database entries for ratings
+                     (define ratings
+                       (for/list ([img (in-list (map path->string (pfs)))])
+                         (define rating (if (db-has-key? 'ratings img)
+                                            (image-rating img)
+                                            0))
+                         (cons (string->path img) rating)))
                      (define new-pfs
-                       (sort (pfs)
+                       (sort ratings
                              (λ (a b)
-                               (define a-rating
-                                 (cond [(embed-support? a)
-                                        (define xmp (get-embed-xmp a))
-                                        (if (empty? xmp)
-                                            "0"
-                                            (xmp-rating (first xmp)))]
-                                       [else "0"]))
-                               (define b-rating
-                                 (cond [(embed-support? b)
-                                        (define xmp (get-embed-xmp b))
-                                        (if (empty? xmp)
-                                            "0"
-                                            (xmp-rating (first xmp)))]
-                                       [else "0"]))
-                               (string<? a-rating b-rating))))
-                     (pfs new-pfs)
+                               (< (cdr a) (cdr b)))))
+                     (pfs (map car new-pfs))
                      (send (status-bar-position)
                            set-label
                            (format "~a / ~a"
@@ -654,6 +684,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                            ((set-xmp-tag 'rdf:Description)
                             xexpr
                             (create-dc-meta type elems attrs))]))
+                      ; set the rating in the database
+                      (set-image-rating! (path->string img) (string->number elems))
+                      ; set xmp data
                       (set-box! image-xmp (list (xexpr->xmp setted)))
                       (set-embed-xmp! img (first (unbox image-xmp)))
                       ; remove this thread from the tracked threads

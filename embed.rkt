@@ -12,7 +12,8 @@
          racket/format
          racket/list
          txexpr
-         xml)
+         xml
+         (only-in "files.rkt" ivy-version))
 (provide add-embed-tags!
          dc:subject->list
          del-embed-tags!
@@ -620,7 +621,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (list? . -> . txexpr?)
   (define dc:sub (list->dc:subject taglist))
   (txexpr 'x:xmpmeta
-          '((x:xmptk (format "Ivy Image Viewer ~a" ivy-version)) (xmlns:x "adobe:ns:meta/"))
+          `((x:xmptk ,(format "Ivy Image Viewer ~a" ivy-version)) (xmlns:x "adobe:ns:meta/"))
           `((rdf:RDF
              ((xmlns:rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
              (rdf:Description
@@ -673,15 +674,17 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define xexpr (string->xexpr xmp))
   (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
   (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
-  (when rdf-desc
-    ; attr may be a number via xmp:Rating
-    (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
-    (define attr-str
-      (if (number? attr)
-          (number->string attr)
-          attr))
-    ; if it doesn't exist as an attr, check if it's an element
-    (cond [(and found (string=? attr-str "")) (get-elements found)]
-          ; does not have xmp:Rating (yet)
-          [(and (not found) (string=? attr-str "")) "0"]
-          [else attr-str])))
+  (cond [rdf-desc
+         ; attr may be a number via xmp:Rating
+         (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
+         (define attr-str
+           (if (number? attr)
+               (number->string attr)
+               attr))
+         ; if it doesn't exist as an attr, check if it's an element
+         (cond [(and found (string=? attr-str ""))
+                (car (get-elements found))]
+               ; does not have xmp:Rating (yet)
+               [(and (not found) (string=? attr-str "")) "0"]
+               [else attr-str])]
+        [else "0"]))

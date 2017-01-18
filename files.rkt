@@ -4,6 +4,8 @@
 (require images/compile-time (for-syntax racket/base racket/draw))
 (provide (all-defined-out))
 
+(define ivy-version "2.1.1")
+
 ; base directory where ivy will put all of its files
 (define ivy-path
   (cond [(eq? (system-type) 'unix)

@@ -28,6 +28,8 @@
             "create table if not exists tags(Tag_label string not null, Image_List string);")
 (query-exec sqlc
             "create table if not exists images(Path string not null, Tag_List string);")
+(query-exec sqlc
+            "create table if not exists ratings(Path string not null, Rating integer);")
 
 ; a single tag class which is associated with a list of images
 (define tag%
@@ -108,6 +110,22 @@
                    (when (member label old-tags)
                      (set! taglist (string-join (sort (remove label old-tags) string<?) ",")))]))))
 
+(define rating%
+  (data-class object%
+              (table-name "ratings")
+              (init-column (path "" "Path")) ; string
+              (column (rating "" "Rating")) ; an integer (-1 .. 5)
+              (primary-key path)
+              (super-new)
+
+              (define/public (get-rating)
+                (get-column rating this))
+
+              ; passing a number is okay
+              (define/public (set-rating n)
+                (if (or (>= n -1) (<= n 5))
+                    (set! rating n)
+                    (raise-argument-error 'set-rating "integer between -1 and 5" n)))))
 
 ; query:
 ; -> (rows-result (headers rows))
@@ -156,11 +174,12 @@
   (in-list (table-column #:db-conn db-conn table col)))
 
 (define/contract (db-has-key? #:db-conn [db-conn sqlc] table key)
-  (->* ([or/c 'images 'tags] string?) (#:db-conn connection?) boolean?)
+  (->* ([or/c 'images 'tags 'ratings] string?) (#:db-conn connection?) boolean?)
   (define objs
     (case table
       [(images) (select-data-objects db-conn image% (where (= path ?)) key)]
-      [(tags) (select-data-objects db-conn tag% (where (= label ?)) key)]))
+      [(tags) (select-data-objects db-conn tag% (where (= label ?)) key)]
+      [(ratings) (select-data-objects db-conn rating% (where (= path ?)) key)]))
   (not (empty? objs)))
 
 ; add tags to image, add image to tags
@@ -207,10 +226,16 @@
     (send img-obj del-tag tag-lst)
     (define img-path (get-column path img-obj))
     ; if the image has no tags, remove from database
-    (if (empty? (send img-obj get-tags))
-        (delete-data-object db-conn img-obj)
-        ; save the changes made
-        (save-data-object db-conn img-obj))))
+    (cond [(empty? (send img-obj get-tags))
+           (delete-data-object db-conn img-obj)
+           (define img-str (send img-obj get-path))
+           ; delete the ratings from the database, too
+           (when (db-has-key? 'ratings img-str)
+             (define ratings-obj (make-data-object sqlc rating% img-str))
+             (delete-data-object ratings-obj))]
+          [else
+           ; save the changes made
+           (save-data-object db-conn img-obj)])))
 
 ; tail-recursive remove img from the tag entries
 ; if the tag has no imgs, remove from db
@@ -327,6 +352,23 @@
        (or/c (listof string?) empty))
   (define img-obj (if (data-object? img) img (make-data-object sqlc image% img)))
   (send img-obj get-tags))
+
+(define/contract (image-rating #:db-conn [db-conn sqlc] img)
+  (->* (string?)
+       (#:db-conn connection?)
+       (integer-in -1 5))
+  (define rating-obj (make-data-object sqlc rating% img))
+  (send rating-obj get-rating))
+
+(define/contract (set-image-rating! #:db-conn [db-conn sqlc] img rating)
+  (->* (string? [integer-in -1 5])
+       (#:db-conn connection?)
+       void?)
+  (define rating-obj (if (db-has-key? 'ratings img)
+                         (make-data-object sqlc rating% img)
+                         (new rating% [path img])))
+  (send rating-obj set-rating rating)
+  (save-data-object db-conn rating-obj))
 
 ; search tags table in db for exact matches
 ; returns a list of paths or empty

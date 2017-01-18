@@ -27,8 +27,6 @@
          gif?
          gif-animated?)
 
-(define ivy-version "2.1.1")
-
 (define (path->symbol p)
   (string->symbol (path->string p)))
 
@@ -568,11 +566,14 @@
      (cond [(db-has-key? 'images img-str)
             (define img-obj (make-data-object sqlc image% img-str))
             (define tags (send img-obj get-tags))
-            (incoming-tags (string-join tags ", "))]
+            (incoming-tags (string-join tags ", "))
+            (when (db-has-key? 'ratings img-str)
+              (define rating-obj (make-data-object sqlc rating% img-str))
+              (define rating (number->string (send rating-obj get-rating)))
+              (send iar set-string-selection (string-append rating " 🌟")))]
            [else (incoming-tags "")])
-     ; check to see if the image has embedded tags
-     ; and use them instead of what's in the DB
-     ; because it may be out of date
+     ; check to see if the image has embedded tags and use them instead of
+     ; what's in the DB because it may be out of date
      (cond [(embed-support? img-str)
             (set-box! image-xmp (get-embed-xmp img-str))
             (define embed-lst (get-embed-tags img-str))
