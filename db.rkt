@@ -232,7 +232,7 @@
            ; delete the ratings from the database, too
            (when (db-has-key? 'ratings img-str)
              (define ratings-obj (make-data-object sqlc rating% img-str))
-             (delete-data-object ratings-obj))]
+             (delete-data-object db-conn ratings-obj))]
           [else
            ; save the changes made
            (save-data-object db-conn img-obj)])))
