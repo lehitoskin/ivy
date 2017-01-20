@@ -228,7 +228,7 @@
     ; if the image has no tags, remove from database
     (cond [(empty? (send img-obj get-tags))
            (delete-data-object db-conn img-obj)
-           (define img-str (send img-obj get-path))
+           (define img-str (get-column path img-obj))
            ; delete the ratings from the database, too
            (when (db-has-key? 'ratings img-str)
              (define ratings-obj (make-data-object sqlc rating% img-str))
