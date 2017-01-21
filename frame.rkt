@@ -9,6 +9,7 @@
          racket/gui/base
          racket/list
          racket/math
+         racket/path
          racket/string
          txexpr
          xml
@@ -213,6 +214,86 @@
                      (format "~a / ~a"
                              (+ (get-index (image-path) (pfs)) 1)
                              (length (pfs))))])))]))
+
+(define ivy-menu-bar-dir-open
+  (new menu-item%
+       [parent ivy-menu-bar-file]
+       [label "Open directory"]
+       [help-string "Open a directory to view."]
+       [callback
+        (λ (i e)
+          (define dir
+            (get-directory
+             "Select a directory to view."
+             open-dialog
+             (image-dir)))
+          ; make sure dir is not false
+          (when dir
+            (define paths
+              (for/fold ([lst empty])
+                        ([file (in-directory dir)])
+                (define ext (path-get-extension file))
+                (if (and ext
+                         (member (bytes->string/utf-8 ext) supported-extensions))
+                    (append lst (list file))
+                    lst)))
+            ; do nothing if dir doesn't contain any supported images
+            (unless (empty? paths)
+              (define img-path (first paths))
+              (cond [(> (length paths) 1) (pfs paths)]
+                    [else
+                     (define-values (base name dir?) (split-path img-path))
+                     (image-dir base)
+                     (pfs (path-files))])
+              (send (ivy-tag-tfield) set-field-background color-white)
+              (image-path img-path)
+              (collect-garbage 'incremental)
+              (load-image img-path))))]))
+
+(define ivy-menu-bar-dir-append
+  (new menu-item%
+       [parent ivy-menu-bar-file]
+       [label "Append directory"]
+       [help-string "Append a directory to the current collection."]
+       [callback
+        (λ (i e)
+          (define dir
+            (get-directory
+             "Select a directory to append."
+             open-dialog
+             (image-dir)))
+          ; make sure dir is not false
+          (when dir
+            (define paths
+              (for/fold ([lst empty])
+                        ([file (in-directory dir)])
+                (define ext (path-get-extension file))
+                (if (and ext
+                         (member (bytes->string/utf-8 ext) supported-extensions))
+                    (append lst (list file))
+                    lst)))
+            ; do nothing if dir doesn't contain any supported images
+            (unless (empty? paths)
+              (cond
+                ; empty collection, adding images and load the first in the list
+                [(equal? (first (pfs)) root-path)
+                 (define img-path (first paths))
+                 (define-values (base name dir?) (split-path img-path))
+                 (image-dir base)
+                 (pfs paths)
+                 (image-path img-path)
+                 (collect-garbage 'incremental)
+                 (load-image img-path)]
+                ; collection has images; appending to collection
+                [else
+                 ; no duplicate paths allowed!
+                 (pfs (remove-duplicates (append (pfs) paths)))
+                 ; change label because it usually isn't called until
+                 ; (load-image) is called and we want to see the changes now
+                 (send (status-bar-position) set-label
+                       (format "~a / ~a"
+                               (+ (get-index (image-path) (pfs)) 1)
+                               (length (pfs))))]))))]))
 
 ; reset the GUI to defaults
 (define ivy-menu-bar-file-collection-new

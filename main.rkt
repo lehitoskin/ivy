@@ -136,16 +136,14 @@
  ; hijack requested-images for -M
  (unless (or (not (show-frame?))
              (empty? args))
-   (define requested-paths (map relative->absolute args))
-   (define checked-paths
-     (for/list ([rp requested-paths])
-       ; in case the user called ivy in the same directory
-       ; as the image
-       (define-values (base name dir?) (split-path rp))
-       (if (eq? base 'relative)
-           (build-path (current-directory-for-user) name)
-           rp)))
-   (define absolute-paths (map relative->absolute args))
+   ; if there are directories as paths, scan them
+   (define absolute-paths
+     (for/fold ([imgs empty])
+               ([ap (map relative->absolute args)])
+       ; directory?
+       (if (directory-exists? ap)
+           (append imgs (for/list ([file (in-directory ap)]) file))
+           (append imgs (list ap)))))
    (cond [(> (length absolute-paths) 1)
           ; we want to load a collection
           (pfs absolute-paths)]
@@ -159,7 +157,7 @@
    ; determine the monitor dimensions
    (define-values (monitor-width monitor-height) (get-display-size))
    (define ext (path-get-extension (image-path)))
-   (when (member (bytes->string/utf-8 ext) supported-extensions)
+   (when (and ext (member (bytes->string/utf-8 ext) supported-extensions))
      (load-image (image-path))
      (define pct (bitmap image-bmp-master))
      (define pct-width (pict-width pct))
