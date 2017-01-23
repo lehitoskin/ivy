@@ -186,7 +186,7 @@
               [else
                (send ivy-frame resize
                      (inexact->exact (floor pct-width))
-                     (inexact->exact (floor y)))])]
+                     (+ (inexact->exact (floor y)) canvas-offset))])]
        ; image is the same size as the monitor
        [(and (= pct-width max-width)
              (= pct-height max-height))
