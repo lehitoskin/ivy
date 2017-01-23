@@ -20,7 +20,6 @@
                   string-null?)
          "db.rkt"
          "embed.rkt"
-         "error-log.rkt"
          "files.rkt")
 (provide (all-defined-out)
          string-null?

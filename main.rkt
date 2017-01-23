@@ -170,23 +170,9 @@
        ; all good, let's resize the frame
        [(and (< pct-width max-width)
              (< pct-height max-height))
-        (define y
-          (if (> pct-width pct-height)
-              (if (> pct-height (- max-height canvas-offset))
-                  (- max-height canvas-offset)
-                  (+ pct-height canvas-offset))
-              pct-height))
-        (cond [(> pct-height (- max-height canvas-offset))
-               (define resized (scale-to-fit pct
-                                             pct-width
-                                             y))
-               (send ivy-frame resize
-                     (- (inexact->exact (floor (pict-width resized))) canvas-offset)
-                     (inexact->exact (floor pct-height)))]
-              [else
-               (send ivy-frame resize
-                     (inexact->exact (floor pct-width))
-                     (+ (inexact->exact (floor y)) canvas-offset))])]
+        (send ivy-frame resize
+              (inexact->exact (floor pct-width))
+              (+ (inexact->exact (floor pct-height)) canvas-offset))]
        ; image is the same size as the monitor
        [(and (= pct-width max-width)
              (= pct-height max-height))
