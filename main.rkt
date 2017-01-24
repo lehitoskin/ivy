@@ -16,6 +16,7 @@
          "embed.rkt"
          "error-log.rkt"
          "frame.rkt"
+         "meta-editor.rkt"
          (only-in "files.rkt" ivy-version))
 
 (define show-frame? (make-parameter #t))
@@ -32,6 +33,8 @@
 (define purging? (make-parameter #f))
 (define show-xmp? (make-parameter #f))
 (define set-xmp? (make-parameter #f))
+(define show-rating? (make-parameter #f))
+(define set-rating? (make-parameter #f))
 
 ; make sure the path provided is a proper absolute path
 (define relative->absolute (compose1 simple-form-path expand-user-path))
@@ -99,6 +102,22 @@
   "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
   (moving? #t)]
+ [("--show-xmp")
+  "Extract the embedded XMP in supported images."
+  (show-frame? #f)
+  (show-xmp? #t)]
+ [("--set-xmp")
+  "Set the embedded XMP in supported images."
+  (show-frame? #f)
+  (set-xmp? #t)]
+ [("--show-rating")
+  "Show the stored rating from the database."
+  (show-frame? #f)
+  (show-rating? #t)]
+ [("--set-rating")
+  "Set the xmp:Rating for the image."
+  (show-frame? #f)
+  (set-rating? #t)]
  #:once-each
  [("-e" "--exact-search")
   "Search the tags database for exact matches."
@@ -120,14 +139,6 @@
   "Search result items are terminated by a null character instead of by whitespace."
   (show-frame? #f)
   (null-flag #t)]
- [("--show-xmp")
-  "Extract the embedded XMP in supported images."
-  (show-frame? #f)
-  (show-xmp? #t)]
- [("--set-xmp")
-  "Set the embedded XMP in supported images."
-  (show-frame? #f)
-  (set-xmp? #t)]
  [("-v" "--verbose")
   "Display verbose information for certain operations."
   (show-frame? #f)
@@ -299,6 +310,16 @@
           (if (null-flag)
               (printf "~a" (bytes-append (string->bytes/utf-8 str) #"\0"))
               (printf "~a~n" str)))))]
+   ; default to 0 if there is no recorded xmp:Rating
+   [(show-rating?)
+    (for ([img (in-list args)])
+      (define absolute-path (path->string (relative->absolute img)))
+      (when (embed-support? absolute-path)
+        (when (verbose?)
+          (printf "~a: " absolute-path))
+        (cond [(db-has-key? 'ratings absolute-path)
+               (displayln (image-rating absolute-path))]
+              [else (displayln 0)])))]
    [(add-tags?)
     (cond
       [(< (length args) 2)
@@ -401,9 +422,9 @@
        (exit)]
       [else
        ; make sure the paths are absolute
-       (define absolute (map (λ (ri) (relative->absolute ri)) (rest args)))
+       (define absolutes (map relative->absolute (rest args)))
        (define xmp-str (first args))
-       (for ([path (in-list absolute)])
+       (for ([path (in-list absolutes)])
          (when (embed-support? path)
            ; set the XMP data
            (set-embed-xmp! path xmp-str)
@@ -417,8 +438,38 @@
                  (flatten (map dc:subject->list dc:sub-lst))
                  empty))
            (when (verbose?)
-             (printf "Setting the XMP of ~a...~n"))
+             (printf "Setting the XMP of ~a...~n" path))
            (reconcile-tags! (path->string path) (sort tags string<?))))])]
+   ; set the xmp:Rating in both the database and the XMP
+   [(set-rating?)
+    (cond
+      [(< (length args) 2)
+       (raise-argument-error 'add-tags "2 or more arguments" (length args))
+       (disconnect sqlc)
+       (exit)]
+      [else
+       (define rating (first args))
+       (define imagelist (rest args))
+       (for ([img (in-list imagelist)])
+         (define absolute-path (path->string (relative->absolute img)))
+         (when (verbose?)
+           (printf "Setting the rating for ~a...~n" absolute-path))
+         (set-image-rating! absolute-path (string->number rating))
+         ; the the rating in the embedded XMP
+         (when (embed-support? absolute-path)
+           (define xmp (get-embed-xmp absolute-path))
+           (define xexpr (if (empty? xmp)
+                             (make-xmp-xexpr empty)
+                             (string->xexpr (first xmp))))
+           (define tag (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
+           (define setted
+             ((set-xmp-tag (if tag 'xmp:Rating 'rdf:Description))
+              xexpr
+              (create-dc-meta "xmp:Rating"
+                              (list rating)
+                              ""
+                              (box (list (xexpr->string xexpr))))))
+           (set-embed-xmp! absolute-path (xexpr->string setted))))])]
    ; moving an image in the database to another location
    [(moving?)
     (define len (length args))

@@ -108,16 +108,16 @@ Search the tags database exclusively with a comma-separated string.
 ### -L, --list-tags *[imagelist]*
 Lists the tags for the image(s).
 
-### -A, --add-tags *[taglist]*
+### -A, --add-tags *[taglist]* *[imagelist]*
 Add tags to an image. ex: ivy -A "tag0, tag1, ..." /path/to/image ...
 
-### -D, --delete-tags *[taglist]*
+### -D, --delete-tags *[taglist]* *[imagelist]*
 Delete tags from image. ex: ivy -D "tag0, tag1, ..." /path/to/image ...
 
-### -P, --purge *[imglist]*
+### -P, --purge *[imagelist]*
 Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ...
 
-### -T, --set-tags *[taglist]*
+### -T, --set-tags *[taglist]* *[imagelist]*
 Sets the taglist of the image. ex: ivy -T "tag0, tag1, ..." /path/to/image ...
 
 ### -M, --move-image *[image(s) ... destination]*
@@ -128,6 +128,12 @@ Shows the XMP metadata for supported files.
 
 ### ---set-xmp *[xmp string]* *[imagelist]*
 Sets the XMP metadata for supported files in imagelist.
+
+### --show-rating *[imagelist]*
+Show the xmp:Rating of the images as recorded in the database.
+
+### --set-rating *[rating]* *[imagelist]*
+Set the xmp:Rating for the images in both the database and the XMP.
 
 ## May be specified once each
 

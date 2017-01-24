@@ -75,7 +75,7 @@
 
 (define attrs '("" "xml:lang"))
 
-(define (create-dc-meta type elems [attrs ""])
+(define (create-dc-meta type elems [attrs ""] [img-xmp image-xmp])
   (define attr-sel (send attr-choice get-string-selection))
   (define attr-lst `(,(list (string->symbol attr-sel) attrs)))
   (case type
@@ -108,9 +108,9 @@
      (txexpr (string->symbol type) '() (list elems))]
     ; tags as attrs - may also be represented as elements
     [("xmp:BaseURL" "xmp:Label" "xmp:Rating")
-     (define xexpr (if (empty? (unbox image-xmp))
+     (define xexpr (if (empty? (unbox img-xmp))
                        (make-xmp-xexpr empty)
-                       (string->xexpr (first (unbox image-xmp)))))
+                       (string->xexpr (first (unbox img-xmp)))))
      (define type-sym (string->symbol type))
      ; if the tag exists as an element, replace it
      (define xmp (findf-txexpr xexpr (is-tag? type-sym)))
@@ -229,7 +229,8 @@
        [choices (append dublin-core xmp-base)]
        [selection 11]
        [callback (λ (lbox evt)
-                   (unless (equal? (image-path) root-path)
+                   (unless (or (equal? (image-path) root-path)
+                               (not (embed-support? (image-path))))
                      (define str (send lbox get-string-selection))
                      ; just in case get-string-selection returns #f
                      (define sel (string->symbol (if str str "")))
@@ -284,6 +285,7 @@
                           (send dc-tfield set-value (string-join lst ", ")))]
                        ; grab the attrs from rdf:Description
                        [(xmp:BaseURL xmp:Label xmp:Rating)
+                        ; check if it's an attr first
                         (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
                         (when rdf-desc
                           ; attr may be a number via xmp:Rating
@@ -294,7 +296,7 @@
                                 attr))
                           ; if it doesn't exist as an attr, check if it's an element
                           (if (and found (string-null? attr-str))
-                              (send dc-tfield set-value (get-elements found))
+                              (send dc-tfield set-value (first (get-elements (first found))))
                               (send dc-tfield set-value attr-str)))]
                        ; everything else is just a single value
                        [else
