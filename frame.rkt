@@ -229,14 +229,7 @@
              (image-dir)))
           ; make sure dir is not false
           (when dir
-            (define paths
-              (for/fold ([lst empty])
-                        ([file (in-directory dir)])
-                (define ext (path-get-extension file))
-                (if (and ext
-                         (member (bytes->string/utf-8 ext) supported-extensions))
-                    (append lst (list file))
-                    lst)))
+            (define paths (dir-files dir))
             ; do nothing if dir doesn't contain any supported images
             (unless (empty? paths)
               (define img-path (first paths))
@@ -264,14 +257,7 @@
              (image-dir)))
           ; make sure dir is not false
           (when dir
-            (define paths
-              (for/fold ([lst empty])
-                        ([file (in-directory dir)])
-                (define ext (path-get-extension file))
-                (if (and ext
-                         (member (bytes->string/utf-8 ext) supported-extensions))
-                    (append lst (list file))
-                    lst)))
+            (define paths (dir-files dir))
             ; do nothing if dir doesn't contain any supported images
             (unless (empty? paths)
               (cond

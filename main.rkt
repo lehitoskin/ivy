@@ -149,12 +149,13 @@
              (empty? args))
    ; if there are directories as paths, scan them
    (define absolute-paths
-     (for/fold ([imgs empty])
-               ([ap (map relative->absolute args)])
-       ; directory?
-       (if (directory-exists? ap)
-           (append imgs (for/list ([file (in-directory ap)]) file))
-           (append imgs (list ap)))))
+     (remove-duplicates
+      (for/fold ([imgs empty])
+                ([ap (map relative->absolute args)])
+        ; directory?
+        (if (directory-exists? ap)
+            (append imgs (dir-files ap))
+            (append imgs (list ap))))))
    (cond [(> (length absolute-paths) 1)
           ; we want to load a collection
           (pfs absolute-paths)]
@@ -162,11 +163,11 @@
           ; we want to load the image from the directory
           (define-values (base name dir?) (split-path (first absolute-paths)))
           (image-dir base)
+          ; (path-files) filters only supported images
           (pfs (path-files))])
    (image-path (first absolute-paths))
    ; resize ivy-frame so that the image isn't horribly squished if it's large
-   (define ext (path-get-extension (image-path)))
-   (when (and ext (member (bytes->string/utf-8 ext) supported-extensions))
+   (when (supported-file? (image-path))
      ; determine the monitor dimensions
      (define-values (monitor-width monitor-height) (get-display-size))
      ; approximate canvas offset

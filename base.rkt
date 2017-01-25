@@ -8,6 +8,7 @@
          racket/bool
          racket/class
          racket/contract
+         racket/file
          racket/format
          racket/function
          racket/gui/base
@@ -91,17 +92,24 @@
         90
         100))
 
-; all image files contained within image-dir
+(define/contract (supported-file? img)
+  (-> path-string? boolean?)
+  (define ext (path-get-extension img))
+  (and ext
+       (member (string-downcase (bytes->string/utf-8 ext)) supported-extensions)
+       #t))
+
+; find all supported images in dir,
+; searched recursively
+(define (dir-files [dir (image-dir)])
+  (find-files supported-file? dir))
+
+; all image files contained within image-dir,
+; but not recursively searched
 (define (path-files)
   (define dir-lst (directory-list (image-dir) #:build? #t))
-  (define file-lst
-    (for/list ([file dir-lst])
-      (define ext (path-get-extension file))
-      (cond [(false? ext) #f]
-            [else
-             (define ext-str (string-downcase (bytes->string/utf-8 ext)))
-             (if (false? (member ext-str supported-extensions)) #f file)])))
-  (filter path? file-lst))
+  (filter supported-file? dir-lst))
+
 ; parameter listof path
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
