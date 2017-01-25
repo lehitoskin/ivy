@@ -1,5 +1,5 @@
 DESTDIR = /usr/local
-DOCDIR = $(DESTDIR)/share/doc/ivy-2.1.1
+DOCDIR = $(DESTDIR)/share/doc/ivy-2.1.2
 MANDIR = $(DESTDIR)/share/man/man1
 
 RACO = raco
