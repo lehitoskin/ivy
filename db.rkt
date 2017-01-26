@@ -323,7 +323,7 @@
 ; if differences and similarities, return in form '(diff-a diff-b)
 (define (lst-diff a b [cmp string<?])
   (define both (sort (append a b) cmp))
-  (define same (sort (keep-duplicates both) cmp))
+  (define same (reverse (keep-duplicates both empty cmp)))
   (cond
     ; everything is different
     [(empty? same) (list empty b)]
@@ -336,14 +336,14 @@
 ; if there are more than two identical entries, they are
 ; counted more than once, so a final sort and remove-duplicates
 ; (how ironic) is possibly necessary.
-(define (keep-duplicates lst [dups empty])
+(define (keep-duplicates lst [dups empty] [cmp string<?])
   (define len (length lst))
   (cond [(< len 2) (remove-duplicates dups)]
         [(>= len 2)
-         (define sorted (sort lst (if (string? (first lst)) string<? path<?)))
+         (define sorted (sort lst cmp))
          (if (equal? (first sorted) (second sorted))
-             (keep-duplicates (rest sorted) (cons (first sorted) dups))
-             (keep-duplicates (rest sorted) dups))]))
+             (keep-duplicates (rest sorted) (cons (first sorted) dups) cmp)
+             (keep-duplicates (rest sorted) dups cmp))]))
 
 ; list the tags associated with the image
 (define/contract (image-taglist #:db-conn [db-conn sqlc] img)
@@ -377,7 +377,7 @@
         [listof string?])
        (#:db-conn connection?)
        (or/c (listof path?) empty?))
-  (cond [(zero? (length tag-lst)) empty]
+  (cond [(empty? tag-lst) empty]
         [else
          ; sql queries will complain for several reasons:
          ; - if a tag has spaces, but no quotes around it
@@ -404,7 +404,21 @@
                    (define sorted (sort results string<?))
                    (map string->path (remove-duplicates sorted))]
                   [else
-                   (map string->path (keep-duplicates results))])])]))
+                   (define duplicates
+                     (remove-duplicates
+                      (for/fold ([dups empty])
+                                ([img (in-list results)])
+                        ; ensure each image contains each tag
+                        (define img-obj (make-data-object sqlc image% img))
+                        (define db-tags (send img-obj get-tags))
+                        (define has-tags?
+                          (flatten
+                           (for/list ([tag (in-list tag-lst)])
+                             (member tag db-tags))))
+                        (if (empty? (filter false? has-tags?))
+                           (append dups (list img))
+                           dups))))
+                   (map string->path duplicates)])])]))
 
 ; return a list of paths or empty
 (define/contract (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
@@ -412,9 +426,9 @@
         [listof string?])
        (#:db-conn connection?)
        (or/c (listof path?) empty?))
-  (cond [(= (length tag-lst) 0) empty]
+  (cond [(empty? tag-lst) empty]
         [else
-         ; search the database
+         ; search the database and return a list of paths
          (define results
            ; iterate over the tags and see if any of them
            ; match our tag-lst
@@ -431,7 +445,19 @@
                  (append db-accum search))))
          (if (or (= (length tag-lst) 1) (eq? type 'or))
              (remove-duplicates results)
-             (keep-duplicates results))]))
+             (remove-duplicates
+              (for/fold ([dups empty])
+                        ([img (in-list results)])
+                ; ensure each image contains each tag
+                (define img-obj (make-data-object sqlc image% (path->string img)))
+                (define db-tags (send img-obj get-tags))
+                (define has-tags?
+                  (flatten
+                   (for/list ([tag (in-list tag-lst)])
+                     (member tag db-tags))))
+                (if (empty? (filter false? has-tags?))
+                    (append dups (list img))
+                    dups))))]))
 
 ; returns a list of paths or empty
 (define/contract (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
