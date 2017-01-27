@@ -388,36 +388,31 @@
                   (format "'~a'"
                           (string-replace str "'" "''"))) tag-lst))
          (define results
-           ; loop over the tags we're searching through
-           (flatten
-            (map (λ (tag-obj)
-                   (send tag-obj get-images))
-                 (select-data-objects db-conn tag% (where (in label lst-quotes))))))
+           ; select the tags we're searching for
+           (map (λ (tag-obj)
+                  (send tag-obj get-images))
+                (select-data-objects db-conn tag% (where (in label lst-quotes)))))
          (case type
            ; turn all the strings into paths, remove duplicate items
            [(or)
-            (define sorted (sort results string<?))
+            (define sorted (sort (flatten results) string<?))
             (map string->path (remove-duplicates sorted))]
            ; turn all the strings in paths, keep only duplicate items
            [(and)
             (cond [(= (length lst-quotes) 1)
-                   (define sorted (sort results string<?))
+                   (define sorted (sort (flatten results) string<?))
                    (map string->path (remove-duplicates sorted))]
                   [else
                    (define duplicates
                      (remove-duplicates
                       (for/fold ([dups empty])
-                                ([img (in-list results)])
+                                ([tags (in-list results)]
+                                 [i (in-naturals)])
                         ; ensure each image contains each tag
-                        (define img-obj (make-data-object sqlc image% img))
-                        (define db-tags (send img-obj get-tags))
-                        (define has-tags?
-                          (flatten
-                           (for/list ([tag (in-list tag-lst)])
-                             (member tag db-tags))))
-                        (if (empty? (filter false? has-tags?))
-                           (append dups (list img))
-                           dups))))
+                        (cond [(= i 0)
+                               (append dups tags)]
+                              [else
+                               (keep-duplicates (append dups tags))]))))
                    (map string->path duplicates)])])]))
 
 ; return a list of paths or empty
@@ -429,35 +424,33 @@
   (cond [(empty? tag-lst) empty]
         [else
          ; search the database and return a list of paths
+         ; iterate over the tags and see if any of them match our tag-lst
          (define results
-           ; iterate over the tags and see if any of them
-           ; match our tag-lst
-           (for/fold ([db-accum empty])
-                     ([db-pair (in-table-pairs #:db-conn db-conn 'tags)])
-             (define search
-               (for/fold ([tag-accum empty])
-                         ([tag (in-list tag-lst)])
-                 (if (string-contains-ci (first db-pair) tag)
-                     (append tag-accum (second db-pair))
-                     tag-accum)))
-             (if (empty? search)
-                 db-accum
-                 (append db-accum search))))
+           ; only query the database once
+           (let ([itp-sequence (in-table-pairs #:db-conn db-conn 'tags)])
+             (for/fold ([tag-accum empty])
+                       ([tag (in-list tag-lst)])
+               (define search
+                 (for/fold ([db-accum empty])
+                           ([db-pair itp-sequence])
+                   (if (string-contains-ci (first db-pair) tag)
+                       (append db-accum (second db-pair))
+                       db-accum)))
+               (if (empty? search)
+                   tag-accum
+                   (append tag-accum (list search))))))
          (if (or (= (length tag-lst) 1) (eq? type 'or))
-             (remove-duplicates results)
+             (remove-duplicates (flatten results))
              (remove-duplicates
               (for/fold ([dups empty])
-                        ([img (in-list results)])
+                        ; sublists may have duplicates, remove them
+                        ([tags (in-list (map remove-duplicates results))]
+                         [i (in-naturals)])
                 ; ensure each image contains each tag
-                (define img-obj (make-data-object sqlc image% (path->string img)))
-                (define db-tags (send img-obj get-tags))
-                (define has-tags?
-                  (flatten
-                   (for/list ([tag (in-list tag-lst)])
-                     (member tag db-tags))))
-                (if (empty? (filter false? has-tags?))
-                    (append dups (list img))
-                    dups))))]))
+                (cond [(= i 0)
+                       (append dups tags)]
+                      [else
+                       (keep-duplicates (append dups tags) empty path<?)]))))]))
 
 ; returns a list of paths or empty
 (define/contract (exclude-search-exact #:db-conn [db-conn sqlc] searched-imgs exclusion-tags)
