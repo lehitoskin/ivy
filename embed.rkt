@@ -11,6 +11,7 @@
          racket/file
          racket/format
          racket/list
+         racket/port
          txexpr
          xml
          (only-in "files.rkt" ivy-version))
@@ -53,15 +54,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define gif-XMP-auth #"XMP")
 (define gif-XMP-header (bytes-append gif-XMP-id gif-XMP-auth))
 
-; takes a byte string and turns it into a decimal number
-(define (bytes->number bstr)
-  (string->number (bytes->hex-string bstr) 16))
-
-; takes a decimal number and turns it into a byte string
-(define (number->bytes num)
-  (define str (~r num #:base 16 #:min-width 4 #:pad-string "0"))
-  (hex-string->bytes str))
-
 (define (jpeg-xmp? bstr)
   (and (>= (bytes-length bstr) (+ (bytes-length jpeg-XMP-id) 4))
        (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id)))
@@ -72,11 +64,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 #|     JPEG stuff     |#
 
-; returns a list of position pairs via regexp-match-positions*
-(define/contract (jpeg-goto-marker in marker-byte)
-  (bytes? byte? . -> . (or/c (listof pair?) empty?))
-  (regexp-match-positions* (byte-regexp (bytes #xff marker-byte)) in))
-
+; path-string, bytes, or input port
 (define/contract (jpeg? img)
   (any/c . -> . boolean?)
   (cond [(path-string? img)
@@ -87,19 +75,32 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(bytes? img)
          (define byts (subbytes img 0 2))
          (bytes=? byts (bytes #xff SOI))]
+        [(input-port? img)
+         (bytes=? (peek-bytes 2 0 img) (bytes #xff SOI))]
         [else #f]))
+
+; returns a list of position pairs
+(define/contract (jpeg-goto-marker in marker-byte)
+  (jpeg? byte? . -> . (or/c (listof pair?) empty?))
+  (regexp-match-peek-positions* (byte-regexp (bytes #xff marker-byte)) in))
 
 ; returns a list of APP1 bytes
 (define/contract (jpeg-get-app1 img)
   (jpeg? . -> . (listof bytes?))
-  (define img-bytes (if (bytes? img)
-                        img
-                        (file->bytes img)))
-  (define positions (jpeg-goto-marker img-bytes APP1))
-  (for/list ([pair (in-list positions)])
-    (define bstr (subbytes img-bytes (cdr pair) (+ (cdr pair) 2)))
-    (define len (bytes->number bstr))
-    (subbytes img-bytes (car pair) (+ (car pair) len 2))))
+  (define img-in
+    (cond [(bytes? img) (open-input-bytes img)]
+          [(path-string? img) (open-input-file img)]
+          [else img]))
+  (define positions (jpeg-goto-marker img-in APP1))
+  (define app1
+    (for/list ([pair (in-list positions)])
+      (define bstr (peek-bytes 2 (cdr pair) img-in))
+      (define len (+ (integer-bytes->integer bstr #f #t) 2))
+      (peek-bytes len (car pair) img-in)))
+  ; only close the port if we made it inside this procedure
+  (unless (input-port? img)
+    (close-input-port img-in))
+  app1)
 
 #|     GIF stuff     |#
 
@@ -151,10 +152,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
    (bytes (bytes-length gif-XMP-header))
    gif-XMP-header
    bstr
-   #"\1"
+   (bytes 1)
    (apply bytes
           (for/list ([magic (in-range #xff #x00 -1)]) magic))
-   #"\0\0"))
+   (bytes 0 0)))
 
 #|     SVG stuff     |#
 
@@ -266,7 +267,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 ; mess upon mess!
 (define (set-xmp-jpeg! jpeg xmp-str)
   (define jpeg-bytes (file->bytes jpeg))
-  (define positions (jpeg-goto-marker jpeg-bytes APP1))
+  (define positions
+    (call-with-input-bytes
+     jpeg-bytes
+     (λ (in) (jpeg-goto-marker in APP1))))
   (define app1-lst (jpeg-get-app1 jpeg-bytes))
   (define filtered
     (filter pair?
@@ -279,9 +283,9 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   empty
                   (car filtered)))
   (define len-bstr (if (empty? filtered)
-                       #"\0"
+                       (bytes 0 0)
                        (subbytes jpeg-bytes (cdr pos) (+ (cdr pos) 2))))
-  (define len (bytes->number len-bstr))
+  (define len (integer-bytes->integer len-bstr #f #t))
   (define bstr-before (if (empty? filtered)
                           (bytes #xff SOI)
                           (subbytes jpeg-bytes 0 (car pos))))
@@ -291,9 +295,9 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   ; create the APP1 byte string
   (define app1-bstr
     (let ([xmp-bstr (string->bytes/utf-8 xmp-str)])
+      (define len (+ 2 (bytes-length xmp-bstr) (bytes-length jpeg-XMP-id)))
       (bytes-append (bytes #xff APP1)
-                    (number->bytes
-                     (+ 2 (bytes-length xmp-bstr) (bytes-length jpeg-XMP-id)))
+                    (integer->integer-bytes len 2 #f #t)
                     jpeg-XMP-id
                     xmp-bstr)))
   (with-output-to-file jpeg
@@ -309,7 +313,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 ; what a giant mess this is
 (define (set-embed-jpeg! jpeg taglist)
   (define jpeg-bytes (file->bytes jpeg))
-  (define positions (jpeg-goto-marker jpeg-bytes APP1))
+  (define positions
+    (call-with-input-bytes
+     jpeg-bytes
+     (λ (in) (jpeg-goto-marker in APP1))))
   (define app1-lst (jpeg-get-app1 jpeg-bytes))
   (define app1-xmp (filter bytes?
                            (map (λ (bstr) (if (jpeg-xmp? bstr) bstr empty)) app1-lst)))
