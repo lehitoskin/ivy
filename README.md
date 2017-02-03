@@ -12,6 +12,7 @@ tracked solely by the application.
 - [gif-image](https://github.com/lehitoskin/gif-image)
 - [png-image](https://github.com/lehitoskin/png-image)
 - [racquel](https://github.com/brown131/racquel)
+- [riff](https://github.com/lehitoskin/riff) (which uses FLIF)
 - [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
 - [sugar](https://github.com/mbutterick/sugar)
 - [txexpr](https://github.com/mbutterick/txexpr)
@@ -120,6 +121,13 @@ an image path and selecting "Edit Tags" from the menu.
 Animated GIF support is currently marked as experimental. To animate a GIF,
 select View -> GIF Animation. Due to the unstable nature of the related code,
 know that some GIF's may not load properly or at all.
+
+### FLIF Support
+
+[FLIF](https://github.com/FLIF-hub/FLIF) support is marked as experimental! To
+load a FLIF file in Ivy, simply open like any other image. Ivy will load the
+image progressively and a little percentage meter will appear prepended to
+the image's filename in the title of the frame.
 
 ### Embedding Tags as XMP metadata
 

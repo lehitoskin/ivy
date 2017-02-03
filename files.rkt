@@ -48,3 +48,6 @@
 
 (unless (directory-exists? thumbnails-path)
   (make-directory thumbnails-path))
+
+; flif decoder parameter
+(define decoder (make-parameter #f))

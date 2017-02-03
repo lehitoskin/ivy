@@ -9,6 +9,7 @@
          racket/list
          racket/path
          racket/string
+         riff
          txexpr
          xml
          "base.rkt"
@@ -175,7 +176,10 @@
      (define max-width (- monitor-width canvas-offset 100))
      (define max-height (- monitor-height 100))
      (load-image (image-path))
-     (define pct (bitmap image-bmp-master))
+     (define pct (if (flif? (image-path))
+                     (let ([dimensions (flif-dimensions (image-path))])
+                       (rectangle (first dimensions) (second dimensions)))
+                     (bitmap image-bmp-master)))
      (define pct-width (pict-width pct))
      (define pct-height (pict-height pct))
      (cond

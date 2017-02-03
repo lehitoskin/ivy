@@ -84,6 +84,13 @@ Animated GIF support is currently marked as experimental. To animate a GIF,
 select View -> GIF Animation. Due to the unstable nature of the related code,
 know that some GIF's may not load properly or at all.
 
+## FLIF Support
+
+FLIF support is marked as experimental! To load a FLIF file in Ivy, simply open
+like any other image. Ivy will load the image progressively and a little
+percentage meter will appear prepended to the image's filename in the title of
+the frame.
+
 ## Embedding Tags as XMP metadata
 
 Ivy embeds the taglist as XMP metadata in the file itself (if that file supports
