@@ -55,6 +55,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define gif-XMP-auth #"XMP")
 (define gif-XMP-header (bytes-append gif-XMP-id gif-XMP-auth))
 
+#|     JPEG stuff     |#
+
 (define (jpeg-xmp? bstr)
   (and (>= (bytes-length bstr) (+ (bytes-length jpeg-XMP-id) 4))
        (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id)))
@@ -62,8 +64,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define (jpeg-has-marker? in marker-byte)
   (and (regexp-try-match (byte-regexp (bytes #xff marker-byte)) in)
        #t))
-
-#|     JPEG stuff     |#
 
 ; path-string, bytes, or input port
 (define/contract (jpeg? img)
@@ -171,7 +171,11 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 #|     FLIF stuff     |#
 
+(define (flif-has-marker? in marker-bytes)
+  (and (regexp-try-match (byte-regexp marker-bytes) in) #t))
 
+(define (flif-goto-marker in marker-bytes)
+  (regexp-match-peek-positions (byte-regexp marker-bytes) in))
 
 #|     Embedding stuff     |#
 
@@ -190,7 +194,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 ; adds the taglist to the existing tags
 ; if there are no existing tags, set them
 (define (add-embed-flif! flif taglist)
-  (eprintf "add-embed-flif! flif: ~v, taglist: ~v\n")
   ; get the image pointer
   (define image (flif-decoder-get-image (decoder) 0))
   (define old-xmp (flif-image-get-metadata image "eXmp"))
@@ -204,21 +207,17 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   ; set the xmp inside the image pointer
   (flif-image-set-metadata! image "eXmp" bstr)
   ; re-encode and save the new flif
-  (eprintf "Encoding memory...")
   (define encoder (flif-create-encoder))
   (define encoded
     (cond [(= (flif-decoder-num-images (decoder)) 1)
-           (eprintf "Only adding one image\n")
            (flif-encoder-add-image! encoder image)
            (flif-encoder-encode-memory encoder)]
           [else
-           (eprintf "Adding multiple images\n")
            (for ([i (in-range (flif-decoder-num-images (decoder)))])
              (define img (flif-decoder-get-image (decoder i)))
              (flif-encoder-add-image! encoder img))
            (flif-encoder-encode-memory encoder)]))
   (flif-destroy-encoder! encoder)
-  (eprintf "Done\nSaving file.\n")
   (with-output-to-file flif
     (λ () (display encoded))
     #:mode 'binary
@@ -282,40 +281,63 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (set-xmp-png! img xmp-str)]
         [(svg? img) (set-xmp-svg! img xmp-str)]))
 
+;
+; TODO:
+; If we're encoding, make sure to grab every option possible
+; and set that in the encoder we've created. Alternatively,
+; do like the other formats and forego the built-in metadata
+; function so I don't have to painstakingly re-encode the
+; image data every time I set the XMP.
+;
 (define (set-xmp-flif! flif xmp-str)
-  (eprintf "set-xmp-flif! flif: ~v, xmp-str: ~v\n" flif xmp-str)
   (define bstr (string->bytes/utf-8 xmp-str))
-  (define image (flif-decoder-get-image (decoder) 0))
-  (flif-image-set-metadata! image "eXmp" bstr)
-  ; re-encode and save the new flif
-  (eprintf "Encoding data...\n")
-  (define encoder (flif-create-encoder))
-  (define encoded
-    (cond [(= (flif-decoder-num-images (decoder)) 1)
-           (eprintf "Adding only one image\n")
-           (flif-encoder-add-image! encoder image)
-           (flif-encoder-encode-memory encoder)]
-          [else
-           (eprintf "Adding multiple images\n")
-           (for ([i (in-range (flif-decoder-num-images (decoder)))])
-             (define img (flif-decoder-get-image (decoder i)))
-             (flif-encoder-add-image! encoder img))
-           (flif-encoder-encode-memory encoder)]))
-  (eprintf "Done\nSaving new data to file\n")
-  (with-output-to-file flif
-    (λ () (display encoded))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  ; in case we're running from the command-line
+  (cond
+    [(decoder)
+     (define image (flif-decoder-get-image (decoder) 0))
+     (flif-image-set-metadata! image "eXmp" bstr)
+     ; re-encode and save the new flif
+     (define encoder (flif-create-encoder))
+     (define encoded
+       (cond [(= (flif-decoder-num-images (decoder)) 1)
+              (flif-encoder-add-image! encoder image)
+              (flif-encoder-encode-memory encoder)]
+             [else
+              (for ([i (in-range (flif-decoder-num-images (decoder)))])
+                (define img (flif-decoder-get-image (decoder) i))
+                (flif-encoder-add-image! encoder img))
+              (flif-encoder-encode-memory encoder)]))
+     (flif-destroy-encoder! encoder)
+     (with-output-to-file flif
+       (λ () (display encoded))
+       #:mode 'binary
+       #:exists 'truncate/replace)]
+    [else
+     (define decoder (flif-create-decoder))
+     (flif-decoder-decode-file! decoder flif)
+     (define image (flif-decoder-get-image decoder 0))
+     ; re-encode and save the new flif
+     (define encoder (flif-create-encoder))
+     (define encoded
+       (cond [(= (flif-decoder-num-images (decoder)) 1)
+              (flif-encoder-add-image! encoder image)
+              (flif-encoder-encode-memory encoder)]
+             [else
+              (for ([i (in-range (flif-decoder-num-images decoder))])
+                (define img (flif-decoder-get-image (decoder i)))
+                (flif-encoder-add-image! encoder img))
+              (flif-encoder-encode-memory encoder)]))
+     (flif-destroy-decoder! decoder)
+     (flif-destroy-encoder! encoder)
+     (with-output-to-file flif
+       (λ () (display encoded))
+       #:mode 'binary
+       #:exists 'truncate/replace)]))
 
 (define (set-embed-flif! flif taglist)
   ; get the image pointer
-  (eprintf "set-embed-flif! flif: ~v, taglist: ~v\n" flif taglist)
-  (eprintf "Getting image from decoder... ")
   (define image (flif-decoder-get-image (decoder) 0))
-  (eprintf "Done!\n")
-  (eprintf "Getting old metadata... ")
   (define old-xmp (flif-image-get-metadata image "eXmp"))
-  (eprintf "Done!\n")
   (define xexpr (if (bytes=? old-xmp #"")
                     ; if the image has no xmp data, generate some
                     (make-xmp-xexpr taglist)
@@ -535,11 +557,24 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(svg? img) (get-embed-svg img)]))
 
 (define (get-embed-flif flif)
-  (define image (flif-decoder-get-image (decoder) 0))
-  (define xmp (flif-image-get-metadata image "eXmp"))
-  (if (bytes=? xmp #"")
-      empty
-      (list xmp)))
+  ; if we're calling from the command-line, we won't have
+  ; a proper decoder in place, so create a new one
+  (cond
+    [(decoder)
+     (define image (flif-decoder-get-image (decoder) 0))
+     (define xmp (flif-image-get-metadata image "eXmp"))
+     (if (bytes=? xmp #"")
+         empty
+         (list (bytes->string/utf-8 xmp)))]
+    [else
+     (define dec (flif-create-decoder))
+     (flif-decoder-decode-file! dec flif)
+     (define image (flif-decoder-get-image (decoder) 0))
+     (define xmp (flif-image-get-metadata image "eXmp"))
+     (flif-destroy-decoder! dec)
+     (if (bytes=? xmp #"")
+         empty
+         (list (bytes->string/utf-8 xmp)))]))
 
 ; retrieve the XMP data located inside the iTXt block(s)
 (define (get-embed-png png)

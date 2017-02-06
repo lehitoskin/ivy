@@ -68,6 +68,8 @@
 (define image-num-loops 0)
 (define animation-thread (make-parameter #f))
 (define decoder-thread (make-parameter #f))
+; number from the decoder thread that shows how much the image is loaded
+(define flif-load-progress (box 0))
 ; GIF cumulative animation
 (define cumulative? (make-parameter #f))
 (define exact-search? (make-parameter #f))
@@ -220,9 +222,7 @@
   (cond [(and (want-animation?) (> (length lst) 1))
          (set! image-lst-timings
                (let ([image (flif-decoder-get-image (decoder) 0)])
-                 (define timing (flif-image-get-frame-delay image))
-                 (flif-destroy-image! image)
-                 (make-list (length lst) timing)))
+                 (make-list (length lst) (flif-image-get-frame-delay image))))
          (load-image (map bitmap lst) 'default)]
         [else (load-image (first lst) 'default)])
   ; set the new frame label
@@ -230,28 +230,8 @@
   (send (send (ivy-canvas) get-parent)
         set-label
         (format "(~a%) ~a" (exact->inexact (/ quality 100)) (path->string name)))
-  ; set the gui information
-  (define size (file-size (image-path)))
-  (send (status-bar-dimensions)
-        set-label
-        (format "~a x ~a pixels  ~a"
-                (send image-bmp-master get-width)
-                (send image-bmp-master get-height)
-                (cond [(>= size (expt 2 20))
-                       (format "~a MiB"
-                               (~r (exact->inexact (/ size (expt 2 20)))
-                                   #:precision 1))]
-                      [(>= size (expt 2 10))
-                       (format "~a KiB"
-                               (~r (exact->inexact (/ size (expt 2 10)))
-                                   #:precision 1))]
-                      [else
-                       (format "~a B" size)])))
-  (send (status-bar-position)
-        set-label
-        (format "~a / ~a"
-                (+ (get-index (image-path) (pfs)) 1)
-                (length (pfs))))
+  ; set the load progress
+  ;(set-box! flif-load-progress quality)
   ; the fewer the calls, the faster the total decoding
   (+ quality 5000))
 
@@ -567,7 +547,10 @@
       ; loop forever
       ; ran through every frame
       [(and (>= i len) (= image-num-loops 0))
-       (loop (first lst) (first image-lst-timings) (first left/top) 0 0)]
+       (loop (first lst) (if (empty? image-lst-timings)
+                             1/20
+                             (first image-lst-timings))
+             (first left/top) 0 0)]
       ; loop forever
       ; still need to display the other frames
       [(and (not (>= i len)) (= image-num-loops 0))
@@ -687,21 +670,28 @@
         (decoder (flif-create-decoder))
         ; progressive decoding
         (flif-decoder-set-callback! (decoder) progressive-callback)
-        (flif-decoder-set-first-callback-quality! (decoder) 1000)
+        (flif-decoder-set-first-callback-quality! (decoder) 100000)
         ; put the actual decoding in its own thread
-        (decoder-thread
+        #;(decoder-thread
          (thread (λ ()
+                   ; set the progress to 0
+                   (set-box! flif-load-progress 0)
+                   ; decode, but do not immediately destroy the decoder
                    (flif-decoder-decode-file! (decoder) img)
                    (define num-frames (flif-decoder-num-images (decoder)))
                    (define image (flif-decoder-get-image (decoder) 0))
                    (set! image-lst-timings
                          (make-list num-frames
                                     (/ (flif-image-get-frame-delay image) 1000)))
-                   (set! image-num-loops (flif-decoder-num-loops (decoder)))
-                   (displayln "decoder-thread; destroying decoder...")
-                   (flif-destroy-decoder! (decoder))
-                   (displayln "Done")
-                   (decoder #f))))
+                   (set! image-num-loops (flif-decoder-num-loops (decoder))))))
+        ; regular decoding
+        (flif-decoder-decode-file! (decoder) img)
+        (let ([image (flif-decoder-get-image (decoder) 0)]
+              [num-frames (flif-decoder-num-images (decoder))])
+          (set! image-lst-timings
+                (make-list num-frames
+                           (/ (flif-image-get-frame-delay image) 1000)))
+          (set! image-num-loops (flif-decoder-num-loops (decoder))))
         ; set the new frame label
         (send (send canvas get-parent) set-label (path->string name))
         ; set the gui information
@@ -724,8 +714,7 @@
         (send sbp set-label
               (format "~a / ~a"
                       (+ (get-index img (pfs)) 1)
-                      (length (pfs))))
-        (collect-garbage)]
+                      (length (pfs))))]
        ; else load the static image
        [else
         ; make sure the bitmap loaded correctly
@@ -735,17 +724,18 @@
                 [(flif? img)
                  (cumulative? #f)
                  (decoder (flif-create-decoder))
+                 ; set the load progress to 0
+                 ;(set-box! flif-load-progress 0)
                  ; progressive decoding
                  (flif-decoder-set-callback! (decoder) progressive-callback)
-                 (flif-decoder-set-first-callback-quality! (decoder) 1000)
+                 (flif-decoder-set-first-callback-quality! (decoder) 100000)
                  ; put the actual decoding in its own thread
-                 (decoder-thread
+                 #;(decoder-thread
                   (thread (λ ()
-                            (flif-decoder-decode-file! (decoder) img)
-                            (flif-destroy-decoder! (decoder))
-                            (decoder #f))))
-                 (collect-garbage)
-                 #t]
+                            ; decode, but do not immediately destroy the decoder
+                            (flif-decoder-decode-file! (decoder) img))))
+                 ; regular decoding
+                 (flif-decoder-decode-file! (decoder) img)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send (send canvas get-parent) set-label (path->string name))
@@ -950,12 +940,16 @@
     ; kill the animation thread, if applicable
     (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
       (kill-thread (animation-thread)))
-    (unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
       (kill-thread (decoder-thread))
       (displayln "load-image-in-collection; aborting decoder...")
       (flif-abort-decoder! (decoder))
       (flif-destroy-decoder! (decoder))
       (displayln "done")
+      (decoder #f))
+    (when (decoder)
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
       (decoder #f))
     (send (ivy-tag-tfield) set-field-background color-white)
     (define prev-index (get-index (image-path) (pfs)))

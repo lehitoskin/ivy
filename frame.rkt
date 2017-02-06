@@ -42,12 +42,16 @@
             (printf "Waiting for thread ~a to finish...\n" (car pair))
             (sleep 1/4)
             (loop)))))
-    (unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
       (kill-thread (decoder-thread))
       (displayln "Quit; aborting decoder...")
       (flif-abort-decoder! (decoder))
       (flif-destroy-decoder! (decoder))
       (displayln "done")
+      (decoder #f))
+    (when (decoder)
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
       (decoder #f))
     (disconnect sqlc))))
 
@@ -300,12 +304,17 @@
         (λ (i e)
           (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
             (kill-thread (animation-thread)))
-          (unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+          #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
             (kill-thread (decoder-thread))
             (displayln "New collection; aborting decoder...")
             (flif-abort-decoder! (decoder))
+            (display "Destroying decoder... ")
             (flif-destroy-decoder! (decoder))
             (displayln "done")
+            (decoder #f))
+          (when (decoder)
+            (flif-abort-decoder! (decoder))
+            (flif-destroy-decoder! (decoder))
             (decoder #f))
           (image-dir (find-system-path 'home-dir))
           (pfs (list root-path))
@@ -441,7 +450,7 @@
 (define ivy-menu-bar-view-gif-animation
   (new checkable-menu-item%
        [parent ivy-menu-bar-view]
-       [label "&GIF Animation"]
+       [label "&Animation"]
        [help-string "Animate GIFs, if possible."]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
