@@ -451,14 +451,14 @@
   (new checkable-menu-item%
        [parent ivy-menu-bar-view]
        [label "&Animation"]
-       [help-string "Animate GIFs, if possible."]
+       [help-string "Animate image, if possible."]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                   (when (and (not (equal? (image-path) root-path))
-                              (gif? (image-path))
-                              (gif-animated? (image-path)))
-                     (collect-garbage 'incremental)
-                     (load-image (image-path))))]))
+                     (when (and (not (equal? (image-path) root-path))
+                                (or (and (gif? (image-path))
+                                         (gif-animated? (image-path)))
+                                    (flif-animated? (image-path))))
+                       (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
   (new menu-item%
