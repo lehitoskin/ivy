@@ -119,15 +119,14 @@ an image path and selecting "Edit Tags" from the menu.
 ### Animated GIF Support
 
 Animated GIF support is currently marked as experimental. To animate a GIF,
-select View -> GIF Animation. Due to the unstable nature of the related code,
-know that some GIF's may not load properly or at all.
+select View -> Animation. Due to the unstable nature of the related code, know
+that some GIF's may not load properly or at all.
 
 ### FLIF Support
 
 [FLIF](https://github.com/FLIF-hub/FLIF) support is marked as experimental! To
-load a FLIF file in Ivy, simply open like any other image. Ivy will load the
-image progressively and a little percentage meter will appear prepended to
-the image's filename in the title of the frame.
+load a FLIF file in Ivy, simply open like any other image. Currently, the FLIF
+decoder is not optimized, so decoding takes much longer than for other formats.
 
 ### Embedding Tags as XMP metadata
 
