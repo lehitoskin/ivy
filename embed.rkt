@@ -178,6 +178,29 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define (flif-goto-marker in marker-bytes)
   (regexp-match-peek-positions (byte-regexp marker-bytes) in))
 
+; seek until just after the header information and
+; take into account the possible nb_frames varint
+(define (flif-skip-header bstr)
+  ; start at 6: FLIF + info + bpc
+  (let loop ([pos 6]
+             [section 0])
+    (cond [(= section 3) pos]
+          [(= section 2)
+           ; does nb_frames exist? (is the image animated?)
+           (define info (flif-read-info-from-memory bstr))
+           (define num (flif-info-num-images info))
+           (flif-destroy-info! info)
+           (if (= num 1)
+               ; still image
+               (loop pos (+ section 1))
+               (loop (+ pos (bytes-length (length->bytes num))) (+ section 1)))]
+          [else
+           ; scan through width+height
+           (define byte (bytes-ref bstr pos))
+           (if (< byte flif-separator)
+               (loop (+ pos 1) (+ section 1))
+               (loop (+ pos 1) section))])))
+
 ; 128
 (define flif-separator #x80)
 
@@ -283,10 +306,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (set-xmp-png! img xmp-str)]
         [(svg? img) (set-xmp-svg! img xmp-str)]))
 
-; TODO: if there is no existing eXmp chunk, seek until
-;   just after FLIF header information, because it's
-;   possible that any existing eXif chunks could have
-;   a #"\0" in the compressed data
 ; do not re-encode the file every time we modify the xmp
 (define (set-xmp-flif! flif xmp)
   (define flif-bstr (file->bytes flif))
@@ -300,11 +319,13 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define deflated-bstr
     (bytes-append (get-output-bytes deflated-out)
                   (integer->integer-bytes (bytes-adler32 xmp-bstr) 4 #f #t)))
+  ; piece everything together
   (define has-exmp? (flif-goto-marker flif-in #"eXmp"))
   (define marker-lst
-    (if has-exmp?
-        has-exmp?
-        (flif-goto-marker flif-in (bytes 0))))
+    (cond [has-exmp? has-exmp?]
+          [else
+           (define header (flif-skip-header flif-bstr))
+           (list (cons header (+ header 1)))]))
   (close-input-port flif-in)
   (define marker (first marker-lst))
   ; just before #"eXmp"
