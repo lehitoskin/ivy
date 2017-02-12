@@ -283,6 +283,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (set-xmp-png! img xmp-str)]
         [(svg? img) (set-xmp-svg! img xmp-str)]))
 
+; TODO: if there is no existing eXmp chunk, seek until
+;   just after FLIF header information, because it's
+;   possible that any existing eXif chunks could have
+;   a #"\0" in the compressed data
 ; do not re-encode the file every time we modify the xmp
 (define (set-xmp-flif! flif xmp)
   (define flif-bstr (file->bytes flif))
@@ -296,25 +300,32 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define deflated-bstr
     (bytes-append (get-output-bytes deflated-out)
                   (integer->integer-bytes (bytes-adler32 xmp-bstr) 4 #f #t)))
+  (define has-exmp? (flif-goto-marker flif-in #"eXmp"))
   (define marker-lst
-    (let ([has-exmp? (flif-goto-marker flif-in #"eXmp")])
-      (if has-exmp?
-          has-exmp?
-          (flif-goto-marker flif-in (bytes 0)))))
+    (if has-exmp?
+        has-exmp?
+        (flif-goto-marker flif-in (bytes 0))))
   (close-input-port flif-in)
   (define marker (first marker-lst))
   ; just before #"eXmp"
   (define before (subbytes flif-bstr 0 (car marker)))
   (define len-bstr
-    (let loop ([bstr #""]
-               [pos (cdr marker)])
-      (define byte (bytes-ref flif-bstr pos))
-      (if (< byte flif-separator)
-          (bytes-append bstr (bytes byte))
-          (loop (bytes-append bstr (bytes byte)) (+ pos 1)))))
+    (if has-exmp?
+        (let loop ([bstr #""]
+                   [pos (cdr marker)])
+          (define byte (bytes-ref flif-bstr pos))
+          (if (< byte flif-separator)
+              (bytes-append bstr (bytes byte))
+              (loop (bytes-append bstr (bytes byte)) (+ pos 1))))
+        #""))
   (define len (bytes->length len-bstr))
-  ; skip up to len for after bytes
-  (define after (subbytes flif-bstr (+ (cdr marker) len 2)))
+  ; skip up to len for after-bytes
+  ; (if there is no existing eXmp chunk, seek until just before the first #"\0")
+  (define after (subbytes flif-bstr (+ (if (zero? len)
+                                           (car marker)
+                                           (cdr marker))
+                                       len
+                                       (bytes-length len-bstr))))
   (with-output-to-file flif
     (λ () (printf "~a~a~a~a~a"
                   before
