@@ -665,7 +665,7 @@
                       (+ (get-index img (pfs)) 1)
                       (length (pfs))))]
        ; load animated flif
-       [(and (want-animation?) (flif? img))
+       [(and (want-animation?) (flif? img) (flif-animated? img))
         (cumulative? #f)
         (decoder (flif-create-decoder))
         ; progressive decoding
