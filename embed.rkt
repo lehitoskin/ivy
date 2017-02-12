@@ -1,7 +1,8 @@
 #lang racket/base
 ; embed.rkt
 ; embed tags into images that support it
-(require file/sha1
+(require file/gunzip
+         file/gzip
          gif-image
          ; identifier conflict with xml
          (prefix-in gif: gif-image/gif-basics)
@@ -177,6 +178,33 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define (flif-goto-marker in marker-bytes)
   (regexp-match-peek-positions (byte-regexp marker-bytes) in))
 
+; 128
+(define flif-separator #x80)
+
+; see https://github.com/FLIF-hub/FLIF/blob/master/src/flif-enc.cpp#L747-L758
+; for implementation details
+(define (length->bytes num)
+  (let loop ([number num]
+             [done? #t])
+    (cond [(< number flif-separator)
+           (if done?
+               (bytes number)
+               (bytes (+ number flif-separator)))]
+          [else
+           (define lsb (bitwise-and number (- flif-separator 1)))
+           (define n (arithmetic-shift number -7))
+           (bytes-append
+            (loop n #f)
+            (loop lsb #t))])))
+
+; modified from riff
+(define (bytes->length bstr)
+  (for/fold ([result 0])
+            ([byte (in-bytes bstr)])
+    (if (< byte flif-separator)
+        (+ result byte)
+        (arithmetic-shift (+ result (- byte flif-separator)) 7))))
+
 #|     Embedding stuff     |#
 
 (define/contract (embed-support? img)
@@ -192,36 +220,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(svg? img) (add-embed-svg! img taglist)]))
 
 ; adds the taglist to the existing tags
-; if there are no existing tags, set them
 (define (add-embed-flif! flif taglist)
-  ; get the image pointer
-  (define image (flif-decoder-get-image (decoder) 0))
-  (define old-xmp (flif-image-get-metadata image "eXmp"))
   (define old-tags (get-embed-tags flif))
   (define reconciled (remove-duplicates (append old-tags taglist)))
-  (define xexpr (if (bytes=? old-xmp #"")
-                    ; if the image has no xmp data, generate some
-                    (make-xmp-xexpr taglist)
-                    (set-dc:subject (string->xexpr (bytes->string/utf-8 old-xmp)) reconciled)))
-  (define bstr (string->bytes/utf-8 (xexpr->xmp xexpr)))
-  ; set the xmp inside the image pointer
-  (flif-image-set-metadata! image "eXmp" bstr)
-  ; re-encode and save the new flif
-  (define encoder (flif-create-encoder))
-  (define encoded
-    (cond [(= (flif-decoder-num-images (decoder)) 1)
-           (flif-encoder-add-image! encoder image)
-           (flif-encoder-encode-memory encoder)]
-          [else
-           (for ([i (in-range (flif-decoder-num-images (decoder)))])
-             (define img (flif-decoder-get-image (decoder i)))
-             (flif-encoder-add-image! encoder img))
-           (flif-encoder-encode-memory encoder)]))
-  (flif-destroy-encoder! encoder)
-  (with-output-to-file flif
-    (λ () (display encoded))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (set-embed-flif! flif reconciled))
 
 ; adds taglist to the existing tags
 ; if there are no existing tags, set them
@@ -281,67 +283,56 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (set-xmp-png! img xmp-str)]
         [(svg? img) (set-xmp-svg! img xmp-str)]))
 
-;
-; TODO:
-; If we're encoding, make sure to grab every option possible
-; and set that in the encoder we've created. Alternatively,
-; do like the other formats and forego the built-in metadata
-; function so I don't have to painstakingly re-encode the
-; image data every time I set the XMP.
-;
-(define (set-xmp-flif! flif xmp-str)
-  (define bstr (string->bytes/utf-8 xmp-str))
-  ; in case we're running from the command-line
-  (cond
-    [(decoder)
-     (define image (flif-decoder-get-image (decoder) 0))
-     (flif-image-set-metadata! image "eXmp" bstr)
-     ; re-encode and save the new flif
-     (define encoder (flif-create-encoder))
-     (define encoded
-       (cond [(= (flif-decoder-num-images (decoder)) 1)
-              (flif-encoder-add-image! encoder image)
-              (flif-encoder-encode-memory encoder)]
-             [else
-              (for ([i (in-range (flif-decoder-num-images (decoder)))])
-                (define img (flif-decoder-get-image (decoder) i))
-                (flif-encoder-add-image! encoder img))
-              (flif-encoder-encode-memory encoder)]))
-     (flif-destroy-encoder! encoder)
-     (with-output-to-file flif
-       (λ () (display encoded))
-       #:mode 'binary
-       #:exists 'truncate/replace)]
-    [else
-     (define decoder (flif-create-decoder))
-     (flif-decoder-decode-file! decoder flif)
-     (define image (flif-decoder-get-image decoder 0))
-     ; re-encode and save the new flif
-     (define encoder (flif-create-encoder))
-     (define encoded
-       (cond [(= (flif-decoder-num-images (decoder)) 1)
-              (flif-encoder-add-image! encoder image)
-              (flif-encoder-encode-memory encoder)]
-             [else
-              (for ([i (in-range (flif-decoder-num-images decoder))])
-                (define img (flif-decoder-get-image (decoder i)))
-                (flif-encoder-add-image! encoder img))
-              (flif-encoder-encode-memory encoder)]))
-     (flif-destroy-decoder! decoder)
-     (flif-destroy-encoder! encoder)
-     (with-output-to-file flif
-       (λ () (display encoded))
-       #:mode 'binary
-       #:exists 'truncate/replace)]))
+; do not re-encode the file every time we modify the xmp
+(define (set-xmp-flif! flif xmp)
+  (define flif-bstr (file->bytes flif))
+  (define flif-in (open-input-bytes flif-bstr))
+  ; deflate the xmp metadata
+  (define xmp-bstr (if (bytes? xmp) xmp (string->bytes/utf-8 xmp)))
+  (define deflated-in (open-input-bytes xmp-bstr))
+  (define deflated-out (open-output-bytes))
+  (deflate deflated-in deflated-out)
+  ; add checksum
+  (define deflated-bstr
+    (bytes-append (get-output-bytes deflated-out)
+                  (integer->integer-bytes (bytes-adler32 xmp-bstr) 4 #f #t)))
+  (define marker-lst
+    (let ([has-exmp? (flif-goto-marker flif-in #"eXmp")])
+      (if has-exmp?
+          has-exmp?
+          (flif-goto-marker flif-in (bytes 0)))))
+  (close-input-port flif-in)
+  (define marker (first marker-lst))
+  ; just before #"eXmp"
+  (define before (subbytes flif-bstr 0 (car marker)))
+  (define len-bstr
+    (let loop ([bstr #""]
+               [pos (cdr marker)])
+      (define byte (bytes-ref flif-bstr pos))
+      (if (< byte flif-separator)
+          (bytes-append bstr (bytes byte))
+          (loop (bytes-append bstr (bytes byte)) (+ pos 1)))))
+  (define len (bytes->length len-bstr))
+  ; skip up to len for after bytes
+  (define after (subbytes flif-bstr (+ (cdr marker) len 2)))
+  (with-output-to-file flif
+    (λ () (printf "~a~a~a~a~a"
+                  before
+                  #"eXmp"
+                  (length->bytes (bytes-length deflated-bstr))
+                  deflated-bstr
+                  after))
+    #:mode 'binary
+    #:exists 'truncate/replace))
 
 (define (set-embed-flif! flif taglist)
-  ; get the image pointer
-  (define image (flif-decoder-get-image (decoder) 0))
-  (define old-xmp (flif-image-get-metadata image "eXmp"))
-  (define xexpr (if (bytes=? old-xmp #"")
+  (define old-xmp (get-embed-flif flif))
+  (define xexpr (if (empty? old-xmp)
                     ; if the image has no xmp data, generate some
                     (make-xmp-xexpr taglist)
-                    (set-dc:subject (string->xexpr (bytes->string/utf-8 old-xmp)) taglist)))
+                    (set-dc:subject
+                     (string->xexpr (first old-xmp))
+                     taglist)))
   (define xmp-str (xexpr->xmp xexpr))
   (set-xmp-flif! flif xmp-str))
 
@@ -556,25 +547,41 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         [(png? img) (get-embed-png img)]
         [(svg? img) (get-embed-svg img)]))
 
+; scan the FLIF and grab the metadata without using the
+; library at all - no need to decode the image
 (define (get-embed-flif flif)
-  ; if we're calling from the command-line, we won't have
-  ; a proper decoder in place, so create a new one
+  (define flif-in (if (bytes? flif)
+                      (open-input-bytes flif)
+                      (open-input-file flif)))
+  (define marker-lst (flif-goto-marker flif-in #"eXmp"))
   (cond
-    [(decoder)
-     (define image (flif-decoder-get-image (decoder) 0))
-     (define xmp (flif-image-get-metadata image "eXmp"))
-     (if (bytes=? xmp #"")
-         empty
-         (list (bytes->string/utf-8 xmp)))]
-    [else
-     (define dec (flif-create-decoder))
-     (flif-decoder-decode-file! dec flif)
-     (define image (flif-decoder-get-image (decoder) 0))
-     (define xmp (flif-image-get-metadata image "eXmp"))
-     (flif-destroy-decoder! dec)
-     (if (bytes=? xmp #"")
-         empty
-         (list (bytes->string/utf-8 xmp)))]))
+    [marker-lst
+     (define marker (first marker-lst))
+     (define len-bstr
+       (let loop ([bstr #""]
+                  [pos (cdr marker)])
+         (define byte (peek-bytes 1 pos flif-in))
+         (if (< (bytes-ref byte 0) flif-separator)
+             (bytes-append bstr byte)
+             (loop (bytes-append bstr byte) (+ pos 1)))))
+     (define len (bytes->length len-bstr))
+     (define xmp-deflated (peek-bytes len (+ (cdr marker) 2) flif-in))
+     (close-input-port flif-in)
+     ; inflate the data
+     (define inflate-in (open-input-bytes xmp-deflated))
+     (define inflate-out (open-output-bytes))
+     ; catch possible malformed compressed data
+     (with-handlers ([exn:fail? (λ (e)
+                                  (eprintf "~a\n" (exn-message e))
+                                  (close-input-port inflate-in)
+                                  (close-output-port inflate-out)
+                                  empty)])
+       (inflate inflate-in inflate-out))
+     (define inflated (get-output-bytes inflate-out))
+     (close-input-port inflate-in)
+     (close-output-port inflate-out)
+     (list (bytes->string/utf-8 inflated))]
+    [else empty]))
 
 ; retrieve the XMP data located inside the iTXt block(s)
 (define (get-embed-png png)
@@ -758,7 +765,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
              ((xmlns:rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
              (rdf:Description
               ((rdf:about "")
-               (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
                (xmlns:dc "http://purl.org/dc/elements/1.1/")
                (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
                (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")

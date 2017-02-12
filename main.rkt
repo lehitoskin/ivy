@@ -249,7 +249,7 @@
     (unless (zero? len)
       (for ([sr (in-list search-sorted)])
         (if (null-flag)
-            (printf "~a" (bytes-append (string->bytes/utf-8 sr) #"\0"))
+            (printf "~a" (bytes-append (string->bytes/utf-8 sr) (bytes 0)))
             (printf "~a~n" sr)))
       (when (verbose?)
         (printf "Found ~a results for tags ~v~n" len (tags-to-search))))]
@@ -266,7 +266,7 @@
     (unless (zero? len)
       (for ([sr (in-list final-sorted)])
         (if (null-flag)
-            (printf "~a" (bytes-append (string->bytes/utf-8 sr) #"\0"))
+            (printf "~a" (bytes-append (string->bytes/utf-8 sr) (bytes 0)))
             (printf "~a~n" sr)))
       (when (verbose?)
         (printf "Found ~a results without tags ~v~n" len (tags-to-exclude))))]
@@ -288,7 +288,7 @@
            (define exclude-sorted (sort (map path->string exclude) string<?))
            (for ([ex (in-list exclude-sorted)])
              (if (null-flag)
-                 (printf "~a" (bytes-append (string->bytes/utf-8 ex) #"\0"))
+                 (printf "~a" (bytes-append (string->bytes/utf-8 ex) (bytes 0)))
                  (printf "~a~n" ex)))
            (when (verbose?)
              (printf "Found ~a results for tags ~v, excluding tags ~v~n"
@@ -302,7 +302,7 @@
         (define taglist (image-taglist absolute-path))
         (for ([tag (in-list taglist)])
           (if (null-flag)
-              (printf "~a" (bytes-append (string->bytes/utf-8 tag) #"\0"))
+              (printf "~a" (bytes-append (string->bytes/utf-8 tag) (bytes 0)))
               (printf "~a~n" tag)))))]
    [(show-xmp?)
     (for ([img (in-list args)])
@@ -313,7 +313,7 @@
         (define xmp (get-embed-xmp absolute-path))
         (for ([str (in-list xmp)])
           (if (null-flag)
-              (printf "~a" (bytes-append (string->bytes/utf-8 str) #"\0"))
+              (printf "~a" (bytes-append (string->bytes/utf-8 str) (bytes 0)))
               (printf "~a~n" str)))))]
    ; default to 0 if there is no recorded xmp:Rating
    [(show-rating?)

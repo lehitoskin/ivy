@@ -1006,10 +1006,19 @@
   (-> (listof path-string?) void?)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
+    (define ext (path-get-extension path))
     (define thumb-bmp
-      (if (bytes=? (path-get-extension path) #".svg")
-          (load-svg-from-file path)
-          (read-bitmap path)))
+      (cond [(bytes=? ext #".svg")
+             (load-svg-from-file path)]
+            [(bytes=? ext #".flif")
+             (define dec (flif-create-decoder))
+             (flif-decoder-decode-file! dec path)
+             (parameterize ([want-animation? #f])
+               (define bmp (first (flif->list path dec)))
+               (flif-destroy-decoder! dec)
+               bmp)]
+            [else
+             (read-bitmap path)]))
     (define thumb-path (path->thumb-path path))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))
