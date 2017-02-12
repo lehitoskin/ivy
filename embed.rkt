@@ -186,14 +186,13 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
              [section 0])
     (cond [(= section 3) pos]
           [(= section 2)
-           ; does nb_frames exist? (is the image animated?)
-           (define info (flif-read-info-from-memory bstr))
-           (define num (flif-info-num-images info))
-           (flif-destroy-info! info)
-           (if (= num 1)
-               ; still image
-               (loop pos (+ section 1))
-               (loop (+ pos (bytes-length (length->bytes num))) (+ section 1)))]
+           (cond [(flif-animated? bstr)
+                  ; count nb_frames
+                  (define byte (bytes-ref bstr pos))
+                  (if (< byte flif-separator)
+                      (loop (+ pos 1) (+ section 1))
+                      (loop (+ pos 1) section))]
+                 [else (loop pos (+ section 1))])]
           [else
            ; scan through width+height
            (define byte (bytes-ref bstr pos))
