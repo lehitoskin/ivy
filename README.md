@@ -31,6 +31,12 @@ sudo make install
 You may change the DESTDIR variable to install ivy to an arbitrary location -
 one that may not require super user privileges.
 
+We provide a .desktop file, which will add Ivy to your desktop application menu.
+If you installed to a nonstandard location, you may need to copy
+`ivy-image-viewer.desktop` to `~/.local/share/applications/`, and edit the the
+paths for the `Exec` and `Icon` lines. You may need to log out and log back in
+before your app menu will notice the new entry.
+
 Or on Windows:
 
 ``` bash
