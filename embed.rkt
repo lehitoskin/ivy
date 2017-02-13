@@ -1,7 +1,8 @@
 #lang racket/base
 ; embed.rkt
 ; embed tags into images that support it
-(require file/sha1
+(require file/gunzip
+         file/gzip
          gif-image
          ; identifier conflict with xml
          (prefix-in gif: gif-image/gif-basics)
@@ -12,9 +13,10 @@
          racket/format
          racket/list
          racket/port
+         riff
          txexpr
          xml
-         (only-in "files.rkt" ivy-version))
+         (only-in "files.rkt" ivy-version decoder))
 (provide add-embed-tags!
          dc:subject->list
          del-embed-tags!
@@ -54,6 +56,8 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define gif-XMP-auth #"XMP")
 (define gif-XMP-header (bytes-append gif-XMP-id gif-XMP-auth))
 
+#|     JPEG stuff     |#
+
 (define (jpeg-xmp? bstr)
   (and (>= (bytes-length bstr) (+ (bytes-length jpeg-XMP-id) 4))
        (bytes=? (subbytes bstr 4 (+ (bytes-length jpeg-XMP-id) 4)) jpeg-XMP-id)))
@@ -61,8 +65,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define (jpeg-has-marker? in marker-byte)
   (and (regexp-try-match (byte-regexp (bytes #xff marker-byte)) in)
        #t))
-
-#|     JPEG stuff     |#
 
 ; path-string, bytes, or input port
 (define/contract (jpeg? img)
@@ -168,18 +170,82 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 (define (svg-has-tag? in bstr)
   (and (regexp-try-match (byte-regexp bstr) in) #t))
 
+#|     FLIF stuff     |#
+
+(define (flif-has-marker? in marker-bytes)
+  (and (regexp-try-match (byte-regexp marker-bytes) in) #t))
+
+(define (flif-goto-marker in marker-bytes)
+  (regexp-match-peek-positions (byte-regexp marker-bytes) in))
+
+; seek until just after the header information and
+; take into account the possible nb_frames varint
+(define (flif-skip-header bstr)
+  ; start at 6: FLIF + info + bpc
+  (let loop ([pos 6]
+             [section 0])
+    (cond [(= section 3) pos]
+          [(= section 2)
+           (cond [(flif-animated? bstr)
+                  ; count nb_frames
+                  (define byte (bytes-ref bstr pos))
+                  (if (< byte flif-separator)
+                      (loop (+ pos 1) (+ section 1))
+                      (loop (+ pos 1) section))]
+                 [else (loop pos (+ section 1))])]
+          [else
+           ; scan through width+height
+           (define byte (bytes-ref bstr pos))
+           (if (< byte flif-separator)
+               (loop (+ pos 1) (+ section 1))
+               (loop (+ pos 1) section))])))
+
+; 128
+(define flif-separator #x80)
+
+; see https://github.com/FLIF-hub/FLIF/blob/master/src/flif-enc.cpp#L747-L758
+; for implementation details
+(define (length->bytes num)
+  (let loop ([number num]
+             [done? #t])
+    (cond [(< number flif-separator)
+           (if done?
+               (bytes number)
+               (bytes (+ number flif-separator)))]
+          [else
+           (define lsb (bitwise-and number (- flif-separator 1)))
+           (define n (arithmetic-shift number -7))
+           (bytes-append
+            (loop n #f)
+            (loop lsb #t))])))
+
+; modified from riff
+(define (bytes->length bstr)
+  (for/fold ([result 0])
+            ([byte (in-bytes bstr)])
+    (if (< byte flif-separator)
+        (+ result byte)
+        (arithmetic-shift (+ result (- byte flif-separator)) 7))))
+
 #|     Embedding stuff     |#
 
 (define/contract (embed-support? img)
   (any/c . -> . boolean?)
-  (or (gif? img) (jpeg? img) (png? img) (svg? img)))
+  (or (flif? img) (gif? img) (jpeg? img) (png? img) (svg? img)))
 
 (define/contract (add-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
-  (cond [(gif? img) (add-embed-gif! img taglist)]
+  (cond [(flif? img) (add-embed-flif! img taglist)]
+        [(gif? img) (add-embed-gif! img taglist)]
         [(jpeg? img) (add-embed-jpeg! img taglist)]
         [(png? img) (add-embed-png! img taglist)]
         [(svg? img) (add-embed-svg! img taglist)]))
+
+; adds the taglist to the existing tags
+(define (add-embed-flif! flif taglist)
+  (define old-tags (get-embed-tags flif))
+  (define reconciled (remove-duplicates (append old-tags taglist)))
+  (set-embed-flif! flif reconciled))
 
 ; adds taglist to the existing tags
 ; if there are no existing tags, set them
@@ -199,8 +265,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
   (with-output-to-file png
-    (λ ()
-      (display new-png))
+    (λ () (display new-png))
     #:mode 'binary
     #:exists 'truncate/replace))
 
@@ -226,17 +291,81 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 (define/contract (set-embed-tags! img taglist)
   (embed-support? list? . -> . void?)
-  (cond [(gif? img) (set-embed-gif! img taglist)]
+  (cond [(flif? img) (set-embed-flif! img taglist)]
+        [(gif? img) (set-embed-gif! img taglist)]
         [(jpeg? img) (set-embed-jpeg! img taglist)]
         [(png? img) (set-embed-png! img taglist)]
         [(svg? img) (set-embed-svg! img taglist)]))
 
 (define/contract (set-embed-xmp! img xmp-str)
   (embed-support? string? . -> . void?)
-  (cond [(gif? img) (set-xmp-gif! img xmp-str)]
+  (cond [(flif? img) (set-xmp-flif! img xmp-str)]
+        [(gif? img) (set-xmp-gif! img xmp-str)]
         [(jpeg? img) (set-xmp-jpeg! img xmp-str)]
         [(png? img) (set-xmp-png! img xmp-str)]
         [(svg? img) (set-xmp-svg! img xmp-str)]))
+
+; do not re-encode the file every time we modify the xmp
+(define (set-xmp-flif! flif xmp)
+  (define flif-bstr (file->bytes flif))
+  (define flif-in (open-input-bytes flif-bstr))
+  ; deflate the xmp metadata
+  (define xmp-bstr (if (bytes? xmp) xmp (string->bytes/utf-8 xmp)))
+  (define deflated-in (open-input-bytes xmp-bstr))
+  (define deflated-out (open-output-bytes))
+  (deflate deflated-in deflated-out)
+  ; add checksum
+  (define deflated-bstr
+    (bytes-append (get-output-bytes deflated-out)
+                  (integer->integer-bytes (bytes-adler32 xmp-bstr) 4 #f #t)))
+  ; piece everything together
+  (define has-exmp? (flif-goto-marker flif-in #"eXmp"))
+  (define marker-lst
+    (cond [has-exmp? has-exmp?]
+          [else
+           (define header (flif-skip-header flif-bstr))
+           (list (cons header (+ header 1)))]))
+  (close-input-port flif-in)
+  (define marker (first marker-lst))
+  ; just before #"eXmp"
+  (define before (subbytes flif-bstr 0 (car marker)))
+  (define len-bstr
+    (if has-exmp?
+        (let loop ([bstr #""]
+                   [pos (cdr marker)])
+          (define byte (bytes-ref flif-bstr pos))
+          (if (< byte flif-separator)
+              (bytes-append bstr (bytes byte))
+              (loop (bytes-append bstr (bytes byte)) (+ pos 1))))
+        #""))
+  (define len (bytes->length len-bstr))
+  ; skip up to len for after-bytes
+  ; (if there is no existing eXmp chunk, seek until just before the first #"\0")
+  (define after (subbytes flif-bstr (+ (if (zero? len)
+                                           (car marker)
+                                           (cdr marker))
+                                       len
+                                       (bytes-length len-bstr))))
+  (with-output-to-file flif
+    (λ () (printf "~a~a~a~a~a"
+                  before
+                  #"eXmp"
+                  (length->bytes (bytes-length deflated-bstr))
+                  deflated-bstr
+                  after))
+    #:mode 'binary
+    #:exists 'truncate/replace))
+
+(define (set-embed-flif! flif taglist)
+  (define old-xmp (get-embed-flif flif))
+  (define xexpr (if (empty? old-xmp)
+                    ; if the image has no xmp data, generate some
+                    (make-xmp-xexpr taglist)
+                    (set-dc:subject
+                     (string->xexpr (first old-xmp))
+                     taglist)))
+  (define xmp-str (xexpr->xmp xexpr))
+  (set-xmp-flif! flif xmp-str))
 
 ; set the XMP data inside the image's iTXt chunk
 (define (set-xmp-png! png xmp-str)
@@ -246,8 +375,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
   (with-output-to-file png
-    (λ ()
-      (display new-png))
+    (λ () (display new-png))
     #:mode 'binary
     #:exists 'truncate/replace))
 
@@ -362,8 +490,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                          (bytes #x3b)
                          (subbytes bstr (+ (first (first pos-pair)) (second (first pos-pair))))))
   (with-output-to-file gif
-    (λ ()
-      (printf "~a~a~a" before-bstr new-appn-xmp after-bstr))
+    (λ () (printf "~a~a~a" before-bstr new-appn-xmp after-bstr))
     #:mode 'binary
     #:exists 'truncate/replace))
 
@@ -412,8 +539,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   #"</metadata>"
                   after))
   (with-output-to-file svg
-    (λ ()
-      (display xmp-bstr))
+    (λ () (display xmp-bstr))
     #:mode 'binary
     #:exists 'truncate/replace))
 
@@ -446,10 +572,47 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 (define/contract (get-embed-xmp img)
   (embed-support? . -> . list?)
-  (cond [(gif? img) (get-embed-gif img)]
+  (cond [(flif? img) (get-embed-flif img)]
+        [(gif? img) (get-embed-gif img)]
         [(jpeg? img) (get-embed-jpeg img)]
         [(png? img) (get-embed-png img)]
         [(svg? img) (get-embed-svg img)]))
+
+; scan the FLIF and grab the metadata without using the
+; library at all - no need to decode the image
+(define (get-embed-flif flif)
+  (define flif-in (if (bytes? flif)
+                      (open-input-bytes flif)
+                      (open-input-file flif)))
+  (define marker-lst (flif-goto-marker flif-in #"eXmp"))
+  (cond
+    [marker-lst
+     (define marker (first marker-lst))
+     (define len-bstr
+       (let loop ([bstr #""]
+                  [pos (cdr marker)])
+         (define byte (peek-bytes 1 pos flif-in))
+         (if (< (bytes-ref byte 0) flif-separator)
+             (bytes-append bstr byte)
+             (loop (bytes-append bstr byte) (+ pos 1)))))
+     (define len (bytes->length len-bstr))
+     (define xmp-deflated (peek-bytes len (+ (cdr marker) 2) flif-in))
+     (close-input-port flif-in)
+     ; inflate the data
+     (define inflate-in (open-input-bytes xmp-deflated))
+     (define inflate-out (open-output-bytes))
+     ; catch possible malformed compressed data
+     (with-handlers ([exn:fail? (λ (e)
+                                  (eprintf "~a\n" (exn-message e))
+                                  (close-input-port inflate-in)
+                                  (close-output-port inflate-out)
+                                  empty)])
+       (inflate inflate-in inflate-out))
+     (define inflated (get-output-bytes inflate-out))
+     (close-input-port inflate-in)
+     (close-output-port inflate-out)
+     (list (bytes->string/utf-8 inflated))]
+    [else empty]))
 
 ; retrieve the XMP data located inside the iTXt block(s)
 (define (get-embed-png png)
@@ -633,7 +796,6 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
              ((xmlns:rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
              (rdf:Description
               ((rdf:about "")
-               (xmlns:Iptc4xmpCore "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/")
                (xmlns:dc "http://purl.org/dc/elements/1.1/")
                (xmlns:xmp "http://ns.adobe.com/xap/1.0/")
                (xmlns:xmpRights "http://ns.adobe.com/xap/1.0/rights/")

@@ -11,6 +11,7 @@
          racket/math
          racket/path
          racket/string
+         riff
          txexpr
          xml
          "base.rkt"
@@ -31,8 +32,8 @@
  (exit:insert-on-callback
   (λ ()
     ; kill the gif thread, if applicable
-    (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-      (kill-thread (gif-thread)))
+    (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+      (kill-thread (animation-thread)))
     ; wait for any xmp threads to finish before exiting
     (unless (hash-empty? xmp-threads)
       (for ([pair (in-list (hash->list xmp-threads))])
@@ -41,6 +42,17 @@
             (printf "Waiting for thread ~a to finish...\n" (car pair))
             (sleep 1/4)
             (loop)))))
+    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+      (kill-thread (decoder-thread))
+      (displayln "Quit; aborting decoder...")
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
+      (displayln "done")
+      (decoder #f))
+    (when (decoder)
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
+      (decoder #f))
     (disconnect sqlc))))
 
 (define closer-frame%
@@ -290,8 +302,20 @@
        [help-string "Empties the current collection"]
        [callback
         (λ (i e)
-          (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-            (kill-thread (gif-thread)))
+          (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+            (kill-thread (animation-thread)))
+          #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+            (kill-thread (decoder-thread))
+            (displayln "New collection; aborting decoder...")
+            (flif-abort-decoder! (decoder))
+            (display "Destroying decoder... ")
+            (flif-destroy-decoder! (decoder))
+            (displayln "done")
+            (decoder #f))
+          (when (decoder)
+            (flif-abort-decoder! (decoder))
+            (flif-destroy-decoder! (decoder))
+            (decoder #f))
           (image-dir (find-system-path 'home-dir))
           (pfs (list root-path))
           (image-path root-path)
@@ -426,15 +450,15 @@
 (define ivy-menu-bar-view-gif-animation
   (new checkable-menu-item%
        [parent ivy-menu-bar-view]
-       [label "&GIF Animation"]
-       [help-string "Animate GIFs, if possible."]
+       [label "&Animation"]
+       [help-string "Animate image, if possible."]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                   (when (and (not (equal? (image-path) root-path))
-                              (gif? (image-path))
-                              (gif-animated? (image-path)))
-                     (collect-garbage 'incremental)
-                     (load-image (image-path))))]))
+                     (when (and (not (equal? (image-path) root-path))
+                                (or (and (gif? (image-path))
+                                         (gif-animated? (image-path)))
+                                    (flif-animated? (image-path))))
+                       (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
   (new menu-item%
@@ -467,9 +491,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) root-path)
                      (collect-garbage 'incremental)
-                     (if (empty? master-gif)
+                     (if (empty? image-lst-master)
                          (load-image (bitmap image-bmp-master) n)
-                         (load-image master-gif n))))]))
+                         (load-image image-lst-master n))))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
@@ -671,9 +695,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                    (unless (equal? (image-path) root-path)
                      (collect-garbage 'incremental)
                      (if (and image-pict
-                              (empty? gif-lst))
+                              (empty? image-lst))
                          (load-image image-pict 'larger)
-                         (load-image gif-lst 'larger))))]))
+                         (load-image image-lst 'larger))))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -684,9 +708,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                    (unless (equal? (image-path) root-path)
                      (collect-garbage 'incremental)
                      (if (and image-pict
-                              (empty? gif-lst))
+                              (empty? image-lst))
                          (load-image image-pict 'smaller)
-                         (load-image gif-lst 'smaller))))]))
+                         (load-image image-lst 'smaller))))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -696,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
                      (collect-garbage 'incremental)
-                     (if (empty? gif-lst)
+                     (if (empty? image-lst)
                          (load-image image-bmp-master 'none)
                          (load-image (image-path) 'none))))]))
 
@@ -708,7 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) root-path)
                      (collect-garbage 'incremental)
-                     (if (empty? gif-lst)
+                     (if (empty? image-lst)
                          (load-image image-bmp-master)
                          (load-image (image-path)))))]))
 
@@ -951,17 +975,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
          (unless (equal? (image-path) root-path)
            (collect-garbage 'incremental)
            (if (and image-pict
-                    (empty? gif-lst))
+                    (empty? image-lst))
                (load-image image-pict 'wheel-smaller)
-               (load-image gif-lst 'wheel-smaller)))]
+               (load-image image-lst 'wheel-smaller)))]
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
          (unless (equal? (image-path) root-path)
            (collect-garbage 'incremental)
            (if (and image-pict
-                    (empty? gif-lst))
+                    (empty? image-lst))
                (load-image image-pict 'wheel-larger)
-               (load-image gif-lst 'wheel-larger)))]
+               (load-image image-lst 'wheel-larger)))]
         ; osx does things a little different
         [(f11) (unless (macosx?)
                  (toggle-fullscreen this ivy-frame))]

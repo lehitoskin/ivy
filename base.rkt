@@ -15,6 +15,7 @@
          racket/list
          racket/path
          racket/string
+         riff
          rsvg
          (only-in srfi/13
                   string-contains-ci
@@ -55,21 +56,39 @@
 (define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions '(".bmp" ".gif" ".jpe" ".jpeg" ".JPEG" ".jpg" ".JPG" ".png" ".svg"))
+; the only extensions ivy will accept - ignores everything else
+(define supported-extensions '(".bmp"
+                               ".flif"
+                               ".gif"
+                               ".jpe"
+                               ".jpeg"
+                               ".JPEG"
+                               ".jpg"
+                               ".JPG"
+                               ".png"
+                               ".svg"
+                               ".xbm"
+                               ".xpm"))
+; gif/flif stuff
+; listof pict?
+(define image-lst-master empty)
+(define image-lst empty)
+; listof real?
+(define image-lst-timings empty)
+; number of times to loop a FLIF (0 = forever)
+(define image-num-loops 0)
+(define animation-thread (make-parameter #f))
+(define decoder-thread (make-parameter #f))
+; number from the decoder thread that shows how much the image is loaded
+(define flif-load-progress (box 0))
+; GIF cumulative animation
+(define cumulative? (make-parameter #f))
 (define exact-search? (make-parameter #f))
+
 (define color-white (make-object color% "white"))
 (define color-black (make-object color% "black"))
 (define color-spring-green (make-object color% "spring green"))
 (define color-gold (make-object color% "gold"))
-
-; animated gif stuff
-; listof pict?
-(define master-gif empty)
-(define gif-lst empty)
-; listof real?
-(define gif-lst-timings empty)
-(define gif-thread (make-parameter #f))
-(define cumulative? (make-parameter #f))
 
 ; contract for image scaling
 (define image-scale/c
@@ -150,6 +169,82 @@
   (when (> (length kids) 0)
     (send parent add-child (car kids))
     (add-children parent (cdr kids))))
+
+; obtain the rgba pixels from the given FLIF image-ptr
+(define (flif-get-rgba image-ptr reader width height [y 0] [bstr #""])
+  (cond [(= y height) bstr]
+        [else
+         (define row (reader image-ptr y (* width 4)))
+         (flif-get-rgba image-ptr reader width height (+ y 1) (bytes-append bstr row))]))
+
+;; COPIED FROM opengl/main
+;; Convert argb -> rgba
+;; Modern wisdom is not to convert to rgba but rather use
+;; GL_BGRA with GL_UNSIGNED_INT_8_8_8_8_REV. But that turns out not
+;; to work on some implementations, even ones which advertise
+;; OpenGL 1.2 support. Great.
+(define (argb->rgba! pixels)
+  (for ([i (in-range (/ (bytes-length pixels) 4))])
+    (let* ([offset (* 4 i)]
+           [alpha (bytes-ref pixels (+ 0 offset))]
+           [red   (bytes-ref pixels (+ 1 offset))]
+           [green (bytes-ref pixels (+ 2 offset))]
+           [blue  (bytes-ref pixels (+ 3 offset))])
+      (bytes-set! pixels (+ 0 offset) red)
+      (bytes-set! pixels (+ 1 offset) green)
+      (bytes-set! pixels (+ 2 offset) blue)
+      (bytes-set! pixels (+ 3 offset) alpha))))
+;; </COPIED>
+
+(define (rgba->argb! pixels)
+  (for ([i (in-range (/ (bytes-length pixels) 4))])
+    (let* ([offset (* 4 i)]
+           [red   (bytes-ref pixels (+ 0 offset))]
+           [green (bytes-ref pixels (+ 1 offset))]
+           [blue  (bytes-ref pixels (+ 2 offset))]
+           [alpha (bytes-ref pixels (+ 3 offset))])
+      (bytes-set! pixels (+ 0 offset) alpha)
+      (bytes-set! pixels (+ 1 offset) red)
+      (bytes-set! pixels (+ 2 offset) green)
+      (bytes-set! pixels (+ 3 offset) blue))))
+
+(define (flif->list dec-ptr)
+  ; only look at the first frame if we want a static image
+  (define num (if (want-animation?)
+                  (flif-decoder-num-images dec-ptr)
+                  1))
+  (for/list ([i (in-range num)])
+    (define image (flif-decoder-get-image dec-ptr i))
+    (define width (flif-image-get-width image))
+    (define height (flif-image-get-height image))
+    ; make sure to decode with the proper depth
+    (define reader (if (= (flif-image-get-depth image) 8)
+                       flif-image-read-row-rgba8
+                       flif-image-read-row-rgba16))
+    (define pixels (flif-get-rgba image reader width height))
+    (rgba->argb! pixels)
+    (define bitmap (make-object bitmap% width height))
+    (send bitmap set-argb-pixels 0 0 width height pixels)
+    bitmap))
+
+(define (progressive-callback quality num-read)
+  (define lst (flif->list (decoder)))
+  (set! image-bmp-master (first lst))
+  (cond [(and (want-animation?) (> (length lst) 1))
+         (set! image-lst-timings
+               (let ([image (flif-decoder-get-image (decoder) 0)])
+                 (make-list (length lst) (flif-image-get-frame-delay image))))
+         (load-image (map bitmap lst) 'default)]
+        [else (load-image (first lst) 'default)])
+  ; set the new frame label
+  (define-values (base name must-be-dir?) (split-path (image-path)))
+  (send (send (ivy-canvas) get-parent)
+        set-label
+        (format "(~a%) ~a" (exact->inexact (/ quality 100)) (path->string name)))
+  ; set the load progress
+  ;(set-box! flif-load-progress quality)
+  ; the fewer the calls, the faster the total decoding
+  (+ quality 5000))
 
 ; objects that will be used extensively in transparency-grid
 (define dgray-color (make-object color% 128 128 128))
@@ -383,12 +478,12 @@
 (define incoming-tags (make-parameter ""))
 (define want-animation? (make-parameter #f))
 
-(define/contract (animated-gif-callback canvas dc lst)
+(define/contract (animation-callback canvas dc lst)
   (-> (is-a?/c canvas%) (is-a?/c dc<%>) list? void?)
-  (define gif-x (inexact->exact (round (pict-width (first lst)))))
-  (define gif-y (inexact->exact (round (pict-height (first lst)))))
-  (define gif-center-x (/ gif-x 2))
-  (define gif-center-y (/ gif-y 2))
+  (define img-x (inexact->exact (round (pict-width (first lst)))))
+  (define img-y (inexact->exact (round (pict-height (first lst)))))
+  (define img-center-x (/ img-x 2))
+  (define img-center-y (/ img-y 2))
   
   (define canvas-x (send canvas get-width))
   (define canvas-y (send canvas get-height))
@@ -400,21 +495,24 @@
   ; the left and top offsets for each frame in the gif,
   ; just in case the frames are of varying sizes
   (define left/top
-    (for/list ([bit-frame (gif-images (image-path))]
-               [master-frame (in-list master-gif)]
-               [gif-frame (in-list gif-lst)])
-      (define master-width (pict-width master-frame))
-      (define master-height (pict-height master-frame))
-      (define gif-width (pict-width gif-frame))
-      (define gif-height (pict-height gif-frame))
-      ; grab the frame's image descriptor
-      ; starting with the graphics control extension
-      (define matched (car (regexp-match-positions (byte-regexp (bytes #x21 #xf9)) bit-frame)))
-      (define lengths (subbytes bit-frame (+ (car matched) 9) (+ (car matched) 13)))
-      (define left (bytes (bytes-ref lengths 1) (bytes-ref lengths 0)))
-      (define top (bytes (bytes-ref lengths 3) (bytes-ref lengths 2)))
-      (list (* (string->number (bytes->hex-string left) 16) (/ gif-width master-width))
-            (* (string->number (bytes->hex-string top) 16) (/ gif-height master-height)))))
+    (cond
+      [(gif? (image-path))
+       (for/list ([bit-frame (gif-images (image-path))]
+                  [master-frame (in-list image-lst-master)]
+                  [gif-frame (in-list image-lst)])
+         (define master-width (pict-width master-frame))
+         (define master-height (pict-height master-frame))
+         (define gif-width (pict-width gif-frame))
+         (define gif-height (pict-height gif-frame))
+         ; grab the frame's image descriptor
+         ; starting with the graphics control extension
+         (define matched (car (regexp-match-positions (byte-regexp (bytes #x21 #xf9)) bit-frame)))
+         (define lengths (subbytes bit-frame (+ (car matched) 9) (+ (car matched) 13)))
+         (define left (bytes (bytes-ref lengths 1) (bytes-ref lengths 0)))
+         (define top (bytes (bytes-ref lengths 3) (bytes-ref lengths 2)))
+         (list (* (string->number (bytes->hex-string left) 16) (/ gif-width master-width))
+               (* (string->number (bytes->hex-string top) 16) (/ gif-height master-height))))]
+      [else (make-list len (list 0 0))]))
   
   ; determine x and y placement as well as
   ; modify the scrollbars outside the animation loop
@@ -422,39 +520,85 @@
   (define y-loc 0)
   (cond
     ; if the image is really big, place it at (0,0)
-    [(and (> gif-x canvas-x)
-          (> gif-y canvas-y))
+    [(and (> img-x canvas-x)
+          (> img-y canvas-y))
      ; x-loc and y-loc are already 0
      (send canvas show-scrollbars #t #t)]
     ; if the image is wider than the canvas, place it at (0,y)
-    [(> gif-x canvas-x)
+    [(> img-x canvas-x)
      (send canvas show-scrollbars #t #f)
      ; x-loc is already 0
-     (set! y-loc (- canvas-center-y gif-center-y))]
+     (set! y-loc (- canvas-center-y img-center-y))]
     ; if the image is taller than the canvas, place it at (x,0)
-    [(> gif-y canvas-y)
+    [(> img-y canvas-y)
      (send canvas show-scrollbars #f #t)
      ; y-loc is already 0
-     (set! x-loc (- canvas-center-x gif-center-x))]
+     (set! x-loc (- canvas-center-x img-center-x))]
     ; otherwise, place it at the center of the canvas
     [else
      (send canvas show-scrollbars #f #f)
-     (set! x-loc (- canvas-center-x gif-center-x))
-     (set! y-loc (- canvas-center-y gif-center-y))])
+     (set! x-loc (- canvas-center-x img-center-x))
+     (set! y-loc (- canvas-center-y img-center-y))])
   
   ; actual animation loop
-  ; runs until gif-thread is killed
-  (let loop ([gif-frame (first lst)]
-             [timing (first gif-lst-timings)]
+  ; runs until animation-thread is killed
+  (let loop ([img-frame (first lst)]
+             [timing
+              (if (empty? image-lst-timings)
+                  1/20
+                  (first image-lst-timings))]
              [offsets (first left/top)]
-             [i 0])
+             [i 0]
+             [times 0])
     ; remove any previous frames from the canvas
     (unless (cumulative?) (send dc clear))
-    (draw-pict gif-frame dc (+ x-loc (first offsets)) (+ y-loc (second offsets)))
+    (draw-pict img-frame dc (+ x-loc (first offsets)) (+ y-loc (second offsets)))
     (sleep timing)
-    (if (>= i len)
-        (loop (first lst) (first gif-lst-timings) (first left/top) 0)
-        (loop (list-ref lst i) (list-ref gif-lst-timings i) (list-ref left/top i) (add1 i)))))
+    (cond
+      ; loop forever
+      ; ran through every frame
+      [(and (>= i len) (= image-num-loops 0))
+       (loop (first lst) (if (empty? image-lst-timings)
+                             1/20
+                             (first image-lst-timings))
+             (first left/top) 0 0)]
+      ; loop forever
+      ; still need to display the other frames
+      [(and (not (>= i len)) (= image-num-loops 0))
+       (loop (list-ref lst i)
+             ; hacky because decoding a FLIF is very slow right now
+             (if (empty? image-lst-timings)
+                 1/20
+                 (list-ref image-lst-timings i))
+             (list-ref left/top i)
+             (add1 i)
+             0)]
+      ; stop looping eventually
+      ; ran through every frame, increment times
+      [(and (>= i len) (not (= image-num-loops 0)))
+       (loop (first lst)
+             ; hacky because decoding a FLIF is very slow right now
+             (if (empty? image-lst-timings)
+                 1/20
+                 (first image-lst-timings))
+             (first left/top)
+             0
+             (add1 times))]
+      ; stop looping eventually
+      ; still need to display the other frames
+      [(and (not (>= i len))
+            (not (= image-num-loops 0)))
+       (loop (list-ref lst i)
+             ; hacky because decoding a FLIF is very slow right now
+             (if (empty? image-lst-timings)
+                 1/20
+                 (list-ref image-lst-timings i))
+             (list-ref left/top i)
+             (add1 i)
+             times)]
+      ; reached the end of our allowed loops, do nothing
+      [(and (>= i len) (not (= image-num-loops 0))) #t]
+      [else #t])))
 
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
@@ -492,9 +636,9 @@
                                    (path->string name)
                                    (exn-message e))
                           ; set the gifs to defaults
-                          (set! master-gif empty)
-                          (set! gif-lst empty)
-                          (set! gif-lst-timings empty)
+                          (set! image-lst-master empty)
+                          (set! image-lst empty)
+                          (set! image-lst-timings empty)
                           ; just load the static image instead
                           (load-image (bitmap img))
                           (send sbe set-label
@@ -508,9 +652,9 @@
               (send bmp load-file bmp-in-port 'gif/alpha)
               (close-input-port bmp-in-port)
               (bitmap bmp)))
-          (set! master-gif lst)
-          (set! gif-lst (map (λ (gif-frame) (scale-image gif-frame scale)) lst))
-          (set! gif-lst-timings (gif-timings img))
+          (set! image-lst-master lst)
+          (set! image-lst (map (λ (gif-frame) (scale-image gif-frame scale)) lst))
+          (set! image-lst-timings (gif-timings img))
           (set! image-pict #f))
         (define size (file-size (image-path)))
         (send sbd set-label
@@ -531,38 +675,122 @@
               (format "~a / ~a"
                       (+ (get-index img (pfs)) 1)
                       (length (pfs))))]
+       ; load animated flif
+       [(and (want-animation?) (flif? img) (flif-animated? img))
+        (cumulative? #f)
+        (decoder (flif-create-decoder))
+        ; progressive decoding
+        (flif-decoder-set-callback! (decoder) progressive-callback)
+        (flif-decoder-set-first-callback-quality! (decoder) 100000)
+        ; put the actual decoding in its own thread
+        #;(decoder-thread
+         (thread (λ ()
+                   ; set the progress to 0
+                   (set-box! flif-load-progress 0)
+                   ; decode, but do not immediately destroy the decoder
+                   (flif-decoder-decode-file! (decoder) img)
+                   (define num-frames (flif-decoder-num-images (decoder)))
+                   (define image (flif-decoder-get-image (decoder) 0))
+                   (set! image-lst-timings
+                         (make-list num-frames
+                                    (/ (flif-image-get-frame-delay image) 1000)))
+                   (set! image-num-loops (flif-decoder-num-loops (decoder))))))
+        ; regular decoding
+        (flif-decoder-decode-file! (decoder) img)
+        (let ([image (flif-decoder-get-image (decoder) 0)]
+              [num-frames (flif-decoder-num-images (decoder))])
+          (set! image-lst-timings
+                (make-list num-frames
+                           (/ (flif-image-get-frame-delay image) 1000)))
+          (set! image-num-loops (flif-decoder-num-loops (decoder))))
+        ; set the new frame label
+        (send (send canvas get-parent) set-label (path->string name))
+        ; set the gui information
+        (define size (file-size (image-path)))
+        (define dimensions (flif-dimensions (image-path)))
+        (send sbd set-label
+              (format "~a x ~a pixels  ~a"
+                      (first dimensions)
+                      (second dimensions)
+                      (cond [(>= size (expt 2 20))
+                             (format "~a MiB"
+                                     (~r (exact->inexact (/ size (expt 2 20)))
+                                         #:precision 1))]
+                            [(>= size (expt 2 10))
+                             (format "~a KiB"
+                                     (~r (exact->inexact (/ size (expt 2 10)))
+                                         #:precision 1))]
+                            [else
+                             (format "~a B" size)])))
+        (send sbp set-label
+              (format "~a / ~a"
+                      (+ (get-index img (pfs)) 1)
+                      (length (pfs))))]
        ; else load the static image
        [else
         ; make sure the bitmap loaded correctly
         (define load-success
-          (if (bytes=? (path-get-extension img) #".svg")
-              (and (set! image-bmp-master (load-svg-from-file img)) #t)
-              (send image-bmp-master load-file img 'unknown/alpha)))
+          (cond [(bytes=? (path-get-extension img) #".svg")
+                 (and (set! image-bmp-master (load-svg-from-file img)) #t)]
+                [(flif? img)
+                 (cumulative? #f)
+                 (decoder (flif-create-decoder))
+                 ; set the load progress to 0
+                 ;(set-box! flif-load-progress 0)
+                 ; progressive decoding
+                 (flif-decoder-set-callback! (decoder) progressive-callback)
+                 (flif-decoder-set-first-callback-quality! (decoder) 100000)
+                 ; put the actual decoding in its own thread
+                 #;(decoder-thread
+                  (thread (λ ()
+                            ; decode, but do not immediately destroy the decoder
+                            (flif-decoder-decode-file! (decoder) img))))
+                 ; regular decoding
+                 (flif-decoder-decode-file! (decoder) img)]
+                [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send (send canvas get-parent) set-label (path->string name))
                (set! image-pict (scale-image image-bmp-master scale))
                (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))
                (define size (file-size (image-path)))
-               (send sbd set-label
-                     (format "~a x ~a pixels  ~a"
-                             (send image-bmp-master get-width)
-                             (send image-bmp-master get-height)
-                             (cond [(>= size (expt 2 20))
-                                    (format "~a MiB"
-                                            (~r (exact->inexact (/ size (expt 2 20)))
-                                                #:precision 1))]
-                                   [(>= size (expt 2 10))
-                                    (format "~a KiB"
-                                            (~r (exact->inexact (/ size (expt 2 10)))
-                                                #:precision 1))]
-                                   [else
-                                    (format "~a B" size)])))
+               (cond
+                 [(flif? (image-path))
+                  (define dimensions (flif-dimensions (image-path)))
+                  (send sbd set-label
+                        (format "~a x ~a pixels  ~a"
+                                (first dimensions)
+                                (second dimensions)
+                                (cond [(>= size (expt 2 20))
+                                       (format "~a MiB"
+                                               (~r (exact->inexact (/ size (expt 2 20)))
+                                                   #:precision 1))]
+                                      [(>= size (expt 2 10))
+                                       (format "~a KiB"
+                                               (~r (exact->inexact (/ size (expt 2 10)))
+                                                   #:precision 1))]
+                                      [else
+                                       (format "~a B" size)])))]
+                 [else
+                  (send sbd set-label
+                        (format "~a x ~a pixels  ~a"
+                                (send image-bmp-master get-width)
+                                (send image-bmp-master get-height)
+                                (cond [(>= size (expt 2 20))
+                                       (format "~a MiB"
+                                               (~r (exact->inexact (/ size (expt 2 20)))
+                                                   #:precision 1))]
+                                      [(>= size (expt 2 10))
+                                       (format "~a KiB"
+                                               (~r (exact->inexact (/ size (expt 2 10)))
+                                                   #:precision 1))]
+                                      [else
+                                       (format "~a B" size)])))])
                (send sbp set-label
                      (format "~a / ~a"
                              (+ (get-index img (pfs)) 1)
                              (length (pfs))))
-               (set! gif-lst empty)
-               (set! gif-lst-timings empty)]
+               (set! image-lst empty)
+               (set! image-lst-timings empty)]
               [else
                (eprintf "Error loading file ~v\n" img)
                (send sbe set-label
@@ -601,31 +829,31 @@
      (send tag-tfield refresh)]
     [(list? img)
      ; scale the image in the desired direction
-     (set! gif-lst (map (λ (pct) (scale-image pct scale)) img))]
+     (set! image-lst (map (λ (pct) (scale-image pct scale)) img))]
     [else
      ; we already have the image loaded
-     (set! master-gif empty)
-     (set! gif-lst empty)
-     (set! gif-lst-timings empty)
+     (set! image-lst-master empty)
+     (set! image-lst empty)
+     (set! image-lst-timings empty)
      (set! image-pict (scale-image img scale))
      (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))])
   
-  (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-    (kill-thread (gif-thread)))
+  (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+    (kill-thread (animation-thread)))
   
-  (if (not (empty? gif-lst))
+  (if (not (empty? image-lst))
       ; gif-lst contains a list of picts, display the animated gif
       (send canvas set-on-paint!
             (λ (canvas dc)
-              (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-                (kill-thread (gif-thread)))
+              (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+                (kill-thread (animation-thread)))
               
               (send dc set-background "black")
               
-              (gif-thread
+              (animation-thread
                (thread
                 (λ ()
-                  (animated-gif-callback canvas dc gif-lst))))))
+                  (animation-callback canvas dc image-lst))))))
       ; otherwise, display the static image
       (send canvas set-on-paint!
             (λ (canvas dc)
@@ -674,8 +902,8 @@
                        (- canvas-center-y img-center-y))]))))
   
   ; tell the scrollbars to adjust for the size of the image
-  (let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first gif-lst)))))]
-        [img-y (inexact->exact (round (pict-height (if image-pict image-pict (first gif-lst)))))])
+  (let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
+        [img-y (inexact->exact (round (pict-height (if image-pict image-pict (first image-lst)))))])
     ; will complain if width/height is less than 1
     (define width (if (< img-x 1) 1 img-x))
     (define height (if (< img-y 1) 1 img-y))
@@ -720,9 +948,20 @@
 ; mmm... curry
 (define ((load-image-in-collection direction))
   (unless (equal? (image-path) root-path)
-    ; kill the gif thread, if applicable
-    (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
-      (kill-thread (gif-thread)))
+    ; kill the animation thread, if applicable
+    (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+      (kill-thread (animation-thread)))
+    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
+      (kill-thread (decoder-thread))
+      (displayln "load-image-in-collection; aborting decoder...")
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
+      (displayln "done")
+      (decoder #f))
+    (when (decoder)
+      (flif-abort-decoder! (decoder))
+      (flif-destroy-decoder! (decoder))
+      (decoder #f))
     (send (ivy-tag-tfield) set-field-background color-white)
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
@@ -778,10 +1017,19 @@
   (-> (listof path-string?) void?)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
+    (define ext (path-get-extension path))
     (define thumb-bmp
-      (if (bytes=? (path-get-extension path) #".svg")
-          (load-svg-from-file path)
-          (read-bitmap path)))
+      (cond [(bytes=? ext #".svg")
+             (load-svg-from-file path)]
+            [(bytes=? ext #".flif")
+             (define dec (flif-create-decoder))
+             (flif-decoder-decode-file! dec path)
+             (parameterize ([want-animation? #f])
+               (define bmp (first (flif->list dec)))
+               (flif-destroy-decoder! dec)
+               bmp)]
+            [else
+             (read-bitmap path)]))
     (define thumb-path (path->thumb-path path))
     ; use pict to scale the image to 100x100
     (define thumb-pct (bitmap thumb-bmp))
