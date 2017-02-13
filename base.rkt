@@ -56,8 +56,19 @@
 (define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
-(define supported-extensions
-  '(".bmp" ".flif" ".gif" ".jpe" ".jpeg" ".JPEG" ".jpg" ".JPG" ".png" ".svg"))
+; the only extensions ivy will accept - ignores everything else
+(define supported-extensions '(".bmp"
+                               ".flif"
+                               ".gif"
+                               ".jpe"
+                               ".jpeg"
+                               ".JPEG"
+                               ".jpg"
+                               ".JPG"
+                               ".png"
+                               ".svg"
+                               ".xbm"
+                               ".xpm"))
 ; gif/flif stuff
 ; listof pict?
 (define image-lst-master empty)
