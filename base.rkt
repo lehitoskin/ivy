@@ -1014,7 +1014,7 @@
              (define dec (flif-create-decoder))
              (flif-decoder-decode-file! dec path)
              (parameterize ([want-animation? #f])
-               (define bmp (first (flif->list path dec)))
+               (define bmp (first (flif->list dec)))
                (flif-destroy-decoder! dec)
                bmp)]
             [else
