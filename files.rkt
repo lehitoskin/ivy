@@ -4,25 +4,25 @@
 (require images/compile-time (for-syntax racket/base racket/draw))
 (provide (all-defined-out))
 
-(define ivy-version "2.1.2")
+(define ivy-version "2.2.0")
 
 ; base directory where ivy will put all of its files
 (define ivy-path
-  (cond [(eq? (system-type) 'unix)
-         ; check XDG variable first, then default
-         ; to ~/.config/ivy
-         (let ([xdg (getenv "XDG_CONFIG_HOME")])
-           (if xdg
-               (build-path xdg "ivy")
-               (build-path (find-system-path 'home-dir)
-                           ".config/ivy")))]
-        [(eq? (system-type) 'windows)
-         (normal-case-path
-          (build-path (find-system-path 'home-dir)
-                      "appdata/local/ivy"))]
-        [(eq? (system-type) 'macosx)
-         (build-path (find-system-path 'home-dir)
-                     "Library/Application Support/ivy")]))
+  (case (system-type)
+    [(unix)
+     ; check XDG variable first, then default to ~/.config/ivy
+     (let ([xdg (getenv "XDG_CONFIG_HOME")])
+       (if xdg
+           (build-path xdg "ivy")
+           (build-path (find-system-path 'home-dir)
+                       ".config/ivy")))]
+    [(windows)
+     (normal-case-path
+      (build-path (find-system-path 'home-dir)
+                  "appdata/local/ivy"))]
+    [(macosx)
+     (build-path (find-system-path 'home-dir)
+                 "Library/Application Support/ivy")]))
 
 (define master-file (build-path ivy-path "catalog.sqlite"))
 
