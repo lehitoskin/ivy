@@ -9,9 +9,9 @@ GenericName[en_US] = image viewer
 Comment            = image viewer, metadata editor, and collection manager
 Comment[en_US]     = image viewer, metadata editor, and collection manager
 
-Categories    = Graphics; 2DGraphics; VectorGraphics; RasterGraphics; Viewer;
-Keywords      = image; metadata; viewer;
-MimeType      = image/bmp; image/flif; image/gif; image/jpeg; image/png; image/svg+xml; image/x‑xbitmap; image/x‑xpixmap;
+Categories    = Graphics;2DGraphics;VectorGraphics;RasterGraphics;Viewer;
+Keywords      = image;metadata;viewer;
+MimeType      = image/bmp;image/flif;image/gif;image/jpeg;image/png;image/svg+xml;image/x‑xbitmap;image/x‑xpixmap;
 # Icon          = /PATH/TO/ICON.png
 # Exec          = /PATH/TO/EXECUTABLE %u
 Terminal      = false
