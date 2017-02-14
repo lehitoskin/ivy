@@ -21,21 +21,34 @@
          (only-in "files.rkt" ivy-version))
 
 (define show-frame? (make-parameter #t))
-(define tags-to-search (make-parameter empty))
+
+(define tags-to-search (make-parameter #f))
 (define search-type (make-parameter #f))
-(define tags-to-exclude (make-parameter empty))
+(define tags-to-exclude (make-parameter #f))
+
 (define null-flag (make-parameter #f))
 (define verbose? (make-parameter #f))
 (define list-tags? (make-parameter #f))
+
 (define add-tags? (make-parameter #f))
+(define tags-to-add (make-parameter #f))
+
 (define delete-tags? (make-parameter #f))
+(define tags-to-delete (make-parameter #f))
+
 (define set-tags? (make-parameter #f))
+(define tags-to-set (make-parameter #f))
+
 (define moving? (make-parameter #f))
 (define purging? (make-parameter #f))
+
 (define show-xmp? (make-parameter #f))
 (define set-xmp? (make-parameter #f))
+(define xmp-to-set (make-parameter #f))
+
 (define show-rating? (make-parameter #f))
 (define set-rating? (make-parameter #f))
+(define rating-to-set (make-parameter 0))
 
 ; make sure the path provided is a proper absolute path
 (define relative->absolute (compose1 simple-form-path expand-user-path))
@@ -84,21 +97,27 @@
   (show-frame? #f)
   (list-tags? #t)]
  [("-A" "--add-tags")
+  taglist
   "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (add-tags? #t)]
+  (add-tags? #t)
+  (tags-to-add taglist)]
  [("-D" "--delete-tags")
+  taglist
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (delete-tags? #t)]
+  (delete-tags? #t)
+  (tags-to-delete taglist)]
  [("-P" "--purge")
   "Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ..."
   (show-frame? #f)
   (purging? #t)]
  [("-T" "--set-tags")
+  taglist
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
-  (set-tags? #t)]
+  (set-tags? #t)
+  (tags-to-set taglist)]
  [("-M" "--move-image")
   "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
@@ -108,17 +127,21 @@
   (show-frame? #f)
   (show-xmp? #t)]
  [("--set-xmp")
+  xmp-str
   "Set the embedded XMP in supported images."
   (show-frame? #f)
-  (set-xmp? #t)]
+  (set-xmp? #t)
+  (xmp-to-set xmp-str)]
  [("--show-rating")
   "Show the stored rating from the database."
   (show-frame? #f)
   (show-rating? #t)]
  [("--set-rating")
+  rating
   "Set the xmp:Rating for the image."
   (show-frame? #f)
-  (set-rating? #t)]
+  (set-rating? #t)
+  (rating-to-set rating)]
  #:once-each
  [("-e" "--exact-search")
   "Search the tags database for exact matches."
@@ -327,21 +350,19 @@
               [else (displayln 0)])))]
    [(add-tags?)
     (cond
-      [(< (length args) 2)
-       (raise-argument-error 'add-tags "2 or more arguments" (length args))
+      [(empty? args)
+       (raise-argument-error 'add-tags "1 or more image arguments" (length args))
        (disconnect sqlc)
        (exit)]
       [else
-       (define taglist (first args))
-       (define imagelist (rest args))
-       (for ([img (in-list imagelist)])
+       (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
          (define tags-to-add
-           (cond [(string-null? taglist) empty]
+           (cond [(string-null? (tags-to-add)) empty]
                  [else
                   (define tags
                     (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split taglist ",")])
+                            (for/list ([tag (string-split (tags-to-add) ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))
          (unless (empty? tags-to-add)
@@ -356,21 +377,19 @@
            (add-tags! img-obj tags-to-add)))])]
    [(delete-tags?)
     (cond
-      [(< (length args) 2)
-       (raise-argument-error 'delete-tags "2 or more arguments" (length args))
+      [(empty? args)
+       (raise-argument-error 'delete-tags "1 or more image arguments" (length args))
        (disconnect sqlc)
        (exit)]
       [else
-       (define taglist (first args))
-       (define imagelist (rest args))
-       (for ([img (in-list imagelist)])
+       (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
          (define tags-to-remove
-           (cond [(string-null? taglist) empty]
+           (cond [(string-null? (tags-to-delete)) empty]
                  [else
                   (define tags
                     (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split taglist ",")])
+                            (for/list ([tag (string-split (tags-to-delete) ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))
          (when (and (not (empty? tags-to-remove))
@@ -394,47 +413,43 @@
         (delete-file thumb-name)))]
    [(set-tags?)
     (cond
-      [(< (length args) 2)
-       (raise-argument-error 'set-tags "2 or more arguments" (length args))
+      [(empty? args)
+       (raise-argument-error 'set-tags "1 or more image arguments" (length args))
        (disconnect sqlc)
        (exit)]
       [else
-       (define taglist (first args))
-       (define imagelist (rest args))
-       (for ([img (in-list imagelist)])
+       (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
-         (define tags-to-set
-           (cond [(string-null? taglist) empty]
+         (define taglist
+           (cond [(string-null? (tags-to-set)) empty]
                  [else
                   (define tags
                     (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split taglist ",")])
+                            (for/list ([tag (string-split (tags-to-set) ",")])
                               (string-trim tag))))
                   (remove-duplicates (sort tags string<?))]))
-         (unless (empty? tags-to-set)
+         (unless (empty? taglist)
            (when (verbose?)
-             (printf "Setting tags of ~v to ~v~n" absolute-path tags-to-set))
-           (reconcile-tags! absolute-path tags-to-set)
+             (printf "Setting tags of ~v to ~v~n" absolute-path taglist))
+           (reconcile-tags! absolute-path taglist)
            (when (embed-support? absolute-path)
-             (set-embed-tags! absolute-path tags-to-set))))])]
+             (set-embed-tags! absolute-path taglist))))])]
    ; set the XMP metadata for a file
    [(set-xmp?)
-    (define len (length args))
     (cond
-      [(< len 2)
-       (raise-argument-error 'set-xmp "2 or more arguments" len)
+      [(empty? args)
+       (raise-argument-error 'set-xmp "1 or more image arguments" (length args))
        (disconnect sqlc)
        (exit)]
       [else
        ; make sure the paths are absolute
-       (define absolutes (map relative->absolute (rest args)))
-       (define xmp-str (first args))
+       (define absolutes (map relative->absolute args))
        (for ([path (in-list absolutes)])
          (when (embed-support? path)
            ; set the XMP data
-           (set-embed-xmp! path xmp-str)
+           (set-embed-xmp! path (xmp-to-set))
            ; grab the tag list and update the database
-           (define xexpr (string->xexpr xmp-str))
+           (define xexpr (string->xexpr (xmp-to-set)))
            ; find the dc:subject info
            (define dc:sub-lst (findf*-txexpr xexpr is-dc:subject?))
            (define tags
@@ -448,19 +463,18 @@
    ; set the xmp:Rating in both the database and the XMP
    [(set-rating?)
     (cond
-      [(< (length args) 2)
-       (raise-argument-error 'add-tags "2 or more arguments" (length args))
+      [(empty? args)
+       (raise-argument-error 'add-tags "1 or more image arguments" (length args))
        (disconnect sqlc)
        (exit)]
       [else
-       (define rating (first args))
-       (define imagelist (rest args))
-       (for ([img (in-list imagelist)])
+       (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
          (when (verbose?)
            (printf "Setting the rating for ~a...~n" absolute-path))
-         (set-image-rating! absolute-path (string->number rating))
-         ; the the rating in the embedded XMP
+         ; set the rating in the database
+         (set-image-rating! absolute-path (string->number (rating-to-set)))
+         ; set the rating in the embedded XMP
          (when (embed-support? absolute-path)
            (define xmp (get-embed-xmp absolute-path))
            (define xexpr (if (empty? xmp)
@@ -471,7 +485,7 @@
              ((set-xmp-tag (if tag 'xmp:Rating 'rdf:Description))
               xexpr
               (create-dc-meta "xmp:Rating"
-                              (list rating)
+                              (rating-to-set)
                               ""
                               (box (list (xexpr->string xexpr))))))
            (set-embed-xmp! absolute-path (xexpr->string setted))))])]
@@ -485,12 +499,12 @@
        (exit)]
       [else
        ; make sure the paths are absolute
-       (define absolute-str (map (λ (ri)
-                                   (path->string (relative->absolute ri)))
-                                 args))
+       (define absolute-str
+         (for/list ([ri (in-list args)])
+           (path->string (relative->absolute ri))))
        (define dest-or-dir (last absolute-str))
        (define-values (dest-base dest-name must-be-dir?) (split-path dest-or-dir))
-       (for ([old-path (in-list (take absolute-str (sub1 len)))])
+       (for ([old-path (in-list (take absolute-str (- len 1)))])
          (define new-path
            (let ([file-name (file-name-from-path old-path)])
              (cond
@@ -504,7 +518,7 @@
                 (cond
                   [(> len 2)
                    (raise-argument-error 'move-image
-                                         "destination as a directory when passed more than 2 args"
+                                         "destination needs to be a directory"
                                          dest-or-dir)
                    #f]
                   [else dest-or-dir])])))
