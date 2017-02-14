@@ -1,6 +1,6 @@
 DESTDIR = /usr/local
-DOCDIR = $(DESTDIR)/share/doc/ivy-2.1.2
-MANDIR = $(DESTDIR)/share/man/man1
+DOCDIR = "$(DESTDIR)/share/doc/ivy-2.1.2"
+MANDIR = "$(DESTDIR)/share/man/man1"
 
 RACO = raco
 RFLAGS = --vv --gui
@@ -15,26 +15,26 @@ MANPAGES = doc/ivy.1.bz2
 all: ivy-bin
 
 ivy-bin: $(SOURCES)
-	${RACO} exe $(RFLAGS) -o $(BINARY) $(MAIN)
+	"${RACO}" exe $(RFLAGS) -o "$(BINARY)" "$(MAIN)"
 
 install: $(BINARY) ivy-image-viewer.desktop $(IMAGES) $(MANPAGES)
-	mkdir -pv $(DESTDIR)/bin
-	mkdir -pv $(DESTDIR)/share/icons/hicolor/{16x16,32x32,48x48,64x64,128x128,256x256,512x512,scalable}/apps
-	mkdir -pv $(DESTDIR)/share/applications
+	mkdir -pv "$(DESTDIR)/bin"
+	mkdir -pv "$(DESTDIR)/share/icons/hicolor/"{16x16,32x32,48x48,64x64,128x128,256x256,512x512,scalable}/apps
+	mkdir -pv "$(DESTDIR)/share/applications"
 	mkdir -pv $(MANDIR)
 	mkdir -pv $(DOCDIR)
-	sed "s:# Icon=/PATH/TO/ICON.png:Icon=$(DESTDIR)/share/icons/hicolor/128x128/apps/ivy-logo-128px.png:" ivy-image-viewer.desktop >$(DESTDIR)/share/applications/ivy-image-viewer.desktop
-	sed -i "s:# Exec=/PATH/TO/EXECUTABLE:Exec=$(DESTDIR)/bin/ivy:" $(DESTDIR)/share/applications/ivy-image-viewer.desktop
-	chmod 0755 $(DESTDIR)/share/applications/ivy-image-viewer.desktop
-	install -m 0755 ivy $(DESTDIR)/bin
-	install -m 0644 img/ivy-logo-16px.png $(DESTDIR)/share/icons/hicolor/16x16/apps
-	install -m 0644 img/ivy-logo-32px.png $(DESTDIR)/share/icons/hicolor/32x32/apps
-	install -m 0644 img/ivy-logo-48px.png $(DESTDIR)/share/icons/hicolor/48x48/apps
-	install -m 0644 img/ivy-logo-64px.png $(DESTDIR)/share/icons/hicolor/64x64/apps
-	install -m 0644 img/ivy-logo-128px.png $(DESTDIR)/share/icons/hicolor/128x128/apps
-	install -m 0644 img/ivy-logo-256px.png $(DESTDIR)/share/icons/hicolor/256x256/apps
-	install -m 0644 img/ivy-logo-512px.png $(DESTDIR)/share/icons/hicolor/512x512/apps
-	install -m 0644 img/ivy-logo.svg $(DESTDIR)/share/icons/hicolor/scalable/apps
+	sed "s:# Icon          = /PATH/TO/ICON.png:Icon          = $(DESTDIR)/share/icons/hicolor/128x128/apps/ivy-logo-128px.png:" ivy-image-viewer.desktop > "$(DESTDIR)/share/applications/ivy-image-viewer.desktop"
+	sed -i "s:# Exec          = /PATH/TO/EXECUTABLE:Exec          = $(DESTDIR)/bin/ivy:" "$(DESTDIR)/share/applications/ivy-image-viewer.desktop"
+	chmod 0755 "$(DESTDIR)/share/applications/ivy-image-viewer.desktop"
+	install -m 0755 ivy "$(DESTDIR)/bin"
+	install -m 0644 img/ivy-logo-16px.png "$(DESTDIR)/share/icons/hicolor/16x16/apps"
+	install -m 0644 img/ivy-logo-32px.png "$(DESTDIR)/share/icons/hicolor/32x32/apps"
+	install -m 0644 img/ivy-logo-48px.png "$(DESTDIR)/share/icons/hicolor/48x48/apps"
+	install -m 0644 img/ivy-logo-64px.png "$(DESTDIR)/share/icons/hicolor/64x64/apps"
+	install -m 0644 img/ivy-logo-128px.png "$(DESTDIR)/share/icons/hicolor/128x128/apps"
+	install -m 0644 img/ivy-logo-256px.png "$(DESTDIR)/share/icons/hicolor/256x256/apps"
+	install -m 0644 img/ivy-logo-512px.png "$(DESTDIR)/share/icons/hicolor/512x512/apps"
+	install -m 0644 img/ivy-logo.svg "$(DESTDIR)/share/icons/hicolor/scalable/apps"
 	install -m 0644 doc/ivy.1.bz2 $(MANDIR)
 	install -m 0644 doc/ivy.md doc/ivy.html README.md $(DOCDIR)
 
