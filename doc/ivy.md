@@ -1,4 +1,4 @@
-% IVY(1) Ivy Image Viewer | Version 1.3
+% IVY(1) Ivy Image Viewer | Version 2.2.0
 
 # NAME
 Ivy Image Viewer
