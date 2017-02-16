@@ -22,33 +22,34 @@
 
 (define show-frame? (make-parameter #t))
 
-(define tags-to-search (make-parameter #f))
+(define tags-to-search (make-parameter empty))
 (define search-type (make-parameter #f))
-(define tags-to-exclude (make-parameter #f))
+(define tags-to-exclude (make-parameter empty))
+(define excluding? (make-parameter #f))
 
 (define null-flag (make-parameter #f))
 (define verbose? (make-parameter #f))
 (define list-tags? (make-parameter #f))
 
 (define add-tags? (make-parameter #f))
-(define tags-to-add (make-parameter #f))
+(define tags-to-add (make-parameter empty))
 
 (define delete-tags? (make-parameter #f))
-(define tags-to-delete (make-parameter #f))
+(define tags-to-delete (make-parameter empty))
 
 (define set-tags? (make-parameter #f))
-(define tags-to-set (make-parameter #f))
+(define tags-to-set (make-parameter empty))
 
 (define moving? (make-parameter #f))
 (define purging? (make-parameter #f))
 
 (define show-xmp? (make-parameter #f))
 (define set-xmp? (make-parameter #f))
-(define xmp-to-set (make-parameter #f))
+(define xmp-to-set (make-parameter ""))
 
 (define show-rating? (make-parameter #f))
 (define set-rating? (make-parameter #f))
-(define rating-to-set (make-parameter 0))
+(define rating-to-set (make-parameter "0"))
 
 ; make sure the path provided is a proper absolute path
 (define relative->absolute (compose1 simple-form-path expand-user-path))
@@ -72,26 +73,18 @@
   (show-frame? #f)
   (search-type 'or)
   (tags-to-search
-   (cond [(string-null? taglist) empty]
-         [else
-          (define tags
-            (filter (λ (tag) (not (string-null? tag)))
-                    (for/list ([tag (string-split taglist ",")])
-                      (string-trim tag))))
-          (remove-duplicates (sort tags string<?))]))]
+   (if (string-null? taglist)
+       empty
+       (string->taglist taglist)))]
  [("-a" "--search-and")
   taglist
   "Search the tags database exclusively with a comma-separated string."
   (show-frame? #f)
   (search-type 'and)
   (tags-to-search
-   (cond [(string-null? taglist) empty]
-         [else
-          (define tags
-            (filter (λ (tag) (not (string-null? tag)))
-                    (for/list ([tag (string-split taglist ",")])
-                      (string-trim tag))))
-          (remove-duplicates (sort tags string<?))]))]
+   (if (string-null? taglist)
+       empty
+       (string->taglist taglist)))]
  [("-L" "--list-tags")
   "Lists the tags for the image(s)."
   (show-frame? #f)
@@ -101,13 +94,19 @@
   "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (add-tags? #t)
-  (tags-to-add taglist)]
+  (tags-to-add
+   (if (string-null? taglist)
+       empty
+       (string->taglist taglist)))]
  [("-D" "--delete-tags")
   taglist
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (delete-tags? #t)
-  (tags-to-delete taglist)]
+  (tags-to-delete
+   (if (string-null? taglist)
+       empty
+       (string->taglist taglist)))]
  [("-P" "--purge")
   "Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ..."
   (show-frame? #f)
@@ -117,7 +116,10 @@
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (set-tags? #t)
-  (tags-to-set taglist)]
+  (tags-to-set
+   (if (string-null? taglist)
+       empty
+       (string->taglist taglist)))]
  [("-M" "--move-image")
   "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
@@ -151,14 +153,11 @@
   exclude
   "Search the tags database with -o/-a, but exclude images with the specified tags."
   (show-frame? #f)
+  (excluding? #t)
   (tags-to-exclude
-   (cond [(string-null? exclude) empty]
-         [else
-          (define tags
-            (filter (λ (tag) (not (string-null? tag)))
-                    (for/list ([tag (string-split exclude ",")])
-                      (string-trim tag))))
-          (remove-duplicates (sort tags string<?))]))]
+   (if (string-null? exclude)
+       empty
+       (string->taglist exclude)))]
  [("-n" "--null")
   "Search result items are terminated by a null character instead of by whitespace."
   (show-frame? #f)
@@ -261,7 +260,9 @@
     (send ivy-frame center 'both)
     (send ivy-frame show #t)]
    ; only searching for tags
-   [(and (not (empty? (tags-to-search)))
+   [(and (search-type)
+         (not (excluding?))
+         (not (empty? (tags-to-search)))
          (empty? (tags-to-exclude)))
     (define search-results
       (if (exact-search?)
@@ -277,7 +278,8 @@
       (when (verbose?)
         (printf "Found ~a results for tags ~v~n" len (tags-to-search))))]
    ; only excluding tags (resulting output may be very long!)
-   [(and (empty? (tags-to-search))
+   [(and (excluding?)
+         (not (search-type))
          (not (empty? (tags-to-exclude))))
     (define imgs (table-column 'images 'Path))
     (define excluded
@@ -294,7 +296,9 @@
       (when (verbose?)
         (printf "Found ~a results without tags ~v~n" len (tags-to-exclude))))]
    ; searching for tags and excluding tags
-   [(and (not (empty? (tags-to-search)))
+   [(and (search-type)
+         (excluding?)
+         (not (empty? (tags-to-search)))
          (not (empty? (tags-to-exclude))))
     (define search-results
       (if (exact-search?)
@@ -357,24 +361,16 @@
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
-         (define tags-to-add
-           (cond [(string-null? (tags-to-add)) empty]
-                 [else
-                  (define tags
-                    (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split (tags-to-add) ",")])
-                              (string-trim tag))))
-                  (remove-duplicates (sort tags string<?))]))
-         (unless (empty? tags-to-add)
+         (unless (empty? (tags-to-add))
            (define img-obj
              (if (db-has-key? 'images absolute-path)
                  (make-data-object sqlc image% absolute-path)
                  (new image% [path absolute-path])))
            (when (verbose?)
-             (printf "Adding tags ~v to ~v~n" tags-to-add absolute-path))
+             (printf "Adding tags ~v to ~v~n" (tags-to-add) absolute-path))
            (when (embed-support? img)
-             (add-embed-tags! img tags-to-add))
-           (add-tags! img-obj tags-to-add)))])]
+             (add-embed-tags! img (tags-to-add)))
+           (add-tags! img-obj (tags-to-add))))])]
    [(delete-tags?)
     (cond
       [(empty? args)
@@ -384,22 +380,14 @@
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
-         (define tags-to-remove
-           (cond [(string-null? (tags-to-delete)) empty]
-                 [else
-                  (define tags
-                    (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split (tags-to-delete) ",")])
-                              (string-trim tag))))
-                  (remove-duplicates (sort tags string<?))]))
-         (when (and (not (empty? tags-to-remove))
+         (when (and (not (empty? (tags-to-delete)))
                     (db-has-key? 'images absolute-path))
            (define img-obj (make-data-object sqlc image% absolute-path))
            (when (verbose?)
-             (printf "Removing tags ~v from ~v~n" tags-to-remove absolute-path))
+             (printf "Removing tags ~v from ~v~n" (tags-to-delete) absolute-path))
            (when (embed-support? img)
-             (del-embed-tags! img tags-to-remove))
-           (del-tags! img-obj tags-to-remove)))])]
+             (del-embed-tags! img (tags-to-delete)))
+           (del-tags! img-obj (tags-to-delete))))])]
    [(purging?)
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
@@ -420,20 +408,12 @@
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
-         (define taglist
-           (cond [(string-null? (tags-to-set)) empty]
-                 [else
-                  (define tags
-                    (filter (λ (tag) (not (string-null? tag)))
-                            (for/list ([tag (string-split (tags-to-set) ",")])
-                              (string-trim tag))))
-                  (remove-duplicates (sort tags string<?))]))
-         (unless (empty? taglist)
+         (unless (empty? (tags-to-set))
            (when (verbose?)
-             (printf "Setting tags of ~v to ~v~n" absolute-path taglist))
-           (reconcile-tags! absolute-path taglist)
+             (printf "Setting tags of ~v to ~v~n" absolute-path (tags-to-set)))
+           (reconcile-tags! absolute-path (tags-to-set))
            (when (embed-support? absolute-path)
-             (set-embed-tags! absolute-path taglist))))])]
+             (set-embed-tags! absolute-path (tags-to-set)))))])]
    ; set the XMP metadata for a file
    [(set-xmp?)
     (cond

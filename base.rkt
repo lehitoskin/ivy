@@ -112,7 +112,7 @@
         100))
 
 (define/contract (supported-file? img)
-  (-> path-string? boolean?)
+  (path-string? . -> . boolean?)
   (define ext (path-get-extension img))
   (and ext
        (member (string-downcase (bytes->string/utf-8 ext)) supported-extensions)
@@ -134,21 +134,24 @@
 ; make pfs just that image, rather than a list of length 1
 (define pfs (make-parameter (list root-path)))
 
+(define (string->taglist str)
+  (define tags
+    (filter (λ (tag) (not (string-null? tag)))
+            (for/list ([tag (string-split str ",")])
+              (string-trim tag))))
+  (remove-duplicates (sort tags string<?)))
+
 (define/contract (tfield->list tf)
-  (-> (is-a?/c text-field%) list?)
+  ((is-a?/c text-field%). -> . list?)
   (define val (send tf get-value))
-  (cond [(string-null? val) empty]
-        [else
-         (define tags
-           (filter (negate string-null?)
-                   (for/list ([tag (string-split val ",")])
-                     (string-trim tag))))
-         (remove-duplicates (sort tags string<?))]))
+  (if (string-null? val)
+      empty
+      (string->taglist val)))
 
 ; get index of an item in the list
 ; numbering starts from 0
 (define/contract (get-index item lst)
-  (-> any/c list? (or/c integer? false?))
+  (any/c list? . -> . (or/c integer? false?))
   (define len (length lst))
   (define pos (member item lst))
   (if pos (- len (length pos)) #f))
@@ -237,8 +240,8 @@
          (load-image (map bitmap lst) 'default)]
         [else (load-image (first lst) 'default)])
   ; set the new frame label
-  (define-values (base name must-be-dir?) (split-path (image-path)))
-  (send (send (ivy-canvas) get-parent)
+  ;(define-values (base name must-be-dir?) (split-path (image-path)))
+  #;(send (send (ivy-canvas) get-parent)
         set-label
         (format "(~a%) ~a" (exact->inexact (/ quality 100)) (path->string name)))
   ; set the load progress
@@ -255,7 +258,7 @@
 ; creates a dark-gray/light-gray grid to place behind images
 ; so that if they are transparent, the grid will become visible.
 (define/contract (transparency-grid img)
-  (-> (or/c (is-a?/c bitmap%) pict?) pict?)
+  ((or/c (is-a?/c bitmap%) pict?) . -> . pict?)
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define y (if (pict? img) (pict-height img) (send img get-height)))
   ; 10 for a square's width
@@ -402,7 +405,7 @@
           [else (apply vl-append base-grid)])))
 
 (define/contract (transparency-grid-append img)
-  (-> (or/c (is-a?/c bitmap%) pict?) pict?)
+  ((or/c (is-a?/c bitmap%) pict?) . -> . pict?)
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define pct (if (pict? img) img (bitmap img)))
   (define grid (transparency-grid img))
@@ -417,7 +420,7 @@
 ; type is a symbol
 ; returns a pict
 (define/contract (scale-image img type)
-  (-> (or/c (is-a?/c bitmap%) pict?) image-scale/c pict?)
+  ((or/c (is-a?/c bitmap%) pict?) image-scale/c . -> . pict?)
   (define canvas (ivy-canvas))
   ; width and height of the image
   (define img-width (if (pict? img)
@@ -479,7 +482,7 @@
 (define want-animation? (make-parameter #f))
 
 (define/contract (animation-callback canvas dc lst)
-  (-> (is-a?/c canvas%) (is-a?/c dc<%>) list? void?)
+  ((is-a?/c canvas%) (is-a?/c dc<%>) list? . -> . void?)
   (define img-x (inexact->exact (round (pict-width (first lst)))))
   (define img-y (inexact->exact (round (pict-height (first lst)))))
   (define img-center-x (/ img-x 2))
@@ -681,7 +684,7 @@
         (decoder (flif-create-decoder))
         ; progressive decoding
         (flif-decoder-set-callback! (decoder) progressive-callback)
-        (flif-decoder-set-first-callback-quality! (decoder) 100000)
+        (flif-decoder-set-first-callback-quality! (decoder) 10000)
         ; put the actual decoding in its own thread
         #;(decoder-thread
          (thread (λ ()
@@ -739,7 +742,7 @@
                  ;(set-box! flif-load-progress 0)
                  ; progressive decoding
                  (flif-decoder-set-callback! (decoder) progressive-callback)
-                 (flif-decoder-set-first-callback-quality! (decoder) 100000)
+                 (flif-decoder-set-first-callback-quality! (decoder) 10000)
                  ; put the actual decoding in its own thread
                  #;(decoder-thread
                   (thread (λ ()
@@ -1014,7 +1017,7 @@
 ; generates 100x100 thumbnails from a list of string paths
 ; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
 (define/contract (generate-thumbnails imgs)
-  (-> (listof path-string?) void?)
+  ((listof path-string?) . -> . void?)
   (for ([path (in-list imgs)])
     ; create and load the bitmap
     (define ext (path-get-extension path))
