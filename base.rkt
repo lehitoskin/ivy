@@ -135,18 +135,18 @@
 (define pfs (make-parameter (list root-path)))
 
 (define (string->taglist str)
-  (define tags
-    (filter (λ (tag) (not (string-null? tag)))
-            (for/list ([tag (string-split str ",")])
-              (string-trim tag))))
-  (remove-duplicates (sort tags string<?)))
+  (cond [(string-null? str) empty]
+        [else
+         (define tags
+           (filter (λ (tag) (not (string-null? tag)))
+                   (for/list ([tag (string-split str ",")])
+                     (string-trim tag))))
+         (remove-duplicates (sort tags string<?))]))
 
 (define/contract (tfield->list tf)
   ((is-a?/c text-field%). -> . list?)
   (define val (send tf get-value))
-  (if (string-null? val)
-      empty
-      (string->taglist val)))
+  (string->taglist val))
 
 ; get index of an item in the list
 ; numbering starts from 0

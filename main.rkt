@@ -8,7 +8,6 @@
          racket/gui/base
          racket/list
          racket/path
-         racket/string
          riff
          txexpr
          xml
@@ -72,19 +71,13 @@
   "Search the tags database inclusively with a comma-separated string."
   (show-frame? #f)
   (search-type 'or)
-  (tags-to-search
-   (if (string-null? taglist)
-       empty
-       (string->taglist taglist)))]
+  (tags-to-search (string->taglist taglist))]
  [("-a" "--search-and")
   taglist
   "Search the tags database exclusively with a comma-separated string."
   (show-frame? #f)
   (search-type 'and)
-  (tags-to-search
-   (if (string-null? taglist)
-       empty
-       (string->taglist taglist)))]
+  (tags-to-search (string->taglist taglist))]
  [("-L" "--list-tags")
   "Lists the tags for the image(s)."
   (show-frame? #f)
@@ -94,19 +87,13 @@
   "Add tags to an image. ex: ivy -A \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (add-tags? #t)
-  (tags-to-add
-   (if (string-null? taglist)
-       empty
-       (string->taglist taglist)))]
+  (tags-to-add (string->taglist taglist))]
  [("-D" "--delete-tags")
   taglist
   "Delete tags from image. ex: ivy -D \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (delete-tags? #t)
-  (tags-to-delete
-   (if (string-null? taglist)
-       empty
-       (string->taglist taglist)))]
+  (tags-to-delete (string->taglist taglist))]
  [("-P" "--purge")
   "Remove all tags from the images and purge from the database. ex: ivy -P /path/to/image ..."
   (show-frame? #f)
@@ -116,10 +103,7 @@
   "Sets the taglist of the image. ex: ivy -T \"tag0, tag1, ...\" /path/to/image ..."
   (show-frame? #f)
   (set-tags? #t)
-  (tags-to-set
-   (if (string-null? taglist)
-       empty
-       (string->taglist taglist)))]
+  (tags-to-set (string->taglist taglist))]
  [("-M" "--move-image")
   "Moves the source file(s) to the destination, updating the database."
   (show-frame? #f)
@@ -154,10 +138,7 @@
   "Search the tags database with -o/-a, but exclude images with the specified tags."
   (show-frame? #f)
   (excluding? #t)
-  (tags-to-exclude
-   (if (string-null? exclude)
-       empty
-       (string->taglist exclude)))]
+  (tags-to-exclude (string->taglist exclude))]
  [("-n" "--null")
   "Search result items are terminated by a null character instead of by whitespace."
   (show-frame? #f)
