@@ -173,13 +173,6 @@
     (send parent add-child (car kids))
     (add-children parent (cdr kids))))
 
-; obtain the rgba pixels from the given FLIF image-ptr
-(define (flif-get-rgba image-ptr reader width height [y 0] [bstr #""])
-  (cond [(= y height) bstr]
-        [else
-         (define row (reader image-ptr y (* width 4)))
-         (flif-get-rgba image-ptr reader width height (+ y 1) (bytes-append bstr row))]))
-
 ;; COPIED FROM opengl/main
 ;; Convert argb -> rgba
 ;; Modern wisdom is not to convert to rgba but rather use
@@ -222,9 +215,9 @@
     (define height (flif-image-get-height image))
     ; make sure to decode with the proper depth
     (define reader (if (= (flif-image-get-depth image) 8)
-                       flif-image-read-row-rgba8
-                       flif-image-read-row-rgba16))
-    (define pixels (flif-get-rgba image reader width height))
+                       flif-image-read-rgba8
+                       flif-image-read-rgba16))
+    (define pixels (reader image width height))
     (rgba->argb! pixels)
     (define bitmap (make-object bitmap% width height))
     (send bitmap set-argb-pixels 0 0 width height pixels)
