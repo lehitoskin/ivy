@@ -219,7 +219,7 @@
                        flif-image-read-rgba16))
     (define pixels (reader image width height))
     (rgba->argb! pixels)
-    (define bitmap (make-object bitmap% width height))
+    (define bitmap (make-object bitmap% width height #f #t))
     (send bitmap set-argb-pixels 0 0 width height pixels)
     bitmap))
 
