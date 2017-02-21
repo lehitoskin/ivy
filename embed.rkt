@@ -340,7 +340,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
         #""))
   (define len (bytes->length len-bstr))
   ; skip up to len for after-bytes
-  ; (if there is no existing eXmp chunk, seek until just before the first #"\0")
+  ; (if there is no existing eXmp chunk, seek until just after the header)
   (define after (subbytes flif-bstr (+ (if (zero? len)
                                            (car marker)
                                            (cdr marker))
@@ -841,10 +841,10 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 (define (xmp-rating xmp)
   (define xexpr (string->xexpr xmp))
-  (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
   (define rdf-desc (findf-txexpr xexpr (is-tag? 'rdf:Description)))
   (cond [rdf-desc
          ; attr may be a number via xmp:Rating
+         (define found (findf-txexpr xexpr (is-tag? 'xmp:Rating)))
          (define attr (attr-ref rdf-desc 'xmp:Rating (λ _ "")))
          (define attr-str
            (if (number? attr)

@@ -57,18 +57,21 @@
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 ; the only extensions ivy will accept - ignores everything else
-(define supported-extensions '(".bmp"
-                               ".flif"
-                               ".gif"
-                               ".jpe"
-                               ".jpeg"
-                               ".JPEG"
-                               ".jpg"
-                               ".JPG"
-                               ".png"
-                               ".svg"
-                               ".xbm"
-                               ".xpm"))
+; shenanigans be here
+(define supported-downcase '(".bmp"
+                             ".flaf"
+                             ".flf"
+                             ".flif"
+                             ".gif"
+                             ".jpe"
+                             ".jpeg"
+                             ".jpg"
+                             ".png"
+                             ".svg"
+                             ".xbm"
+                             ".xpm"))
+(define supported-extensions (append supported-downcase
+                                     (map string-upcase supported-downcase)))
 ; gif/flif stuff
 ; listof pict?
 (define image-lst-master empty)

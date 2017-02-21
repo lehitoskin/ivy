@@ -457,7 +457,8 @@
                      (when (and (not (equal? (image-path) root-path))
                                 (or (and (gif? (image-path))
                                          (gif-animated? (image-path)))
-                                    (flif-animated? (image-path))))
+                                    (and (flif? (image-path))
+                                         (flif-animated? (image-path)))))
                        (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
