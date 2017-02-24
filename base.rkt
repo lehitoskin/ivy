@@ -475,7 +475,7 @@
 (define status-bar-position (make-parameter #f))
 (define status-bar-size (make-parameter #f))
 (define incoming-tags (make-parameter ""))
-(define want-animation? (make-parameter #f))
+(define want-animation? (make-parameter #t))
 
 (define/contract (animation-callback canvas dc lst)
   ((is-a?/c canvas%) (is-a?/c dc<%>) list? . -> . void?)

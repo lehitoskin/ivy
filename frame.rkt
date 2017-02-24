@@ -447,11 +447,12 @@
        [shortcut-prefix (if (macosx?) '(ctl cmd) (get-default-shortcut-prefix))]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
 
-(define ivy-menu-bar-view-gif-animation
+(define ivy-menu-bar-view-animation
   (new checkable-menu-item%
        [parent ivy-menu-bar-view]
        [label "&Animation"]
        [help-string "Animate image, if possible."]
+       [checked (want-animation?)]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
                      (when (and (not (equal? (image-path) root-path))
