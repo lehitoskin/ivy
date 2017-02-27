@@ -991,6 +991,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         ; osx does things a little different
         [(f11) (unless (macosx?)
                  (toggle-fullscreen this ivy-frame))]
+        ; only do something if we're fullscreened,
+        ; since the tag bar isn't available in fullscreen anyway
+        [(escape) (when (and (send ivy-frame is-fullscreened?) (not (macosx?)))
+                      (toggle-fullscreen this ivy-frame))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
