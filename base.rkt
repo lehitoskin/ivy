@@ -28,6 +28,9 @@
          gif?
          gif-animated?)
 
+; max length of a frame's label string
+(define +label-max+ 198)
+
 (define (path->symbol p)
   (string->symbol (path->string p)))
 
@@ -607,6 +610,7 @@
        (image-scale/c)
        void?)
   (define canvas (ivy-canvas))
+  (define ivy-frame (send canvas get-parent))
   (define tag-tfield (ivy-tag-tfield))
   (define iar (ivy-actions-rating))
   (define sbd (status-bar-dimensions))
@@ -627,7 +631,7 @@
        [(and (want-animation?) (gif? img) (gif-animated? img))
         (define load-success (send image-bmp-master load-file img))
         ; set the new frame label
-        (send (send canvas get-parent) set-label (path->string name))
+        (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
         ; make a list of picts
         (with-handlers
             ([exn:fail? (λ (e)
@@ -703,7 +707,7 @@
                            (/ (flif-image-get-frame-delay image) 1000)))
           (set! image-num-loops (flif-decoder-num-loops (decoder))))
         ; set the new frame label
-        (send (send canvas get-parent) set-label (path->string name))
+        (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
         ; set the gui information
         (define size (file-size (image-path)))
         (define dimensions (flif-dimensions (image-path)))
@@ -748,7 +752,7 @@
                  (flif-decoder-decode-file! (decoder) img)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
-               (send (send canvas get-parent) set-label (path->string name))
+               (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
                (set! image-pict (scale-image image-bmp-master scale))
                (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))
                (define size (file-size (image-path)))

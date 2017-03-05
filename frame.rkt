@@ -807,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     (if (string=? (send tfield get-value) (incoming-tags))
         (send (ivy-canvas) focus)
         (send tfield set-value (incoming-tags)))
-    (send ivy-frame set-label (path->string name-path))))
+    (send ivy-frame set-label (string-truncate (path->string name-path) +label-max+))))
 
 (define ivy-tfield%
   (class text-field%
@@ -836,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
            (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
                   (define tags (send tf get-value))
-                  (send ivy-frame set-label name-str)
+                  (send ivy-frame set-label (string-truncate name-str +label-max+))
                   (when (embed-support? img-str)
                     ; put this into a new thread to speed things up
                     (let loop ()
@@ -866,7 +866,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                     (show-tag-browser))
                   (send (ivy-canvas) focus)]
                  [else
-                  (send ivy-frame set-label (string-append "* " name-str))
+                  (send ivy-frame set-label
+                        (string-truncate (string-append "* " name-str) +label-max+))
                   ; see color-database<%> for more named colors
                   (send tf set-field-background color-gold)])))]))
 
@@ -880,7 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
             (define img (image-path))
             (define img-str (path->string img))
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
-            (send ivy-frame set-label (path->string name-path))
+            (send ivy-frame set-label (string-truncate (path->string name-path) +label-max+))
             (define tags (send (ivy-tag-tfield) get-value))
             (send (ivy-tag-tfield) set-field-background color-spring-green)
             (when (embed-support? img-str)
