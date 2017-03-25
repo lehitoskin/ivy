@@ -64,8 +64,7 @@
  [("-V" "--version")
   "Display Ivy version."
   (printf "Ivy ~a~n" ivy-version)
-  (disconnect sqlc)
-  (exit)]
+  (exit:exit)]
  [("-o" "--search-or")
   taglist
   "Search the tags database inclusively with a comma-separated string."
@@ -178,11 +177,10 @@
      (define canvas-offset 84)
      (define max-width (- monitor-width canvas-offset 100))
      (define max-height (- monitor-height 100))
-     (load-image (image-path))
      (define pct (if (flif? (image-path))
                      (let ([dimensions (flif-dimensions (image-path))])
                        (rectangle (first dimensions) (second dimensions)))
-                     (bitmap image-bmp-master)))
+                     (bitmap (image-path))))
      (define pct-width (pict-width pct))
      (define pct-height (pict-height pct))
      (cond
@@ -239,7 +237,9 @@
     (send (ivy-canvas) focus)
     ; center the frame
     (send ivy-frame center 'both)
-    (send ivy-frame show #t)]
+    (send ivy-frame show #t)
+    ; canvas won't resize until the frame is shown
+    (load-image (image-path))]
    ; only searching for tags
    [(and (search-type)
          (not (excluding?))
@@ -337,8 +337,7 @@
     (cond
       [(empty? args)
        (raise-argument-error 'add-tags "1 or more image arguments" (length args))
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
@@ -356,8 +355,7 @@
     (cond
       [(empty? args)
        (raise-argument-error 'delete-tags "1 or more image arguments" (length args))
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
@@ -384,8 +382,7 @@
     (cond
       [(empty? args)
        (raise-argument-error 'set-tags "1 or more image arguments" (length args))
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
@@ -400,8 +397,7 @@
     (cond
       [(empty? args)
        (raise-argument-error 'set-xmp "1 or more image arguments" (length args))
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        ; make sure the paths are absolute
        (define absolutes (map relative->absolute args))
@@ -426,8 +422,7 @@
     (cond
       [(empty? args)
        (raise-argument-error 'add-tags "1 or more image arguments" (length args))
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        (for ([img (in-list args)])
          (define absolute-path (path->string (relative->absolute img)))
@@ -456,8 +451,7 @@
     (cond
       [(< len 2)
        (raise-argument-error 'move-image "2 or more arguments" len)
-       (disconnect sqlc)
-       (exit)]
+       (exit:exit)]
       [else
        ; make sure the paths are absolute
        (define absolute-str
@@ -515,5 +509,4 @@
            (rename-file-or-directory old-path new-path #f)))])])
  ; exit explicitly
  (unless (show-frame?)
-   (disconnect sqlc)
-   (exit)))
+   (exit:exit)))

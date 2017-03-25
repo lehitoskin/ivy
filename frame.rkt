@@ -9,7 +9,6 @@
          racket/gui/base
          racket/list
          racket/math
-         racket/path
          racket/string
          riff
          txexpr
@@ -23,7 +22,7 @@
          "meta-editor.rkt"
          "search-dialog.rkt"
          "tag-browser.rkt")
-(provide (all-defined-out))
+(provide (all-defined-out) exit:exit)
 
 ; framework stuff
 (application:current-app-name "Ivy")
@@ -995,7 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         ; only do something if we're fullscreened,
         ; since the tag bar isn't available in fullscreen anyway
         [(escape) (when (and (send ivy-frame is-fullscreened?) (not (macosx?)))
-                      (toggle-fullscreen this ivy-frame))]
+                    (toggle-fullscreen this ivy-frame))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]
         [(home) (load-first-image)]
