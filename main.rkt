@@ -238,9 +238,8 @@
     ; center the frame
     (send ivy-frame center 'both)
     (send ivy-frame show #t)
-    ; canvas won't resize until the frame is shown.
-    ; make sure we don't try to load "/" as an image.
-    (unless (eq? (image-path) root-path)
+    ; canvas won't resize until the frame is shown
+    (when (supported-file? (image-path))
       (load-image (image-path)))]
    ; only searching for tags
    [(and (search-type)
