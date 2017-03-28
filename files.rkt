@@ -27,7 +27,15 @@
 (define master-file (build-path ivy-path "catalog.sqlite"))
 
 ; path for cached thumbnails
-(define thumbnails-path (build-path ivy-path "thumbnails"))
+; - on *NIX, use ~/.cache/thumbnails/normal
+(define thumbnails-path
+  (if (eq? (system-type) 'unix)
+      (let ([xdg (getenv "XDG_CACHE_HOME")])
+        (if xdg
+            (build-path xdg "thumbnails/normal")
+            (build-path (find-system-path 'home-dir)
+                        ".cache/thumbnails/normal")))
+      (build-path ivy-path "thumbnails")))
 
 (begin-for-syntax
   (define logo

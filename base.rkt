@@ -2,6 +2,7 @@
 ; base.rkt
 ; base file for ivy, the taggable image viewer
 (require file/convertible
+         file/md5
          file/sha1
          gif-image
          pict
@@ -1003,18 +1004,20 @@
       (filter (negate empty?) (append accum (list lst)))
       (grid-list (drop lst width) width (append accum (list (take lst width))))))
 
-(define (path->thumb-path path)
-  (define path-str (if (path? path) (path->string path) path))
-  (define thumb-name
-    (string-append
-     (if (eq? (system-type) 'windows)
-         (string-replace (string-replace path-str "\\" "_")
-                         "C:" "C")
-         (string-replace path-str "/" "_"))
-     ".png"))
+; md5 *of the path*, not the image
+(define/contract (path->md5 path)
+  ((or/c path? string? bytes?) . -> . path?)
+  (define path-bstr
+    (cond [(path? path)
+           (string->bytes/utf-8 (path->string path))]
+          [(string? path)
+           (string->bytes/utf-8 path)]
+          [(bytes? path) path]))
+  (define in (open-input-bytes (bytes-append #"file://" path-bstr)))
+  (define thumb-name (bytes->string/utf-8 (bytes-append (md5 in #t) #".png")))
   (build-path thumbnails-path thumb-name))
 
-; generates 100x100 thumbnails from a list of string paths
+; generates 128x128 thumbnails from a list of string paths
 ; e.g. (generate-thumbnails (map path->string (search-dict master 'or "beach")))
 (define/contract (generate-thumbnails imgs)
   ((listof path-string?) . -> . void?)
@@ -1033,10 +1036,10 @@
                bmp)]
             [else
              (read-bitmap path)]))
-    (define thumb-path (path->thumb-path path))
-    ; use pict to scale the image to 100x100
+    (define thumb-path (path->md5 path))
+    ; use pict to scale the image to 128x128
     (define thumb-pct (bitmap thumb-bmp))
-    (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 100 100)))
+    (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 128 128)))
     (define thumb-port-out (open-output-file thumb-path
                                              #:mode 'binary
                                              #:exists 'truncate/replace))

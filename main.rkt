@@ -238,8 +238,10 @@
     ; center the frame
     (send ivy-frame center 'both)
     (send ivy-frame show #t)
-    ; canvas won't resize until the frame is shown
-    (load-image (image-path))]
+    ; canvas won't resize until the frame is shown.
+    ; make sure we don't try to load "/" as an image.
+    (unless (eq? (image-path) root-path)
+      (load-image (image-path)))]
    ; only searching for tags
    [(and (search-type)
          (not (excluding?))
@@ -371,7 +373,7 @@
     (for ([img (in-list args)])
       (define absolute-path (path->string (relative->absolute img)))
       ; clean up the thumbnail cache a little
-      (define thumb-name (path->thumb-path absolute-path))
+      (define thumb-name (path->md5 absolute-path))
       (when (verbose?)
         (printf "Purging ~v from the database.~n" absolute-path))
       (db-purge! absolute-path)
@@ -483,8 +485,8 @@
              ; reassociate the tags to the new destination
              [(db-has-key? 'images old-path)
               ; clean up the thumbnail cache a little
-              (define old-thumb-name (path->thumb-path old-path))
-              (define new-thumb-name (path->thumb-path new-path))
+              (define old-thumb-name (path->md5 old-path))
+              (define new-thumb-name (path->md5 new-path))
               (define old-img-obj (make-data-object sqlc image% old-path))
               (define tags (send old-img-obj get-tags))
               ; remove the old thumbnails

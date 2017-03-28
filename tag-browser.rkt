@@ -272,7 +272,7 @@
             (define img-path (string->path img-str))
             ; set new thumbnail data
             ; get the thumbnail path
-            (define thumb-path (path->thumb-path img-str))
+            (define thumb-path (path->md5 img-str))
             ; make certain the thumbnail exists
             (unless (file-exists? thumb-path)
               (generate-thumbnails (list img-str)))
@@ -298,7 +298,7 @@
        [alignment '(center center)]
        [stretchable-width #f]))
 
-(define thumb-bmp (make-object bitmap% 100 100))
+(define thumb-bmp (make-object bitmap% 128 128))
 
 (define updating-frame
   (new frame%

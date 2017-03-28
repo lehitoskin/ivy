@@ -155,7 +155,7 @@
          
      (define thumbs-path
        (for/list ([path-str (in-list imgs-str)])
-         (path->thumb-path path-str)))
+         (path->md5 path-str)))
          
      ; generate the thumbnail in case it does not exist
      (generate-thumbnails
