@@ -1025,17 +1025,17 @@
     ; create and load the bitmap
     (define ext (path-get-extension path))
     (define thumb-bmp
-      (cond [(bytes=? ext #".svg")
-             (load-svg-from-file path)]
-            [(bytes=? ext #".flif")
-             (define dec (flif-create-decoder))
-             (flif-decoder-decode-file! dec path)
-             (parameterize ([want-animation? #f])
-               (define bmp (first (flif->list dec)))
-               (flif-destroy-decoder! dec)
-               bmp)]
-            [else
-             (read-bitmap path)]))
+      (case ext
+        [(#".svg" #".SVG")
+         (load-svg-from-file path)]
+        [(#".flif" #".FLIF" #".flaf" #".FLAF")
+         (define dec (flif-create-decoder))
+         (flif-decoder-decode-file! dec path)
+         (parameterize ([want-animation? #f])
+           (define bmp (first (flif->list dec)))
+           (flif-destroy-decoder! dec)
+           bmp)]
+        [else (read-bitmap path)]))
     (define thumb-path (path->md5 path))
     ; use pict to scale the image to 128x128
     (define thumb-pct (bitmap thumb-bmp))
