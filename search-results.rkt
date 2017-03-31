@@ -132,7 +132,7 @@
        [label "Ivy - Preparing Search Preview"]
        [width 200]
        [height 40]
-       [style '(float)]))
+       [style '(no-resize-border no-caption no-system-menu)]))
 
 (define prep-msg
   (new message%
@@ -149,14 +149,11 @@
      (send prep-notification show #t)
      ; remove everything from the text so we can reuse it
      (send txt erase)
-         
+     
      (define imgs-str (sort (map path->string imgs) string<?))
+     (define thumbs-path (map path->md5 imgs-str))
      (set! searched-images imgs)
-         
-     (define thumbs-path
-       (for/list ([path-str (in-list imgs-str)])
-         (path->md5 path-str)))
-         
+     
      ; generate the thumbnail in case it does not exist
      (generate-thumbnails
       (filter path-string?
@@ -165,11 +162,11 @@
                 (if (file-exists? thumb)
                     #f
                     path-str))))
-         
+     
      (for ([thumb-str (in-list thumbs-path)]
            [img-path (in-list imgs)]
            [img-str (in-list imgs-str)])
-       (define img-name (path->string (file-name-from-path img-str)))
+       (define img-name (string-truncate (path->string (file-name-from-path img-str)) 15))
        (define thumb+name
          (pict->bitmap
           (vc-append

@@ -1,7 +1,9 @@
 #lang racket/base
 ; files.rkt
 ; definitions of file paths that ivy uses
-(require images/compile-time (for-syntax racket/base racket/draw))
+(require images/compile-time
+         (for-syntax racket/base racket/draw)
+         racket/file)
 (provide (all-defined-out))
 
 (define ivy-version "2.2.1")
@@ -52,10 +54,11 @@
 
 ; create the config directory
 (unless (directory-exists? ivy-path)
-  (make-directory ivy-path))
+  (make-directory* ivy-path))
 
 (unless (directory-exists? thumbnails-path)
-  (make-directory thumbnails-path))
+  (make-directory* thumbnails-path)
+  (file-or-directory-permissions thumbnails-path #o700))
 
 ; flif decoder parameter
 (define decoder (make-parameter #f))
