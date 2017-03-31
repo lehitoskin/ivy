@@ -5,6 +5,7 @@
          file/md5
          file/sha1
          gif-image
+         net/uri-codec
          pict
          png-image
          racket/bool
@@ -1005,19 +1006,26 @@
       (filter (negate empty?) (append accum (list lst)))
       (grid-list (drop lst width) width (append accum (list (take lst width))))))
 
+(define/contract (path->uri path)
+  (path-string? . -> . string?)
+  ; convert the path-string to a valid URI
+  (define path-lst (explode-path path))
+  ; the first entry is going to be garbled, so omit that part
+  (define encoded (map (compose1 uri-encode path->string) (rest path-lst)))
+  (string-append "file://"
+                 (if (eq? (system-type) 'windows)
+                     "/c:/"
+                     "/")
+                 (string-join encoded "/")))
+
 ; returns the absolute path to the thumbnail we want,
 ; with the name of the thumbnail being an md5sum
 ; md5 *of the path*, not the image
 (define/contract (path->md5 path)
-  ((or/c path? string? bytes?) . -> . path?)
-  (define path-bstr
-    (cond [(path? path)
-           (path->bytes path)]
-          [(string? path)
-           (string->bytes/utf-8 path)]
-          [(bytes? path) path]))
-  (define in (open-input-bytes (bytes-append #"file://" path-bstr)))
-  (define thumb-name (bytes->string/utf-8 (bytes-append (md5 in #t) #".png")))
+  (path-string? . -> . path?)
+  (define uri (path->uri path))
+  ; encode to md5
+  (define thumb-name (bytes->string/utf-8 (bytes-append (md5 uri #t) #".png")))
   (build-path thumbnails-path thumb-name))
 
 ; generates 128x128 thumbnails from a list of string paths
@@ -1042,7 +1050,7 @@
     (define thumb-path (path->md5 path))
     ; use a temporary file in case there's concurrent
     ; thumbnail generation going on
-    (define thumb-tmp (string-append (path->string thumb-path) "-ivy-tmp"))
+    (define thumb-tmp (string-append (number->string (current-seconds)) "_ivy-tmp.png"))
     ; use pict to scale the image to 128x128
     (define thumb-pct (bitmap thumb-bmp))
     (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 128 128)))
@@ -1052,11 +1060,7 @@
     (printf "Writing bytes to ~a~n" thumb-path)
     (define thumb-hash (png->hash (convert thumb-small 'png-bytes)))
     ; set thumbnail attributes
-    (define uri (string-append
-                 "file://"
-                 (if (path? path)
-                     (path->string path)
-                     path)))
+    (define uri (path->uri path))
     (define mtime (file-or-directory-modify-seconds path))
     (define mime
       (case ext
@@ -1071,23 +1075,23 @@
     (define size (file-size path))
     (define software (format "Ivy Image Viewer ~a" ivy-version))
     (define setted
-      (let* ([mti (itxt-set thumb-hash
-                            (make-itxt-hash
-                             (make-itxt-chunk (number->string mtime) "Thumb::MTime"))
+      (let* ([mti (text-set thumb-hash
+                            (make-text-hash
+                             (make-text-chunk (number->string mtime) "Thumb::MTime"))
                             "Thumb::MTime")]
-             [ur (itxt-set mti
-                           (make-itxt-hash
-                            (make-itxt-chunk uri "Thumb::URI"))
+             [ur (text-set mti
+                           (make-text-hash
+                            (make-text-chunk uri "Thumb::URI"))
                            "Thumb::URI")]
-             [sz (itxt-set ur
-                           (make-itxt-hash
-                            (make-itxt-chunk (number->string size) "Thumb::Size"))
+             [sz (text-set ur
+                           (make-text-hash
+                            (make-text-chunk (number->string size) "Thumb::Size"))
                            "Thumb::Size")]
-             [mty (itxt-set sz
-                            (make-itxt-hash
-                             (make-itxt-chunk mime "Thumb::Mimetype"))
+             [mty (text-set sz
+                            (make-text-hash
+                             (make-text-chunk mime "Thumb::Mimetype"))
                             "Thumb::Mimetype")])
-        (itxt-set mty (make-itxt-hash (make-itxt-chunk software "Software")) "Software")))
+        (text-set mty (make-text-hash (make-text-chunk software "Software")) "Software")))
     ; save to disk
     (write-bytes (hash->png setted) thumb-port-out)
     (close-output-port thumb-port-out)
