@@ -7,7 +7,8 @@
          "base.rkt"
          "db.rkt"
          "embed.rkt"
-         "files.rkt")
+         "files.rkt"
+         "thumbnails.rkt")
 (provide browser-frame show-tag-browser)
 
 (define browser-frame

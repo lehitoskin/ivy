@@ -15,9 +15,10 @@
          "db.rkt"
          "embed.rkt"
          "error-log.rkt"
+         (only-in "files.rkt" ivy-version)
          "frame.rkt"
          "meta-editor.rkt"
-         (only-in "files.rkt" ivy-version))
+         "thumbnails.rkt")
 
 (define show-frame? (make-parameter #t))
 
