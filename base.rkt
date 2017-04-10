@@ -1,7 +1,8 @@
 #lang racket/base
 ; base.rkt
 ; base file for ivy, the taggable image viewer
-(require file/sha1
+(require (only-in ffi/unsafe malloc)
+         file/sha1
          gif-image
          pict
          racket/bool
@@ -228,7 +229,8 @@
     (send bitmap set-argb-pixels 0 0 width height pixels)
     bitmap))
 
-(define (progressive-callback quality num-read)
+(define (progressive-callback info-struct user-data)
+  (define quality (callback-info-t-quality info-struct))
   (define lst (flif->list (decoder)))
   (set! image-bmp-master (first lst))
   (cond [(and (want-animation?) (> (length lst) 1))
@@ -245,7 +247,7 @@
   ; set the load progress
   ;(set-box! flif-load-progress quality)
   ; the fewer the calls, the faster the total decoding
-  (+ quality 5000))
+  (set-callback-info-t-quality! (+ quality 5000)))
 
 ; objects that will be used extensively in transparency-grid
 (define dgray-color (make-object color% 128 128 128))
@@ -682,8 +684,9 @@
         (cumulative? #f)
         (decoder (flif-create-decoder))
         ; progressive decoding
-        (flif-decoder-set-callback! (decoder) progressive-callback)
-        (flif-decoder-set-first-callback-quality! (decoder) 10000)
+        ;(define user-data (malloc 1))
+        ;(flif-decoder-set-callback! (decoder) progressive-callback user-data)
+        ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
         ; put the actual decoding in its own thread
         #;(decoder-thread
          (thread (λ ()
@@ -701,6 +704,8 @@
         (flif-decoder-decode-file! (decoder) img)
         (let ([image (flif-decoder-get-image (decoder) 0)]
               [num-frames (flif-decoder-num-images (decoder))])
+          (define lst (flif->list (decoder)))
+          (set! image-bmp-master (first lst))
           (set! image-lst-timings
                 (make-list num-frames
                            (/ (flif-image-get-frame-delay image) 1000)))
@@ -740,15 +745,19 @@
                  ; set the load progress to 0
                  ;(set-box! flif-load-progress 0)
                  ; progressive decoding
-                 (flif-decoder-set-callback! (decoder) progressive-callback)
-                 (flif-decoder-set-first-callback-quality! (decoder) 10000)
+                 ;(define user-data (malloc 1))
+                 ;(flif-decoder-set-callback! (decoder) progressive-callback user-data)
+                 ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
                  ; put the actual decoding in its own thread
                  #;(decoder-thread
                   (thread (λ ()
                             ; decode, but do not immediately destroy the decoder
                             (flif-decoder-decode-file! (decoder) img))))
                  ; regular decoding
-                 (flif-decoder-decode-file! (decoder) img)]
+                 (flif-decoder-decode-file! (decoder) img)
+                 (define lst (flif->list (decoder)))
+                 (set! image-bmp-master (first lst))
+                 (load-image (first lst) 'default)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
