@@ -1,8 +1,7 @@
 #lang racket/base
 ; base.rkt
 ; base file for ivy, the taggable image viewer
-(require (only-in ffi/unsafe malloc)
-         file/sha1
+(require file/sha1
          gif-image
          pict
          racket/bool
@@ -61,20 +60,20 @@
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 ; the only extensions ivy will accept - ignores everything else
 ; shenanigans be here
-(define supported-downcase '(".bmp"
-                             ".flaf"
-                             ".flf"
-                             ".flif"
-                             ".gif"
-                             ".jpe"
-                             ".jpeg"
-                             ".jpg"
-                             ".png"
-                             ".svg"
-                             ".xbm"
-                             ".xpm"))
-(define supported-extensions (append supported-downcase
-                                     (map string-upcase supported-downcase)))
+(define +supported-downcase+ '(".bmp"
+                               ".flaf"
+                               ".flf"
+                               ".flif"
+                               ".gif"
+                               ".jpe"
+                               ".jpeg"
+                               ".jpg"
+                               ".png"
+                               ".svg"
+                               ".xbm"
+                               ".xpm"))
+(define +supported-extensions+ (append +supported-downcase+
+                                       (map string-upcase +supported-downcase+)))
 ; gif/flif stuff
 ; listof pict?
 (define image-lst-master empty)
@@ -121,7 +120,7 @@
   (path-string? . -> . boolean?)
   (define ext (path-get-extension img))
   (and ext
-       (member (string-downcase (bytes->string/utf-8 ext)) supported-extensions)
+       (member (string-downcase (bytes->string/utf-8 ext)) +supported-extensions+)
        #t))
 
 ; find all supported images in dir,
@@ -237,6 +236,7 @@
          (set! image-lst-timings
                (let ([image (flif-decoder-get-image (decoder) 0)])
                  (make-list (length lst) (flif-image-get-frame-delay image))))
+         (set! image-num-loops (flif-decoder-num-loops (decoder)))
          (load-image (map bitmap lst) 'default)]
         [else (load-image (first lst) 'default)])
   ; set the new frame label
@@ -247,7 +247,7 @@
   ; set the load progress
   ;(set-box! flif-load-progress quality)
   ; the fewer the calls, the faster the total decoding
-  (set-callback-info-t-quality! (+ quality 5000)))
+  (+ quality 5000))
 
 ; objects that will be used extensively in transparency-grid
 (define dgray-color (make-object color% 128 128 128))
@@ -684,22 +684,8 @@
         (cumulative? #f)
         (decoder (flif-create-decoder))
         ; progressive decoding
-        ;(define user-data (malloc 1))
-        ;(flif-decoder-set-callback! (decoder) progressive-callback user-data)
+        ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
         ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
-        ; put the actual decoding in its own thread
-        #;(decoder-thread
-         (thread (λ ()
-                   ; set the progress to 0
-                   (set-box! flif-load-progress 0)
-                   ; decode, but do not immediately destroy the decoder
-                   (flif-decoder-decode-file! (decoder) img)
-                   (define num-frames (flif-decoder-num-images (decoder)))
-                   (define image (flif-decoder-get-image (decoder) 0))
-                   (set! image-lst-timings
-                         (make-list num-frames
-                                    (/ (flif-image-get-frame-delay image) 1000)))
-                   (set! image-num-loops (flif-decoder-num-loops (decoder))))))
         ; regular decoding
         (flif-decoder-decode-file! (decoder) img)
         (let ([image (flif-decoder-get-image (decoder) 0)]
@@ -745,14 +731,8 @@
                  ; set the load progress to 0
                  ;(set-box! flif-load-progress 0)
                  ; progressive decoding
-                 ;(define user-data (malloc 1))
-                 ;(flif-decoder-set-callback! (decoder) progressive-callback user-data)
+                 ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
                  ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
-                 ; put the actual decoding in its own thread
-                 #;(decoder-thread
-                  (thread (λ ()
-                            ; decode, but do not immediately destroy the decoder
-                            (flif-decoder-decode-file! (decoder) img))))
                  ; regular decoding
                  (flif-decoder-decode-file! (decoder) img)
                  (define lst (flif->list (decoder)))

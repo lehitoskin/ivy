@@ -30,24 +30,18 @@
 (void
  (exit:insert-on-callback
   (λ ()
-    ; kill the gif thread, if applicable
+    ; kill the animation thread, if applicable
     (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
       (kill-thread (animation-thread)))
     ; wait for any xmp threads to finish before exiting
     (unless (hash-empty? xmp-threads)
-      (for ([pair (in-list (hash->list xmp-threads))])
+      (for ([pair (in-hash-pairs xmp-threads)])
         (let loop ()
           (unless (thread-dead? (cdr pair))
             (printf "Waiting for thread ~a to finish...\n" (car pair))
             (sleep 1/4)
             (loop)))))
-    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
-      (kill-thread (decoder-thread))
-      (displayln "Quit; aborting decoder...")
-      (flif-abort-decoder! (decoder))
-      (flif-destroy-decoder! (decoder))
-      (displayln "done")
-      (decoder #f))
+    ; clean up the decoder pointer
     (when (decoder)
       (flif-abort-decoder! (decoder))
       (flif-destroy-decoder! (decoder))
@@ -166,7 +160,7 @@
              `(("All images"
                 ,(string-append
                   "*"
-                  (string-join supported-extensions ";*")))
+                  (string-join +supported-extensions+ ";*")))
                ("Any" "*.*"))))
           ; make sure the path is not false
           (when paths
@@ -201,7 +195,7 @@
              `(("All images"
                 ,(string-append
                   "*"
-                  (string-join supported-extensions ";*")))
+                  (string-join +supported-extensions+ ";*")))
                ("Any" "*.*"))))
           ; the user did not click cancel
           (when paths
