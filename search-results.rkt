@@ -135,6 +135,10 @@
        [height 40]
        [style '(no-resize-border no-caption no-system-menu)]))
 
+; set the icon for the frame
+(unless (macosx?)
+  (void (send prep-notification set-icon logo-bmp)))
+
 (define prep-msg
   (new message%
        [parent prep-notification]
