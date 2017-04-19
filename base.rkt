@@ -228,8 +228,8 @@
     (send bitmap set-argb-pixels 0 0 width height pixels)
     bitmap))
 
-(define (progressive-callback info-struct user-data)
-  (define quality (callback-info-t-quality info-struct))
+(define (progressive-callback quality bytes-read decode-over? user-data context)
+  (flif-decoder-generate-preview context)
   (define lst (flif->list (decoder)))
   (set! image-bmp-master (first lst))
   (cond [(and (want-animation?) (> (length lst) 1))
@@ -732,7 +732,7 @@
                  ;(set-box! flif-load-progress 0)
                  ; progressive decoding
                  ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
-                 ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
+                 ;(flif-decoder-set-first-callback-quality! (decoder) 5000)
                  ; regular decoding
                  (flif-decoder-decode-file! (decoder) img)
                  (define lst (flif->list (decoder)))
