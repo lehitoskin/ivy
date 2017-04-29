@@ -12,7 +12,7 @@ tracked solely by the application.
 - [gif-image](https://github.com/lehitoskin/gif-image)
 - [png-image](https://github.com/lehitoskin/png-image)
 - [racquel](https://github.com/brown131/racquel)
-- [riff](https://github.com/lehitoskin/riff) (which uses FLIF, see below)
+- [riff](https://github.com/lehitoskin/riff) v0.2 (which uses FLIF v0.3, see below)
 - [rsvg](https://github.com/takikawa/rsvg) (which uses librsvg)
 - [sugar](https://github.com/mbutterick/sugar)
 - [txexpr](https://github.com/mbutterick/txexpr)

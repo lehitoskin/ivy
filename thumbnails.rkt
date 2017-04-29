@@ -16,9 +16,9 @@
          "files.rkt")
 (provide path->md5 generate-thumbnails)
 
+; convert the path-string to a valid URI
 (define/contract (path->uri path)
   (path-string? . -> . string?)
-  ; convert the path-string to a valid URI
   (define path-lst (explode-path path))
   ; the first entry is going to be garbled, so omit that part
   (define encoded (map (compose1 uri-encode path->string) (rest path-lst)))

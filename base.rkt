@@ -39,12 +39,12 @@
 (define (macosx?)
   (eq? (system-type) 'macosx))
 
-(define root-path
+(define +root-path+
   (if (eq? (system-type) 'windows)
       (build-path "C:\\")
       (build-path "/")))
 ; path of the currently displayed image
-(define image-path (make-parameter root-path))
+(define image-path (make-parameter +root-path+))
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
@@ -137,7 +137,7 @@
 ; parameter listof path
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
-(define pfs (make-parameter (list root-path)))
+(define pfs (make-parameter (list +root-path+)))
 
 (define (string->taglist str)
   (cond [(string-null? str) empty]
@@ -938,7 +938,7 @@
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry
 (define ((load-image-in-collection direction))
-  (unless (equal? (image-path) root-path)
+  (unless (equal? (image-path) +root-path+)
     ; kill the animation thread, if applicable
     (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
       (kill-thread (animation-thread)))

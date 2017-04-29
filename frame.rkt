@@ -201,7 +201,7 @@
           (when paths
             (cond
               ; empty collection, adding images and load the first in the list
-              [(equal? (first (pfs)) root-path)
+              [(equal? (first (pfs)) +root-path+)
                (define img-path (first paths))
                (define-values (base name dir?) (split-path img-path))
                (image-dir base)
@@ -267,7 +267,7 @@
             (unless (empty? paths)
               (cond
                 ; empty collection, adding images and load the first in the list
-                [(equal? (first (pfs)) root-path)
+                [(equal? (first (pfs)) +root-path+)
                  (define img-path (first paths))
                  (define-values (base name dir?) (split-path img-path))
                  (image-dir base)
@@ -310,8 +310,8 @@
             (flif-destroy-decoder! (decoder))
             (decoder #f))
           (image-dir (find-system-path 'home-dir))
-          (pfs (list root-path))
-          (image-path root-path)
+          (pfs (list +root-path+))
+          (image-path +root-path+)
           (send (ivy-canvas) set-on-paint!
                 (λ (canvas dc)
                   (send canvas set-canvas-background color-black)))
@@ -448,7 +448,7 @@
        [checked (want-animation?)]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                     (when (and (not (equal? (image-path) root-path))
+                     (when (and (not (equal? (image-path) +root-path+))
                                 (or (and (gif? (image-path))
                                          (gif-animated? (image-path)))
                                     (and (flif? (image-path))
@@ -484,7 +484,7 @@
        [parent ivy-menu-bar-view-zoom-to]
        [label (format "~a%" n)]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (if (empty? image-lst-master)
                          (load-image (bitmap image-bmp-master) n)
@@ -496,7 +496,7 @@
        [label "Rotate left"]
        [help-string "Rotate the image left."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (load-image (rotate image-pict (/ pi 2)) 'same)))]))
 
@@ -506,7 +506,7 @@
        [label "Rotate right"]
        [help-string "Rotate the image right."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (load-image (rotate image-pict (- (/ pi 2))) 'same)))]))
 
@@ -516,7 +516,7 @@
        [label "Flip horizontal"]
        [help-string "Flip the image horizontally."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (define flo
                        (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
                      (collect-garbage 'incremental)
@@ -528,7 +528,7 @@
        [label "Flip vertical"]
        [help-string "Flip the image vertically."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (define flo
                        (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
                      (collect-garbage 'incremental)
@@ -540,7 +540,7 @@
        [label "Sort Alphabetically"]
        [help-string "Sort the current collection alphabetically."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (define new-pfs (sort (pfs) path<?))
                      (pfs new-pfs)
                      (send (status-bar-position)
@@ -555,7 +555,7 @@
        [label "Sort by High Rating"]
        [help-string "Sort the current collection by highest Rating."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      ; read the database entries for ratings
                      (define ratings
                        (for/list ([img (in-list (map path->string (pfs)))])
@@ -580,7 +580,7 @@
        [label "Sort by Low Rating"]
        [help-string "Sort the current collection by lowest Rating."]
        [callback (λ (i e)
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      ; read the database entries for ratings
                      (define ratings
                        (for/list ([img (in-list (map path->string (pfs)))])
@@ -687,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (if (and image-pict
                               (empty? image-lst))
@@ -700,7 +700,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (if (and image-pict
                               (empty? image-lst))
@@ -713,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (if (empty? image-lst)
                          (load-image image-bmp-master 'none)
@@ -725,7 +725,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
-                   (unless (equal? (image-path) root-path)
+                   (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
                      (if (empty? image-lst)
                          (load-image image-bmp-master)
@@ -744,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       [callback (λ (choice evt)
                   ; do nothing if we've pressed ctrl+n or if the
                   ; image cannot embed metadata
-                  (unless (or (equal? (image-path) root-path)
+                  (unless (or (equal? (image-path) +root-path+)
                               (not (embed-support? (image-path))))
                     (define img (image-path))
 
@@ -794,7 +794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                                       (thread set-xmp:rating!))])))]))
 
 (define (on-escape-key tfield)
-  (unless (equal? (image-path) root-path)
+  (unless (equal? (image-path) +root-path+)
     (send tfield set-field-background color-white)
     (define-values (base name-path must-be-dir?) (split-path (image-path)))
     (if (string=? (send tfield get-value) (incoming-tags))
@@ -822,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (unless (equal? (image-path) root-path)
+         (unless (equal? (image-path) +root-path+)
            (define img (image-path))
            (define img-str (path->string img))
            (define-values (base name-path must-be-dir?) (split-path img))
@@ -870,7 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [label "Set"]
        [callback
         (λ (button event)
-          (unless (equal? (image-path) root-path)
+          (unless (equal? (image-path) +root-path+)
             (define img (image-path))
             (define img-str (path->string img))
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
@@ -937,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (cond
         ; empty collection, adding 1 image
         ; like file-open, but only open the single image
-        [(equal? (first (pfs)) root-path)
+        [(equal? (first (pfs)) +root-path+)
          (define-values (base name dir?) (split-path pathname))
          (image-dir base)
          (pfs (list pathname))
@@ -968,7 +968,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (case type
         [(wheel-down)
          ; do nothing if we've pressed ctrl+n
-         (unless (equal? (image-path) root-path)
+         (unless (equal? (image-path) +root-path+)
            (collect-garbage 'incremental)
            (if (and image-pict
                     (empty? image-lst))
@@ -976,7 +976,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                (load-image image-lst 'wheel-smaller)))]
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
-         (unless (equal? (image-path) root-path)
+         (unless (equal? (image-path) +root-path+)
            (collect-garbage 'incremental)
            (if (and image-pict
                     (empty? image-lst))

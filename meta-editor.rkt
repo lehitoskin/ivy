@@ -122,7 +122,7 @@
     [else empty]))
 
 (define (ok-callback)
-  (unless (equal? (image-path) root-path)
+  (unless (equal? (image-path) +root-path+)
     (define type (send xmp-lbox get-string-selection))
     (when type
       (define elems (send dc-tfield get-value))
@@ -229,7 +229,7 @@
        [choices (append dublin-core xmp-base)]
        [selection 11]
        [callback (λ (lbox evt)
-                   (unless (or (equal? (image-path) root-path)
+                   (unless (or (equal? (image-path) +root-path+)
                                (not (embed-support? (image-path))))
                      (define str (send lbox get-string-selection))
                      ; just in case get-string-selection returns #f
@@ -381,7 +381,7 @@
 (define (show-meta-frame)
   (fields-defaults)
   (define img (image-path))
-  (when (and (not (equal? img root-path))
+  (when (and (not (equal? img +root-path+))
              (embed-support? img))
     ; wait for any previous xmp-threads to complete
     (let loop ()
