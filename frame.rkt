@@ -467,8 +467,9 @@
 (define ivy-menu-bar-view-meta-editor
   (new menu-item%
        [parent ivy-menu-bar-view]
-       [label "Metadata Editor"]
+       [label "Metadata &Editor"]
        [help-string "Open the metadata editor."]
+       [shortcut #\E]
        [callback (λ (i e)
                    (show-meta-frame))]))
 
