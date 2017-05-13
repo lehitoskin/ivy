@@ -644,7 +644,7 @@
                           (set! image-lst empty)
                           (set! image-lst-timings empty)
                           ; just load the static image instead
-                          (load-image (bitmap img))
+                          (load-image (bitmap img) scale)
                           (send sbe set-label
                                 (format "Error loading file ~v"
                                         (string-truncate (path->string name) 30))))])
@@ -692,9 +692,12 @@
               [num-frames (flif-decoder-num-images (decoder))])
           (define lst (flif->list (decoder)))
           (set! image-bmp-master (first lst))
+          (set! image-lst-master lst)
+          (set! image-lst (map (λ (flaf-frame) (scale-image flaf-frame scale)) lst))
           (set! image-lst-timings
                 (make-list num-frames
                            (/ (flif-image-get-frame-delay image) 1000)))
+          (set! image-pict #f)
           (set! image-num-loops (flif-decoder-num-loops (decoder))))
         ; set the new frame label
         (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
@@ -737,7 +740,7 @@
                  (flif-decoder-decode-file! (decoder) img)
                  (define lst (flif->list (decoder)))
                  (set! image-bmp-master (first lst))
-                 (load-image (first lst) 'default)]
+                 (load-image (first lst) scale)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
@@ -833,7 +836,7 @@
     (kill-thread (animation-thread)))
   
   (if (not (empty? image-lst))
-      ; gif-lst contains a list of picts, display the animated gif
+      ; image-lst contains a list of picts, display the animated gif
       (send canvas set-on-paint!
             (λ (canvas dc)
               (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
