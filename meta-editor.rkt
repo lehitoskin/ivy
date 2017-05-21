@@ -194,7 +194,7 @@
        [width 600]
        [height 400]))
 
-(unless (macosx?)
+(unless macosx?
   (void (send meta-frame set-icon logo-bmp)))
 
 (define tab-panel

@@ -18,7 +18,7 @@
        [height 500]))
 
 ; set the icon for the frame
-(unless (macosx?)
+(unless macosx?
   (void (send browser-frame set-icon logo-bmp)))
 
 ; begin menu bar definitions

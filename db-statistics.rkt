@@ -14,7 +14,7 @@
                          [width 800]
                          [height 100]))
 
-(unless (macosx?)
+(unless macosx?
   (void (send stats-frame set-icon logo-bmp)))
 
 (define stats-vpanel

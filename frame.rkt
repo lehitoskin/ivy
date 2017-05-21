@@ -63,7 +63,7 @@
        [height 600]))
 
 ; set the icon for the frame
-(unless (macosx?)
+(unless macosx?
   (void (send ivy-frame set-icon logo-bmp)))
 
 (define ivy-menu-bar
@@ -86,7 +86,7 @@
        [label "&View"]))
 
 (define ivy-menu-bar-window
-  (when (macosx?)
+  (when macosx?
     (new menu%
          [parent ivy-menu-bar]
          [label "&Window"])))
@@ -102,7 +102,7 @@
   (define was-fullscreen?  (send frame is-fullscreened?))
   (define going-to-be-fullscreen? (not was-fullscreen?))
   (send frame fullscreen going-to-be-fullscreen?)
-  (unless (macosx?)
+  (unless macosx?
     (on-fullscreen-event going-to-be-fullscreen?)))
 
 (define (on-fullscreen-event is-fullscreen?)
@@ -116,7 +116,7 @@
 
 ; polling timer callback; only way to know the user is fullscreen if they don't
 ; use our ui callback, e.g. fullscreen button on mac; only be relevant on OS X?
-(when (macosx?)
+(when macosx?
   (define was-fullscreen? (make-parameter #f))
   (define ivy-fullscreen-poller
     (new timer%
@@ -180,7 +180,7 @@
        [parent ivy-menu-bar-file]
        [label "Append images to c&ollection"]
        [shortcut #\O]
-       [shortcut-prefix (if (macosx?) '(cmd shift) '(ctl shift))]
+       [shortcut-prefix (if macosx? '(cmd shift) '(ctl shift))]
        [help-string "Append images to existing collection"]
        [callback
         (λ (i e)
@@ -382,7 +382,7 @@
                    (displayln "Done."))]))
 
 (define ivy-menu-bar-file-quit
-  (if (macosx?)
+  (if macosx?
       #f
       (new menu-item%
            [parent ivy-menu-bar-file]
@@ -436,8 +436,8 @@
        [parent ivy-menu-bar-view]
        [label "Fullscreen"]
        [help-string "Enter fullscreen mode."]
-       [shortcut (if (macosx?) #\F #f)]
-       [shortcut-prefix (if (macosx?) '(ctl cmd) (get-default-shortcut-prefix))]
+       [shortcut (if macosx? #\F #f)]
+       [shortcut-prefix (if macosx? '(ctl cmd) (get-default-shortcut-prefix))]
        [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
 
 (define ivy-menu-bar-view-animation
@@ -603,7 +603,7 @@
 ;; Window menu items ;;
 
 (define ivy-menu-bar-window-minimize
-  (when (macosx?)
+  (when macosx?
     (new menu-item%
          [parent ivy-menu-bar-window]
          [label "&Minimize"]
@@ -984,11 +984,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                (load-image image-pict 'wheel-larger)
                (load-image image-lst 'wheel-larger)))]
         ; osx does things a little different
-        [(f11) (unless (macosx?)
+        [(f11) (unless macosx?
                  (toggle-fullscreen this ivy-frame))]
         ; only do something if we're fullscreened,
         ; since the tag bar isn't available in fullscreen anyway
-        [(escape) (when (and (send ivy-frame is-fullscreened?) (not (macosx?)))
+        [(escape) (when (and (send ivy-frame is-fullscreened?) (not macosx?))
                     (toggle-fullscreen this ivy-frame))]
         [(left) (load-previous-image)]
         [(right) (load-next-image)]

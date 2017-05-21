@@ -23,7 +23,7 @@
        [height 450]))
 
 ; set the icon for the frame
-(unless (macosx?)
+(unless macosx?
   (void (send results-frame set-icon logo-bmp)))
 
 (define results-menu-bar (new menu-bar% [parent results-frame]))
@@ -51,7 +51,7 @@
        [parent results-menu-bar-file]
        [label "Append results to c&ollection"]
        [shortcut #\O]
-       [shortcut-prefix (if (macosx?) '(cmd shift) '(ctl shift))]
+       [shortcut-prefix (if macosx? '(cmd shift) '(ctl shift))]
        [help-string "Append search results to existing collection"]
        [callback (λ (button event)
                    (unless (empty? searched-images)
@@ -136,7 +136,7 @@
        [style '(no-resize-border no-caption no-system-menu)]))
 
 ; set the icon for the frame
-(unless (macosx?)
+(unless macosx?
   (void (send prep-notification set-icon logo-bmp)))
 
 (define prep-msg

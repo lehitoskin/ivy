@@ -36,7 +36,7 @@
 (define (symbol->path p)
   (string->path (symbol->string p)))
 
-(define (macosx?)
+(define macosx?
   (eq? (system-type) 'macosx))
 
 (define +root-path+
@@ -1128,7 +1128,7 @@
   km)
 
 (define (set-default-editor-bindings km)
-  (cond [(macosx?)
+  (cond [macosx?
          (send km map-function ":d:c" "copy")
          (send km map-function ":d:с" "copy") ;; russian cyrillic
          (send km map-function ":d:v" "insert-clipboard")
