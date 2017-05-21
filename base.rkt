@@ -698,7 +698,9 @@
                 (make-list num-frames
                            (/ (flif-image-get-frame-delay image) 1000)))
           (set! image-pict #f)
-          (set! image-num-loops (flif-decoder-num-loops (decoder))))
+          (set! image-num-loops (flif-decoder-num-loops (decoder)))
+          (flif-destroy-decoder! (decoder))
+          (decoder #f))
         ; set the new frame label
         (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
         ; set the gui information
@@ -740,6 +742,8 @@
                  (flif-decoder-decode-file! (decoder) img)
                  (define lst (flif->list (decoder)))
                  (set! image-bmp-master (first lst))
+                 (flif-destroy-decoder! (decoder))
+                 (decoder #f)
                  (load-image (first lst) scale)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
