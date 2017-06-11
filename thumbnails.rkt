@@ -107,4 +107,5 @@
     (close-output-port thumb-port-out)
     ; rename thumb-tmp to thumb-path
     (rename-file-or-directory thumb-tmp thumb-path #t)
-    (file-or-directory-permissions thumb-path #o600)))
+    (unless (eq? (system-type) 'windows)
+      (file-or-directory-permissions thumb-path #o600))))
