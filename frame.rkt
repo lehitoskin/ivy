@@ -935,20 +935,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     
     (define/override (on-drop-file pathname)
       ; append the image to the current collection
+      (define-values (base name must-be-dir?) (split-path pathname))
+      (define directory? (directory-exists? pathname))
       (cond
-        ; empty collection, adding 1 image
-        ; like file-open, but only open the single image
+        ; empty collection
         [(equal? (first (pfs)) +root-path+)
-         (define-values (base name dir?) (split-path pathname))
-         (image-dir base)
-         (pfs (list pathname))
-         (image-path pathname)
-         (collect-garbage 'incremental)
-         (load-image pathname)]
+         (cond [directory?
+                (define files
+                  (for/fold ([lst empty])
+                            ([p (in-directory pathname)])
+                    (if (supported-file? p)
+                        (append lst (list p))
+                        lst)))
+                (image-dir pathname)
+                (pfs files)
+                (image-path (first files))
+                (load-image (first files))]
+               [else
+                (image-dir base)
+                (pfs (list pathname))
+                (image-path pathname)
+                (load-image pathname)])]
         ; collection has images; appending to collection
         [else
+         (define files
+           (if (directory-exists? pathname)
+               (for/fold ([lst empty])
+                         ([p (in-directory pathname)])
+                 (if (supported-file? p)
+                     (append lst (list p))
+                     lst))
+               (list pathname)))
          ; no duplicate paths allowed!
-         (pfs (remove-duplicates (append (pfs) (list pathname))))
+         (pfs (remove-duplicates (append (pfs) files)))
          ; change label because it usually isn't called until
          ; (load-image) is called and we want to see the changes now
          (send (status-bar-position) set-label
