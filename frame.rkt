@@ -36,11 +36,8 @@
     ; wait for any xmp threads to finish before exiting
     (unless (hash-empty? xmp-threads)
       (for ([pair (in-hash-pairs xmp-threads)])
-        (let loop ()
-          (unless (thread-dead? (cdr pair))
-            (printf "Waiting for thread ~a to finish...\n" (car pair))
-            (sleep 1/4)
-            (loop)))))
+        (printf "Waiting for thread ~a to finish...~n" (car pair))
+        (sync (cdr pair))))
     ; clean up the decoder pointer
     (when (decoder)
       (flif-abort-decoder! (decoder))
@@ -784,12 +781,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                                       (thread set-xmp:rating!))]
                           [else
                            ; wait for any xmp-threads to finish before continuing
-                           (let loop ()
-                             (unless (or (not (hash-has-key? xmp-threads img))
-                                         (thread-dead? (hash-ref xmp-threads img)))
-                               (printf "Waiting for thread ~a to finish...\n" img)
-                               (sleep 1/4)
-                               (loop)))
+                           (when (hash-has-key? xmp-threads img)
+                             (printf "Waiting for thread ~a to finish...~n" img)
+                             (sync (hash-ref xmp-threads img)))
                            (hash-set! xmp-threads
                                       img
                                       (thread set-xmp:rating!))])))]))
@@ -833,12 +827,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                   (send ivy-frame set-label (string-truncate name-str +label-max+))
                   (when (embed-support? img-str)
                     ; put this into a new thread to speed things up
-                    (let loop ()
-                      (unless (or (not (hash-has-key? xmp-threads img))
-                                  (thread-dead? (hash-ref xmp-threads img)))
-                        (printf "Waiting for thread ~a to finish...\n" img)
-                        (sleep 1/4)
-                        (loop)))
+                    ; wait for any threads on this image to complete
+                    (when (hash-has-key? xmp-threads img)
+                      (printf "Waiting for thread ~a to finish...~n" img)
+                      (sync (hash-ref xmp-threads img)))
                     (hash-set! xmp-threads
                                img
                                (thread (λ ()
@@ -880,12 +872,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
             (send (ivy-tag-tfield) set-field-background color-spring-green)
             (when (embed-support? img-str)
               ; put this into a new thread to speed things up
-              (let loop ()
-                (unless (or (not (hash-has-key? xmp-threads img))
-                            (thread-dead? (hash-ref xmp-threads img)))
-                  (printf "Waiting for thread ~a to finish...\n" img)
-                  (sleep 1/4)
-                  (loop)))
+              ; wait for any threads on this image to complete
+              (when (hash-has-key? xmp-threads img)
+                (printf "Waiting for thread ~a to finish...~n" img)
+                (sync (hash-ref xmp-threads img)))
               (hash-set! xmp-threads
                          img
                          (thread (λ ()
