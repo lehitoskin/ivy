@@ -116,11 +116,12 @@
         90
         100))
 
+; a supported file must have an extension
 (define/contract (supported-file? img)
   (path-string? . -> . boolean?)
   (define ext (path-get-extension img))
   (and ext
-       (member (string-downcase (bytes->string/utf-8 ext)) +supported-extensions+)
+       (member (bytes->string/utf-8 ext) +supported-extensions+)
        #t))
 
 ; find all supported images in dir,

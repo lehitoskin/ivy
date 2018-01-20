@@ -47,7 +47,7 @@
 
 (define (err-mbox)
   (message-box "Ivy Tag Browser - Error"
-               "You must first select a item from the list."
+               "You must first select an item from the list."
                #f
                '(ok stop)))
 
