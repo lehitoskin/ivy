@@ -167,8 +167,8 @@
           ; we want to load the image from the directory
           (define-values (base name dir?) (split-path (first absolute-paths)))
           (image-dir base)
-          ; (path-files) filters only supported images
-          (pfs (path-files))])
+          ; (path-files dir) filters only supported images
+          (pfs (path-files base))])
    (image-path (first absolute-paths))
    ; resize ivy-frame so that the image isn't horribly squished if it's large
    (when (supported-file? (image-path))
@@ -239,7 +239,7 @@
     ; center the frame
     (send ivy-frame center 'both)
     (send ivy-frame show #t)
-    ; canvas won't resize until the frame is shown
+    ; canvas won't resize until the frame is shown.
     (when (supported-file? (image-path))
       (load-image (image-path)))]
    ; only searching for tags

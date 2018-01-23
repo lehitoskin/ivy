@@ -114,7 +114,7 @@
   (data-class object%
               (table-name "ratings")
               (init-column (path "" "Path")) ; string
-              (column (rating "" "Rating")) ; an integer (-1 .. 5)
+              (column (rating 0 "Rating")) ; an integer (-1 .. 5)
               (primary-key path)
               (super-new)
 

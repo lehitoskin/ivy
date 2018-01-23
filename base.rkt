@@ -129,10 +129,10 @@
 (define (dir-files [dir (image-dir)])
   (find-files supported-file? dir))
 
-; all image files contained within image-dir,
+; all image files contained within dir,
 ; but not recursively searched
-(define (path-files)
-  (define dir-lst (directory-list (image-dir) #:build? #t))
+(define (path-files dir)
+  (define dir-lst (directory-list dir #:build? #t))
   (filter supported-file? dir-lst))
 
 ; parameter listof path

@@ -166,7 +166,7 @@
                   [else
                    (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
-                   (pfs (path-files))])
+                   (pfs (path-files base))])
             (send (ivy-tag-tfield) set-field-background color-white)
             (image-path img-path)
             (collect-garbage 'incremental)
@@ -239,7 +239,7 @@
                     [else
                      (define-values (base name dir?) (split-path img-path))
                      (image-dir base)
-                     (pfs (path-files))])
+                     (pfs (path-files base))])
               (send (ivy-tag-tfield) set-field-background color-white)
               (image-path img-path)
               (collect-garbage 'incremental)
