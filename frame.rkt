@@ -554,13 +554,17 @@
        [help-string "Sort the current collection by highest Rating."]
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
-                     ; read the database entries for ratings
+                     ; read the database entries for ratings.
+                     ; -1 rating means "don't include"
                      (define ratings
-                       (for/list ([img (in-list (map path->string (pfs)))])
+                       (for/fold ([lst empty])
+                                 ([img (in-list (map path->string (pfs)))])
                          (define rating (if (db-has-key? 'ratings img)
                                             (image-rating img)
                                             0))
-                         (cons (string->path img) rating)))
+                         (if (= rating -1)
+                             lst
+                             (append lst (list (cons (string->path img) rating))))))
                      (define new-pfs
                        (sort ratings
                              (λ (a b)
@@ -580,12 +584,16 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      ; read the database entries for ratings
+                     ; -1 rating means "don't include"
                      (define ratings
-                       (for/list ([img (in-list (map path->string (pfs)))])
+                       (for/fold ([lst empty])
+                                 ([img (in-list (map path->string (pfs)))])
                          (define rating (if (db-has-key? 'ratings img)
                                             (image-rating img)
                                             0))
-                         (cons (string->path img) rating)))
+                         (if (= rating -1)
+                             lst
+                             (append lst (list (cons (string->path img) rating))))))
                      (define new-pfs
                        (sort ratings
                              (λ (a b)
