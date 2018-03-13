@@ -97,11 +97,9 @@
     ; alt - may have xml:lang attr
     [("dc:description" "dc:rights" "dc:title")
      (define lst
-       (for/fold ([alt '(rdf:Alt ())])
-                 ([v (string-split elems ",")])
-         (if (string-null? attr-sel)
-             (append alt `((rdf:li () ,(string-trim v))))
-             (append alt `((rdf:li ,attr-lst ,(string-trim v)))))))
+       (if (string-null? attr-sel)
+           `(rdf:Alt () (rdf:li () ,(string-trim elems)))
+           `(rdf:Alt () (rdf:li ,attr-lst ,(string-trim elems)))))
      (txexpr (string->symbol type) '() (list lst))]
     ; text - single string entry
     [("dc:coverage" "dc:identifier" "dc:source")
@@ -161,6 +159,12 @@
       (send meta-frame show #f))))
 
 (define (fields-defaults)
+  ; set fields to defaults
+  (send dc-tfield set-value "")
+  (send attr-tfield set-value "")
+  (send attr-choice set-string-selection ""))
+
+(define (meta-editor-defaults)
   ; set tabs to default
   (let ([num (send tab-panel get-number)])
     (cond [(= num 1)
@@ -170,11 +174,8 @@
            (for ([tab (in-range (- num 1))])
              (send tab-panel delete 1))
            (send tab-panel set-item-label 0 "default")]))
-  ; set fields to defaults
-  (send dc-tfield set-value "")
-  (send attr-tfield set-value "")
-  (send xmp-lbox set-string-selection "dc:subject")
-  (send attr-choice set-string-selection ""))
+  (fields-defaults)
+  (send xmp-lbox set-string-selection "dc:subject"))
 
 (define (langs-hash found)
   (define elem+attrs (map (λ (tx) (findf-txexpr tx is-rdf:li?)) found))
@@ -238,8 +239,8 @@
                                        (make-xmp-xexpr empty)
                                        (string->xexpr (first (unbox image-xmp)))))
                      (define found (findf*-txexpr xexpr (is-tag? sel)))
-                     (unless found
-                       (send dc-tfield set-value ""))
+                     ; set some fields to defaults
+                     (fields-defaults)
                      ; set tabs to default
                      (let ([num (send tab-panel get-number)])
                        (cond [(= num 1)
@@ -303,7 +304,6 @@
                         (when found
                           (define lst (flatten (map (λ (item) (get-elements item)) found)))
                           (send dc-tfield set-value (string-join lst ", ")))])))]))
-                          
 
 (define dc-vpanel
   (new vertical-panel%
@@ -328,8 +328,7 @@
        [parent dc-vpanel]
        [alignment '(left center)]))
 
-; on callback, update the attr-tfield with the data
-; from XMP, if available
+; on callback, update the attr-tfield with the data from XMP, if available
 (define attr-choice
   (new choice%
        [parent attr-hpanel]
@@ -364,14 +363,14 @@
              [parent button-hpanel]
              [label "&Cancel"]
              [callback (λ (button event)
-                         (fields-defaults)
+                         (meta-editor-defaults)
                          (send meta-frame show #f))])]
        [else
         (new button%
              [parent button-hpanel]
              [label "&Cancel"]
              [callback (λ (button event)
-                         (fields-defaults)
+                         (meta-editor-defaults)
                          (send meta-frame show #f))])
         (new button%
              [parent button-hpanel]
@@ -379,7 +378,7 @@
              [callback (λ (button event) (ok-callback))])]))
 
 (define (show-meta-frame)
-  (fields-defaults)
+  (meta-editor-defaults)
   (define img (image-path))
   (when (and (not (equal? img +root-path+))
              (embed-support? img))
