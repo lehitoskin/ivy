@@ -6,7 +6,7 @@
          racket/file)
 (provide (all-defined-out))
 
-(define ivy-version "2.2.2")
+(define ivy-version "2.3.0")
 
 ; base directory where ivy will put all of its files
 (define ivy-path
