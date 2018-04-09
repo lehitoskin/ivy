@@ -60,7 +60,9 @@
     (define thumb-path (path->md5 path))
     ; use a temporary file in case there's concurrent
     ; thumbnail generation going on
-    (define thumb-tmp (string-append (number->string (current-seconds)) "_ivy-tmp.png"))
+    (define thumb-tmp
+      (build-path thumbnails-path
+                  (string-append (number->string (current-seconds)) "_ivy-tmp.png")))
     ; use pict to scale the image to 128x128
     (define thumb-pct (bitmap thumb-bmp))
     (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 128 128)))
