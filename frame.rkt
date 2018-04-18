@@ -322,6 +322,43 @@
           (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0)
           (collect-garbage 'incremental))]))
 
+(define ivy-menu-bar-filter
+  (new menu%
+       [parent ivy-menu-bar-file]
+       [label "Filter"]
+       [help-string "Filter displayed images"]))
+
+
+(define ivy-menu-bar-filter-tagged
+  (new menu-item%
+       [parent ivy-menu-bar-filter]
+       [label "&Tagged"]
+       [shortcut #\T]
+       [help-string "Show only tagged images"]
+       [callback (λ (i e)
+                   (define new-pfs (filter (λ (path) (db-has-key? 'images (path->string path))) (pfs)))
+                   (pfs new-pfs)
+                   (send (ivy-tag-tfield) set-field-background color-white)
+                   (image-path (first new-pfs))
+                   (collect-garbage 'incremental)
+                   (load-image (image-path))
+                   (send (ivy-canvas) refresh-now))]))
+
+(define ivy-menu-bar-filter-untagged
+  (new menu-item%
+       [parent ivy-menu-bar-filter]
+       [label "&Untagged"]
+       [shortcut #\U]
+       [help-string "Show only untagged images"]
+       [callback (λ (i e)
+                   (define new-pfs (filter (λ (path) (not (db-has-key? 'images (path->string path)))) (pfs)))
+                   (pfs new-pfs)
+                   (send (ivy-tag-tfield) set-field-background color-white)
+                   (image-path (first new-pfs))
+                   (collect-garbage 'incremental)
+                   (load-image (image-path))
+                   (send (ivy-canvas) refresh-now))]))
+
 (define ivy-menu-bar-search-tag
   (new menu-item%
        [parent ivy-menu-bar-file]
@@ -604,54 +641,6 @@
                            (format "~a / ~a"
                                    (+ (get-index (image-path) (pfs)) 1)
                                    (length (pfs))))))]))
-
-(define ivy-menu-bar-view-filter
-  (new menu%
-       [parent ivy-menu-bar-view]
-       [label "&Filter"]
-       [help-string "Filter displayed images"]))
-
-;; TODO: checkable
-;(define ivy-menu-bar-view-filter-all
-;  (new menu-item%
-;       [parent ivy-menu-bar-view-filter]
-;       [label "&All"]
-;       [shortcut #\A]
-;       [help-string "Show all images"]
-;       [callback (λ (i e)
-;                   (define new-pfs (filter db-has-key? (pfs)))
-;                   ; don't update pfs, because this is only a view filter
-;                   (send (status-bar-position)
-;                         set-label
-;                         (format "1 / ~a" (length (new-pfs)))))]))
-;
-;(define ivy-menu-bar-view-filter-tagged
-;  (new menu-item%
-;       [parent ivy-menu-bar-view-filter]
-;       [label "&Tagged"]
-;       [shortcut #\T]
-;       [help-string "Show only tagged images"]
-;       [callback (λ (i e)
-;                   (define new-pfs (filter db-has-key? (pfs)))
-;                   ; don't update pfs, because this is only a view filter
-;                   (send (status-bar-position)
-;                         set-label
-;                         (format "1 / ~a" (length (new-pfs)))))]))
-
-(define ivy-menu-bar-view-filter-untagged
-  (new menu-item%
-       [parent ivy-menu-bar-view-filter]
-       [label "&Untagged"]
-       [shortcut #\U]
-       [help-string "Show only untagged images"]
-       [callback (λ (i e)
-                   (define new-pfs (filter (λ (path) (not (db-has-key? 'images (path->string path)))) (pfs)))
-                   (pfs new-pfs)
-                   (send (ivy-tag-tfield) set-field-background color-white)
-                   (image-path (first new-pfs))
-                   (collect-garbage 'incremental)
-                   (load-image (image-path))
-                   (send (ivy-canvas) refresh-now))]))
 
 ;; Window menu items ;;
 
