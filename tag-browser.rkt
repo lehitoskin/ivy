@@ -250,6 +250,7 @@
                    (define tag-label (if sel (send lbox get-string sel) ""))
                    (define img-list (search-db-exact 'or (list tag-label)))
                    (send img-lbox clear)
+                   (remove-children thumb-vpanel (send thumb-vpanel get-children))
                    (for ([img (in-list img-list)])
                      (define img-path-str (path->string img))
                      (define img-label-str (if (> (string-length img-path-str) 200)
