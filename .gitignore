@@ -13,3 +13,4 @@ compiled
 ivy.app
 mac.iconset
 .DS_Store
+*.dmg
