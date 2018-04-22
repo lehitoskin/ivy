@@ -249,6 +249,7 @@
                    (define sel (send lbox get-selection))
                    (define tag-label (if sel (send lbox get-string sel) ""))
                    (define img-list (search-db-exact 'or (list tag-label)))
+                   (send img-lbox set-label (format "Image List (~a)" (length img-list)))
                    (send img-lbox clear)
                    (remove-children thumb-vpanel (send thumb-vpanel get-children))
                    (for ([img (in-list img-list)])
@@ -264,7 +265,7 @@
 
 (define img-lbox
   (new list-box%
-       [label "Image List"]
+       [label "Image List        "]
        [parent img-vpanel]
        [style '(single vertical-label)]
        [choices (list "")]
