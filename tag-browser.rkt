@@ -153,7 +153,8 @@
         (λ (button evt)
           (define sel (send img-lbox get-selection))
           (cond [(number? sel)
-                 (define img-label (send img-lbox get-string sel))
+                 (define img-label (or (send img-lbox get-data sel)
+                                       (send img-lbox get-string sel)))
                  ; 15 the tallest any column can be
                  (define tag-grid (grid-list (image-taglist img-label) 15))
                  ; remove any children vpanel might have
@@ -247,11 +248,14 @@
        [callback (λ (lbox evt)
                    (define sel (send lbox get-selection))
                    (define tag-label (if sel (send lbox get-string sel) ""))
-                   ; clear old data
+                   (define img-list (search-db-exact 'or (list tag-label)))
                    (send img-lbox clear)
-                   (for ([img (in-list (search-db-exact 'or (list tag-label)))])
-                     (define img-str (path->string img))
-                     (send img-lbox append img-str)))]))
+                   (for ([img (in-list img-list)])
+                     (define img-path-str (path->string img))
+                     (define img-label-str (if (> (string-length img-path-str) 200)
+                                               (format "~a..." (substring img-path-str 0 197))
+                                               img-path-str))
+                     (send img-lbox append img-label-str img-path-str)))]))
 
 (define img-vpanel
   (new vertical-panel%
