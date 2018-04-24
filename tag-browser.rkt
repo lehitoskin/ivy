@@ -231,6 +231,14 @@
 
 ; end menu bar definitions
 
+(define tag-filter-tfield
+  (new text-field%
+       [parent browser-frame]
+       [label "Filter Tags"]
+       [callback (λ (tfield evt)
+                   (define filter-str (or (send (send tfield get-editor) get-text) ".*"))
+                   (update-tag-browser filter-str))]))
+
 (define browser-hpanel
   (new horizontal-panel%
        [parent browser-frame]))
@@ -319,7 +327,7 @@
        [parent updating-frame]
        [label "Updating Tag Browser..."]))
 
-(define (update-tag-browser)
+(define (update-tag-browser [filter-str (or (send (send tag-filter-tfield get-editor) get-text) ".*")])
   (send updating-frame center 'both)
   (send updating-frame show #t)
   ; remove the "" we put as a placeholder
@@ -328,7 +336,11 @@
   ; remove old thumb-button
   (remove-children thumb-vpanel (send thumb-vpanel get-children))
   ; get every tag in the database
-  (define tag-labels (sort (table-column 'tags 'Tag_Label) string<?))
+  (define tag-labels (sort
+                       (filter (lambda (tag) (regexp-match filter-str tag))
+                         (table-column 'tags 'Tag_Label)
+                         )
+                       string<?))
   ; add them to the list-box
   (for ([tag (in-list tag-labels)])
     (send tag-lbox append tag))
