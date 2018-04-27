@@ -481,34 +481,41 @@
                   [else dest-or-dir])])))
          ; do the actual moving
          (when new-path
-           (cond
-             ; reassociate the tags to the new destination
-             [(db-has-key? 'images old-path)
-              ; clean up the thumbnail cache a little
-              (define old-thumb-name (path->md5 old-path))
-              (define new-thumb-name (path->md5 new-path))
-              (define old-img-obj (make-data-object sqlc image% old-path))
-              (define tags (send old-img-obj get-tags))
-              ; remove the old thumbnails
-              (when (file-exists? old-thumb-name)
-                (delete-file old-thumb-name))
-              (when (file-exists? new-thumb-name)
-                (delete-file new-thumb-name))
-              (reconcile-tags! new-path tags)
-              ; preserve the old rating, if we can
-              (define old-rating
-                (if (db-has-key? 'ratings old-path)
-                    (image-rating old-path)
-                    0))
-              (set-image-rating! new-path old-rating)
-              (db-purge! old-path)]
-             [else
-              ; spit out an error message, but move anyway
-              (eprintf "Database does not contain ~v~n" old-path)])
-           ; copy the file over, do not overwrite dest if exists
-           (when (verbose?)
-             (printf "Moving ~v to ~v~n" old-path new-path))
-           (rename-file-or-directory old-path new-path #f)))])])
+           ; if new-path exists or old-path doesn't exist, error out
+           (cond [(file-exists? new-path)
+                  (raise-user-error '--move-image "Destination path ~v already exists." new-path)]
+                 [(not (file-exists? old-path))
+                  (raise-user-error '--move-image "Source path ~v does not exist." old-path)]
+                 [else
+                  (cond
+                    ; reassociate the tags to the new destination
+                    [(db-has-key? 'images old-path)
+                     ; clean up the thumbnail cache a little
+                     (define old-thumb-name (path->md5 old-path))
+                     (define new-thumb-name (path->md5 new-path))
+                     (define old-img-obj (make-data-object sqlc image% old-path))
+                     (define tags (send old-img-obj get-tags))
+                     ; remove the old thumbnails
+                     (when (file-exists? old-thumb-name)
+                       (delete-file old-thumb-name))
+                     (when (file-exists? new-thumb-name)
+                       (delete-file new-thumb-name))
+                     ; move the tags
+                     (reconcile-tags! new-path tags)
+                     ; preserve the old rating, if we can
+                     (define old-rating
+                       (if (db-has-key? 'ratings old-path)
+                           (image-rating old-path)
+                           0))
+                     (set-image-rating! new-path old-rating)
+                     (db-purge! old-path)]
+                    [else
+                     ; spit out an error message, but move anyway
+                     (eprintf "Database does not contain ~v~n" old-path)])
+                  ; copy the file over, do not overwrite dest if exists
+                  (when (verbose?)
+                    (printf "Moving ~v to ~v~n" old-path new-path))
+                  (rename-file-or-directory old-path new-path #f)])))])])
  ; exit explicitly
  (unless (show-frame?)
    (exit:exit)))
