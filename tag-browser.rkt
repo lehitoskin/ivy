@@ -4,6 +4,7 @@
 (require racket/class
          racket/gui/base
          racket/string
+         (only-in srfi/13 string-contains-ci)
          "base.rkt"
          "db.rkt"
          "embed.rkt"
@@ -153,7 +154,8 @@
         (λ (button evt)
           (define sel (send img-lbox get-selection))
           (cond [(number? sel)
-                 (define img-label (send img-lbox get-string sel))
+                 (define img-label (or (send img-lbox get-data sel)
+                                       (send img-lbox get-string sel)))
                  ; 15 the tallest any column can be
                  (define tag-grid (grid-list (image-taglist img-label) 15))
                  ; remove any children vpanel might have
@@ -230,6 +232,45 @@
 
 ; end menu bar definitions
 
+; begin tag filtering/search definitions
+
+(define should-use-regex (make-parameter #f))
+
+(define (filter-query tfield)
+  (or (send (send tfield get-editor) get-text)
+      (if (should-use-regex)
+          ".*"
+          "")))
+
+(define tag-filter-layout
+  (new horizontal-panel%
+       [parent browser-frame]
+       [stretchable-height #f]))
+
+(define (filter-tags filter-str regex)
+  (λ (tag)
+    (if (should-use-regex)
+        (regexp-match filter-str tag)
+        (string-contains-ci tag filter-str))))
+
+(define tag-filter-tfield
+  (new text-field%
+       [parent tag-filter-layout]
+       [label "Filter Tags"]
+       [callback (λ (tfield evt)
+                   (update-tag-browser (filter-query tfield)))]))
+
+(define tag-filter-regex-checkbox
+  (new check-box%
+       [parent tag-filter-layout]
+       [label "Regex"]
+       [value #f]
+       [callback (λ (chk evt)
+                   (should-use-regex (not (should-use-regex)))
+                   (update-tag-browser))]))
+
+; end tag filtering/search definitions
+
 (define browser-hpanel
   (new horizontal-panel%
        [parent browser-frame]))
@@ -247,11 +288,16 @@
        [callback (λ (lbox evt)
                    (define sel (send lbox get-selection))
                    (define tag-label (if sel (send lbox get-string sel) ""))
-                   ; clear old data
+                   (define img-list (search-db-exact 'or (list tag-label)))
+                   (send img-lbox set-label (format "Image List (~a)" (length img-list)))
                    (send img-lbox clear)
-                   (for ([img (in-list (search-db-exact 'or (list tag-label)))])
-                     (define img-str (path->string img))
-                     (send img-lbox append img-str)))]))
+                   (remove-children thumb-vpanel (send thumb-vpanel get-children))
+                   (for ([img (in-list img-list)])
+                     (define img-path-str (path->string img))
+                     (define img-label-str (if (> (string-length img-path-str) 200)
+                                               (format "~a..." (substring img-path-str 0 197))
+                                               img-path-str))
+                     (send img-lbox append img-label-str img-path-str)))]))
 
 (define img-vpanel
   (new vertical-panel%
@@ -259,7 +305,7 @@
 
 (define img-lbox
   (new list-box%
-       [label "Image List"]
+       [label "Image List        "]
        [parent img-vpanel]
        [style '(single vertical-label)]
        [choices (list "")]
@@ -313,7 +359,7 @@
        [parent updating-frame]
        [label "Updating Tag Browser..."]))
 
-(define (update-tag-browser)
+(define (update-tag-browser [filter-str (filter-query tag-filter-tfield)])
   (send updating-frame center 'both)
   (send updating-frame show #t)
   ; remove the "" we put as a placeholder
@@ -322,7 +368,10 @@
   ; remove old thumb-button
   (remove-children thumb-vpanel (send thumb-vpanel get-children))
   ; get every tag in the database
-  (define tag-labels (sort (table-column 'tags 'Tag_Label) string<?))
+  (define tag-labels (sort
+                       (filter (filter-tags filter-str should-use-regex)
+                         (table-column 'tags 'Tag_Label))
+                       string<?))
   ; add them to the list-box
   (for ([tag (in-list tag-labels)])
     (send tag-lbox append tag))
