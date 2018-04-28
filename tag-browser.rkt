@@ -3,7 +3,8 @@
 ; browse taglist and images, modify tags if necessary
 (require racket/class
          racket/gui/base
-         srfi/13 ; instead of racket/string, for string-contains-ci
+         racket/string
+         (only-in srfi/13 string-contains-ci)
          "base.rkt"
          "db.rkt"
          "embed.rkt"
