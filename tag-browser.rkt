@@ -3,7 +3,7 @@
 ; browse taglist and images, modify tags if necessary
 (require racket/class
          racket/gui/base
-         racket/string
+         srfi/13 ; instead of racket/string, for string-contains-ci
          "base.rkt"
          "db.rkt"
          "embed.rkt"
@@ -231,13 +231,44 @@
 
 ; end menu bar definitions
 
+; begin tag filtering/search definitions
+
+(define should-use-regex (make-parameter #f))
+
+(define (filter-query tfield)
+  (or (send (send tfield get-editor) get-text)
+      (if (should-use-regex)
+          ".*"
+          "")))
+
+(define tag-filter-layout
+  (new horizontal-panel%
+       [parent browser-frame]
+       [stretchable-height #f]))
+
+(define (filter-tags filter-str regex)
+  (λ (tag)
+    (if (should-use-regex)
+        (regexp-match filter-str tag)
+        (string-contains-ci tag filter-str))))
+
 (define tag-filter-tfield
   (new text-field%
-       [parent browser-frame]
+       [parent tag-filter-layout]
        [label "Filter Tags"]
        [callback (λ (tfield evt)
-                   (define filter-str (or (send (send tfield get-editor) get-text) ".*"))
-                   (update-tag-browser filter-str))]))
+                   (update-tag-browser (filter-query tfield)))]))
+
+(define tag-filter-regex-checkbox
+  (new check-box%
+       [parent tag-filter-layout]
+       [label "Regex"]
+       [value #f]
+       [callback (λ (chk evt)
+                   (should-use-regex (not (should-use-regex)))
+                   (update-tag-browser))]))
+
+; end tag filtering/search definitions
 
 (define browser-hpanel
   (new horizontal-panel%
@@ -327,7 +358,7 @@
        [parent updating-frame]
        [label "Updating Tag Browser..."]))
 
-(define (update-tag-browser [filter-str (or (send (send tag-filter-tfield get-editor) get-text) ".*")])
+(define (update-tag-browser [filter-str (filter-query tag-filter-tfield)])
   (send updating-frame center 'both)
   (send updating-frame show #t)
   ; remove the "" we put as a placeholder
@@ -337,9 +368,8 @@
   (remove-children thumb-vpanel (send thumb-vpanel get-children))
   ; get every tag in the database
   (define tag-labels (sort
-                       (filter (lambda (tag) (regexp-match filter-str tag))
-                         (table-column 'tags 'Tag_Label)
-                         )
+                       (filter (filter-tags filter-str should-use-regex)
+                         (table-column 'tags 'Tag_Label))
                        string<?))
   ; add them to the list-box
   (for ([tag (in-list tag-labels)])
