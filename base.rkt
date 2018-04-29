@@ -144,9 +144,10 @@
   (cond [(string-null? str) empty]
         [else
          (define tags
-           (filter (λ (tag) (not (string-null? tag)))
-                   (for/list ([tag (string-split str ",")])
-                     (string-trim tag))))
+           (filter
+            (negate string-null?)
+            (map string-trim
+                 (string-split str ","))))
          (remove-duplicates (sort tags string<?))]))
 
 (define/contract (tfield->list tf)
