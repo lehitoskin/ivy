@@ -4,6 +4,9 @@
 (require framework
          images/flomap
          pict
+         (only-in plot/utils
+                  clamp-real
+                  ivl)
          racket/bool
          racket/class
          racket/gui/base
@@ -1026,31 +1029,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         [(wheel-down)
          ; do nothing if we've pressed ctrl+n
          (unless (equal? (image-path) +root-path+)
-           (collect-garbage 'incremental)
-;           (if (and image-pict
-;                    (empty? image-lst))
-;               (load-image image-pict 'wheel-smaller)
-;               (load-image image-lst 'wheel-smaller))
-           (define dc (send this get-dc))
-           (define-values [cur-scale-x cur-scale-y] (send dc get-scale))
-           (define new-scale (max (- cur-scale-x 0.1) 0.1))
-           (printf "New Scale: ~a~n" new-scale)
-           (send dc set-scale new-scale new-scale)
-           (send this refresh-now))]
+           (send this zoom-by -0.05))]
         [(wheel-up)
          ; do nothing if we've pressed ctrl+n
          (unless (equal? (image-path) +root-path+)
-           (collect-garbage 'incremental)
-;           (if (and image-pict
-;                    (empty? image-lst))
-;               (load-image image-pict 'wheel-larger)
-;               (load-image image-lst 'wheel-larger))
-           (define dc (send this get-dc))
-           (define-values [cur-scale-x cur-scale-y] (send dc get-scale))
-           (define new-scale (min (+ cur-scale-x 0.1) 4.0))
-           (printf "New Scale: ~a~n" new-scale)
-           (send dc set-scale new-scale new-scale)
-           (send this refresh-now))]
+           (send this zoom-by 0.05))]
         ; osx does things a little different
         [(f11) (unless macosx?
                  (toggle-fullscreen this ivy-frame))]
@@ -1064,7 +1047,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         [(end) (load-last-image)]
         [(#\,) (focus-tag-tfield)
                (send (send (ivy-tag-tfield) get-editor) insert ", ")]
-        [(#\return) (focus-tag-tfield)]))))
+        [(#\return) (focus-tag-tfield)]))
+
+    ; zooms view by a specified increment (positive or negative)
+    (define/public (zoom-by inc)
+      (define dc (send this get-dc))
+      (define-values [cur-scale-x cur-scale-y]
+        (send dc get-scale))
+      (define new-scale
+        (clamp-real (+ cur-scale-x inc) (ivl 0.1 4.0)))
+      (send this zoom-to new-scale))
+
+    ; zooms to a specific zoom-factor (1.0 == "no zoom")
+    (define/public (zoom-to factor)
+      (define dc (send this get-dc))
+      (send dc set-scale factor factor)
+      (send this refresh-now))
+
+    (define/override (on-size width height)
+      (recenter-origin width height)
+      (send this refresh-now))
+
+    (define/private (recenter-origin width height)
+      (define dc (send this get-dc))
+      (send dc set-origin
+        (/ width 2)
+        (/ height 2)))))
 
 (ivy-canvas
  (new ivy-canvas%
@@ -1075,11 +1083,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       [paint-callback (λ (canvas dc)
                         (send canvas set-canvas-background color-black))]))
 (send (ivy-canvas) accept-drop-files #t)
-(let* ([canvas (ivy-canvas)]
-       [dc (send canvas get-dc)])
-  (send dc set-origin
-        (/ (send canvas get-width) 2)
-        (/ (send canvas get-height) 2)))
 
 (define status-bar-hpanel
   (new horizontal-panel%

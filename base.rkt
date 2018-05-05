@@ -507,33 +507,16 @@
          (list (* (string->number (bytes->hex-string left) 16) (/ gif-width master-width))
                (* (string->number (bytes->hex-string top) 16) (/ gif-height master-height))))]
       [else (make-list len (list 0 0))]))
-  
-  ; determine x and y placement as well as
+
+  ; set the center location
+  (define x-loc (- img-center-x))
+  (define y-loc (- img-center-y))
+
   ; modify the scrollbars outside the animation loop
-  (define x-loc 0)
-  (define y-loc 0)
-  (cond
-    ; if the image is really big, place it at (0,0)
-    [(and (> img-x canvas-x)
-          (> img-y canvas-y))
-     ; x-loc and y-loc are already 0
-     (send canvas show-scrollbars #t #t)]
-    ; if the image is wider than the canvas, place it at (0,y)
-    [(> img-x canvas-x)
-     (send canvas show-scrollbars #t #f)
-     ; x-loc is already 0
-     (set! y-loc (- canvas-center-y img-center-y))]
-    ; if the image is taller than the canvas, place it at (x,0)
-    [(> img-y canvas-y)
-     (send canvas show-scrollbars #f #t)
-     ; y-loc is already 0
-     (set! x-loc (- canvas-center-x img-center-x))]
-    ; otherwise, place it at the center of the canvas
-    [else
-     (send canvas show-scrollbars #f #f)
-     (set! x-loc (- canvas-center-x img-center-x))
-     (set! y-loc (- canvas-center-y img-center-y))])
-  
+  (define hscroll (> img-x canvas-x))
+  (define vscroll (> img-y canvas-y))
+  (send canvas show-scrollbars hscroll vscroll)
+
   ; actual animation loop
   ; runs until animation-thread is killed
   (let loop ([img-frame (first lst)]
@@ -602,13 +585,15 @@
        (image-scale/c)
        void?)
   (define canvas (ivy-canvas))
+  (define dc (send canvas get-dc))
   (define ivy-frame (send canvas get-parent))
   (define tag-tfield (ivy-tag-tfield))
   (define iar (ivy-actions-rating))
   (define sbd (status-bar-dimensions))
   (define sbe (status-bar-error))
   (define sbp (status-bar-position))
-  
+
+  (send dc set-scale 1.0 1.0)
   (send sbe set-label "")
   
   (cond
@@ -871,31 +856,14 @@
               
               ; keep the background black
               (send canvas set-canvas-background color-black)
-              
-              (cond
-                ; if the image is really big, place it at (0,0)
-                [(and (> img-width canvas-x)
-                      (> img-height canvas-y))
-                 (send canvas show-scrollbars #t #t)
-                 (send dc draw-bitmap image-bmp 0 0)]
-                ; if the image is wider than the canvas,
-                ; place it at (0,y)
-                [(> img-width canvas-x)
-                 (send canvas show-scrollbars #t #f)
-                 (send dc draw-bitmap image-bmp
-                       0 (- canvas-center-y img-center-y))]
-                ; if the image is taller than the canvas,
-                ; place it at (x,0)
-                [(> img-height canvas-y)
-                 (send canvas show-scrollbars #f #t)
-                 (send dc draw-bitmap image-bmp
-                       (- canvas-center-x img-center-x) 0)]
-                ; otherwise, place it at the normal position
-                [else
-                 (send canvas show-scrollbars #f #f)
-                 (send dc draw-bitmap image-bmp
-                       (- canvas-center-x img-center-x)
-                       (- canvas-center-y img-center-y))]))))
+
+              ; center the image on the canvas
+              (send dc draw-bitmap image-bmp (- img-center-x) (- img-center-y))
+
+              ; configure scrollbars
+              (define hscroll (> img-width canvas-x))
+              (define vscroll (> img-width canvas-y))
+              (send canvas show-scrollbars hscroll vscroll))))
   
   ; tell the scrollbars to adjust for the size of the image
   (let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
