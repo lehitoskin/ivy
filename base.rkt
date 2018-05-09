@@ -814,7 +814,9 @@
                   (values '() "")
                   ; the embedded tags may come back unsorted
                   (values embed-lst (string-join embed-lst ", ")))]
-             [else (values '() "")]))
+             [else
+              (set-box! image-xmp empty)
+              (values '() "")]))
      ; now verify the tags match, and merge them/let the user know if necessary
      (incoming-tags (cond [(string=? db-tags embed-tags) db-tags]
                           [else
