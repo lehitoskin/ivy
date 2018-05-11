@@ -94,6 +94,7 @@
 (define color-black (make-object color% "black"))
 (define color-spring-green (make-object color% "spring green"))
 (define color-gold (make-object color% "gold"))
+(define color-red (make-object color% "red"))
 
 ; contract for image scaling
 (define image-scale/c
@@ -798,30 +799,49 @@
                              (string-truncate (path->string name) 30)))])])
      
      ; pick what string to display for tags...
-     (cond [(db-has-key? 'images img-str)
-            (define img-obj (make-data-object sqlc image% img-str))
-            (define tags (send img-obj get-tags))
-            (incoming-tags (string-join tags ", "))
-            (when (db-has-key? 'ratings img-str)
-              (define rating-obj (make-data-object sqlc rating% img-str))
-              (define rating (number->string (send rating-obj get-rating)))
-              (send iar set-string-selection (string-append rating " 🌟")))]
-           [else (incoming-tags "")])
-     ; check to see if the image has embedded tags and use them instead of
-     ; what's in the DB because it may be out of date
-     (cond [(embed-support? img-str)
-            (set-box! image-xmp (get-embed-xmp img-str))
-            (define embed-lst (get-embed-tags img-str))
-            (unless (empty? embed-lst)
-              ; the embedded tags may come back unsorted
-              (incoming-tags (string-join (sort embed-lst string<?) ", ")))
-            ; set the label of ivy-actions-rating to the rating of the
-            ; image (if applicable)
-            (define rating (if (empty? (unbox image-xmp))
-                               "0"
-                               (xmp-rating (first (unbox image-xmp)))))
-            (send iar set-string-selection (string-append rating " 🌟"))]
-           [else (set-box! image-xmp empty)])
+     (define-values [db-tags-lst db-tags]
+       (cond [(db-has-key? 'images img-str)
+              (define img-obj (make-data-object sqlc image% img-str))
+              (define tags (send img-obj get-tags))
+              (values tags (string-join tags ", "))]
+             [else (values '() "")]))
+     ; check to see if the image has embedded tags
+     (define-values [embed-tags-lst embed-tags]
+       (cond [(embed-support? img-str)
+              (set-box! image-xmp (get-embed-xmp img-str))
+              (define embed-lst (sort (get-embed-tags img-str) string<?))
+              (if (empty? embed-lst)
+                  (values '() "")
+                  ; the embedded tags may come back unsorted
+                  (values embed-lst (string-join embed-lst ", ")))]
+             [else
+              (set-box! image-xmp empty)
+              (values '() "")]))
+     ; now verify the tags match, and merge them/let the user know if necessary
+     (incoming-tags (cond [(string=? db-tags embed-tags) db-tags]
+                          [else
+                           (send (ivy-tag-tfield) set-field-background color-red)
+                           (string-join (remove-duplicates (sort (append db-tags-lst embed-tags-lst) string<?)) ", ")]))
+
+     ; load the image's rating, if any
+     (define db-rating
+       (if (db-has-key? 'ratings img-str)
+           (let ([rating-obj (make-data-object sqlc rating% img-str)])
+             (number->string (send rating-obj get-rating)))
+           "0"))
+     ; set the label of ivy-actions-rating to the rating of the
+     ; image (if applicable)
+     (define embed-rating
+       (if (and (embed-support? img-str)
+                (not (empty? (unbox image-xmp))))
+           (xmp-rating (first (unbox image-xmp)))
+           "0"))
+     ; set the rating widget
+     (define incoming-rating
+       (if (string=? "0" embed-rating)
+           db-rating
+           embed-rating))
+     (send iar set-string-selection (string-append incoming-rating " 🌟"))
 
      ; ...put them in the tfield
      (send tag-tfield set-value (incoming-tags))
