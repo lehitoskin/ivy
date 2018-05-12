@@ -297,7 +297,20 @@
                      (define img-label-str (if (> (string-length img-path-str) 200)
                                                (format "~a..." (substring img-path-str 0 197))
                                                img-path-str))
-                     (send img-lbox append img-label-str img-path-str)))]))
+                     (send img-lbox append img-label-str img-path-str))
+                   ; double click to load the tag category
+                   (when (eq? (send evt get-event-type) 'list-box-dclick)
+                     (define img-path (string->path (send img-lbox get-string 0)))
+                     (define-values (base name dir?) (split-path img-path))
+                     (image-dir base)
+                     ; populate pfs with the images in the tag category
+                     (define lst
+                       (for/list ([img (in-range (send img-lbox get-number))])
+                         (string->path (send img-lbox get-string img))))
+                     (pfs lst)
+                     (send (ivy-tag-tfield) set-field-background color-white)
+                     (image-path img-path)
+                     (load-image img-path)))]))
 
 (define img-vpanel
   (new vertical-panel%
@@ -334,7 +347,11 @@
                   (λ (button evt)
                     (define-values (base name dir?) (split-path img-path))
                     (image-dir base)
-                    (pfs (path-files base))
+                    ; populate pfs with the images in the tag category
+                    (define lst
+                      (for/list ([img (in-range (send lbox get-number))])
+                        (string->path (send lbox get-string img))))
+                    (pfs lst)
                     (send (ivy-tag-tfield) set-field-background color-white)
                     (image-path img-path)
                     (load-image img-path))])))]))
