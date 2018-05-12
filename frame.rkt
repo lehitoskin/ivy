@@ -72,6 +72,11 @@
        [parent ivy-menu-bar]
        [label "&File"]))
 
+(define ivy-menu-bar-edit
+  (new menu%
+       [parent ivy-menu-bar]
+       [label "&Edit"]))
+
 (define ivy-menu-bar-navigation
   (new menu%
        [parent ivy-menu-bar]
@@ -336,7 +341,8 @@
        [shortcut #\T]
        [help-string "Show only tagged images"]
        [callback (λ (i e)
-                   (define new-pfs (filter (λ (path) (db-has-key? 'images (path->string path))) (pfs)))
+                   (define new-pfs
+                     (filter (λ (path) (db-has-key? 'images (path->string path))) (pfs)))
                    (pfs new-pfs)
                    (send (ivy-tag-tfield) set-field-background color-white)
                    (image-path (first new-pfs))
@@ -351,7 +357,8 @@
        [shortcut #\U]
        [help-string "Show only untagged images"]
        [callback (λ (i e)
-                   (define new-pfs (filter (λ (path) (not (db-has-key? 'images (path->string path)))) (pfs)))
+                   (define new-pfs
+                     (filter (λ (path) (not (db-has-key? 'images (path->string path)))) (pfs)))
                    (pfs new-pfs)
                    (send (ivy-tag-tfield) set-field-background color-white)
                    (image-path (first new-pfs))
@@ -425,6 +432,27 @@
            [help-string "Quit the program."]
            [callback (λ (i e) (exit:exit))])))
 
+;; Edit menu items ;;
+
+(define ivy-menu-bar-edit-meta-editor
+  (new menu-item%
+       [parent ivy-menu-bar-edit]
+       [label "Metadata &Editor"]
+       [help-string "Open the metadata editor."]
+       [shortcut #\E]
+       [callback (λ (i e) (show-meta-frame))]))
+
+(define ivy-menu-bar-edit-copy-path
+  (new menu-item%
+       [parent ivy-menu-bar-edit]
+       [label "Copy Image Path"]
+       [help-string "Copy the current image's path"]
+       [callback (λ (i e)
+                   (unless (eq? (image-path) +root-path+)
+                     (send the-clipboard set-clipboard-string
+                           (path->string (image-path))
+                           (current-seconds))))]))
+
 ;; Navigation menu items ;;
 
 (define ivy-menu-bar-navigation-prev
@@ -497,15 +525,6 @@
        [help-string "Open the Tag Browser."]
        [callback (λ (i e)
                    (show-tag-browser))]))
-
-(define ivy-menu-bar-view-meta-editor
-  (new menu-item%
-       [parent ivy-menu-bar-view]
-       [label "Metadata &Editor"]
-       [help-string "Open the metadata editor."]
-       [shortcut #\E]
-       [callback (λ (i e)
-                   (show-meta-frame))]))
 
 (define ivy-menu-bar-view-zoom-to
   (new menu%
