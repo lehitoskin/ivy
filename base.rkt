@@ -214,13 +214,12 @@
 
 (define (flif->list dec-ptr)
   ; only look at the first frame if we want a static image
-  (define num (if (want-animation?)
-                  (flif-decoder-num-images dec-ptr)
-                  1))
+  (define num (if (want-animation?) (flif-decoder-num-images dec-ptr) 1))
+  (define dimensions (flif-dimensions (image-path)))
   (for/list ([i (in-range num)])
     (define image (flif-decoder-get-image dec-ptr i))
-    (define width (flif-image-get-width image))
-    (define height (flif-image-get-height image))
+    (define width (first dimensions))
+    (define height (second dimensions))
     ; make sure to decode with the proper depth
     (define reader (if (= (flif-image-get-depth image) 8)
                        flif-image-read-rgba8
@@ -693,13 +692,12 @@
         (flif-decoder-decode-file! (decoder) img)
         (let ([image (flif-decoder-get-image (decoder) 0)]
               [num-frames (flif-decoder-num-images (decoder))])
+          (define timing-delay (flif-image-get-frame-delay image))
           (define lst (flif->list (decoder)))
           (set! image-bmp-master (first lst))
           (set! image-lst-master lst)
           (set! image-lst (map (λ (flaf-frame) (scale-image flaf-frame scale)) lst))
-          (set! image-lst-timings
-                (make-list num-frames
-                           (/ (flif-image-get-frame-delay image) 1000)))
+          (set! image-lst-timings (make-list num-frames (/ timing-delay 1000)))
           (set! image-pict #f)
           (set! image-num-loops (flif-decoder-num-loops (decoder)))
           (flif-destroy-decoder! (decoder))
@@ -818,10 +816,13 @@
               (set-box! image-xmp empty)
               (values '() "")]))
      ; now verify the tags match, and merge them/let the user know if necessary
-     (incoming-tags (cond [(string=? db-tags embed-tags) db-tags]
-                          [else
-                           (send (ivy-tag-tfield) set-field-background color-red)
-                           (string-join (remove-duplicates (sort (append db-tags-lst embed-tags-lst) string<?)) ", ")]))
+     (incoming-tags
+      (cond [(string=? db-tags embed-tags) db-tags]
+            [else
+             (send (ivy-tag-tfield) set-field-background color-red)
+             (define mismatched
+               (remove-duplicates (sort (append db-tags-lst embed-tags-lst) string<?)))
+             (string-join mismatched ", ")]))
 
      ; load the image's rating, if any
      (define db-rating
