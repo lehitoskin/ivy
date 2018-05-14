@@ -218,8 +218,8 @@
                       (define found (findf*-txexpr xexpr (is-tag? sel)))
                       (when found
                         (define elem+attrs (map (λ (tx) (findf-txexpr tx is-rdf:li?)) found))
-                        (define attrs (map (λ (rdf:li) (get-attrs rdf:li)) elem+attrs))
-                        (define elems (map (λ (rdf:li) (get-elements rdf:li)) elem+attrs))
+                        (define attrs (map get-attrs elem+attrs))
+                        (define elems (map get-elements elem+attrs))
                         (define langs (langs-hash found))
                         (define tab-sel (send tpanel get-selection))
                         (define tab-label (send tpanel get-item-label tab-sel))
@@ -286,7 +286,7 @@
                          dc:type)
                         (when found
                           (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
-                          (define lst (flatten (map (λ (item) (get-elements item)) rdf:li)))
+                          (define lst (flatten (map get-elements rdf:li)))
                           (send dc-tfield set-value (string-join lst ", ")))]
                        ; grab the attrs from rdf:Description
                        [(xmp:BaseURL xmp:Label xmp:Rating)
@@ -306,7 +306,7 @@
                        ; everything else is just a single value
                        [else
                         (when found
-                          (define lst (flatten (map (λ (item) (get-elements item)) found)))
+                          (define lst (flatten (map get-elements found)))
                           (send dc-tfield set-value (string-join lst ", ")))])))]))
 
 (define dc-vpanel
