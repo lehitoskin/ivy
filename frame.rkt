@@ -519,16 +519,13 @@
        [help-string "Zoom the image to a specified percentage."]))
 
 
-(for ([n (in-range 10 110 10)])
+(for ([n (list 10 25 50 75 100 200 400)])
   (new menu-item%
        [parent ivy-menu-bar-view-zoom-to]
        [label (format "~a%" n)]
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst-master)
-                         (load-image (bitmap image-bmp-master) n)
-                         (load-image image-lst-master n))))]))
+                      (send (ivy-canvas) zoom-to (/ n 100.0))))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
