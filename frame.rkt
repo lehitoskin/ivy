@@ -512,16 +512,53 @@
        [callback (λ (i e)
                    (show-tag-browser))]))
 
-(define ivy-menu-bar-view-zoom-to
+(define ivy-menu-bar-view-zoom
   (new menu%
        [parent ivy-menu-bar-view]
-       [label "Zoom To"]
-       [help-string "Zoom the image to a specified percentage."]))
+       [label "Zoom"]
+       [help-string "Zoom the image."]))
 
+
+(define ivy-menu-bar-view-zoom-in
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Zoom In"]
+       [help-string "Zoom the image by 10%"]
+       [shortcut #\=]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-by 0.1)))]))
+
+
+(define ivy-menu-bar-view-zoom-out
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Zoom Out"]
+       [help-string "Zoom the image out by 10%"]
+       [shortcut #\-]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-by -0.1)))]))
+
+(new separator-menu-item%
+     [parent ivy-menu-bar-view-zoom])
+
+(define ivy-menu-bar-view-zoom-reset
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Reset"]
+       [help-string "Zoom the image out by 10%"]
+       [shortcut #\0]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-to 1.0)))]))
+
+(new separator-menu-item%
+     [parent ivy-menu-bar-view-zoom])
 
 (for ([n (list 10 25 50 75 100 200 400)])
   (new menu-item%
-       [parent ivy-menu-bar-view-zoom-to]
+       [parent ivy-menu-bar-view-zoom]
        [label (format "~a%" n)]
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
