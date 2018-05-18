@@ -9,6 +9,7 @@
                   ivl)
          racket/bool
          racket/class
+         (only-in racket/format ~r)
          racket/gui/base
          racket/list
          racket/math
@@ -985,6 +986,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     (send txt set-position (send txt last-position)))
   (send (ivy-tag-tfield) focus))
 
+; forward define for use by zoom methods
+(define status-bar-zoom (make-parameter #f))
+
 (define ivy-canvas%
   (class canvas%
     (super-new)
@@ -1096,7 +1100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     (define/public (zoom-to factor)
       (define dc (send this get-dc))
       (send dc set-scale factor factor)
-      (send this refresh-now))
+      (send this refresh-now)
+      (send (status-bar-zoom) set-label
+            (format "@ ~aX" (~r factor #:precision 2))))
 
     (define/override (on-size width height)
       (recenter-origin width height)
@@ -1142,6 +1148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [alignment '(right center)]))
 
 (status-bar-dimensions
+ (new message%
+      [parent dimensions-hpanel]
+      [label ""]
+      [auto-resize #t]))
+
+(status-bar-zoom
  (new message%
       [parent dimensions-hpanel]
       [label ""]
