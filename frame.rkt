@@ -771,11 +771,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (and image-pict
-                              (empty? image-lst))
-                         (load-image image-pict 'larger)
-                         (load-image image-lst 'larger))))]))
+                     (send (ivy-canvas) zoom-by 0.1)))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -784,11 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (and image-pict
-                              (empty? image-lst))
-                         (load-image image-pict 'smaller)
-                         (load-image image-lst 'smaller))))]))
+                     (send (ivy-canvas) zoom-by -0.1)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -797,10 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst)
-                         (load-image image-bmp-master 'none)
-                         (load-image (image-path) 'none))))]))
+                     (send (ivy-canvas) zoom-to 1.0)))]))
 
 (define ivy-actions-zoom-fit
   (new button%
@@ -809,10 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst)
-                         (load-image image-bmp-master)
-                         (load-image (image-path)))))]))
+                     (send (ivy-canvas) zoom-to-fit)))]))
 
 
 (ivy-actions-rating
@@ -1103,6 +1089,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (send this refresh-now)
       (send (status-bar-zoom) set-label
             (format "@ ~aX" (~r factor #:precision 2))))
+
+    ; adjusts zoom level so the entire image fits, and at least one dimension
+    ; will be the same size as the window.
+    (define/public (zoom-to-fit)
+      (define w (send this get-width))
+      (define h (send this get-height))
+      (define img-w (send image-bmp-master get-width))
+      (define img-h (send image-bmp-master get-height))
+      (define new-zoom (min (/ w img-w)
+                            (/ h img-h)))
+      (send this zoom-to new-zoom))
 
     (define/override (on-size width height)
       (recenter-origin width height)
