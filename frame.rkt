@@ -541,8 +541,8 @@
                    (unless (equal? (image-path) +root-path+)
                      (send (ivy-canvas) zoom-by -0.1)))]))
 
-(new separator-menu-item%
-     [parent ivy-menu-bar-view-zoom])
+(void (new separator-menu-item%
+           [parent ivy-menu-bar-view-zoom]))
 
 (define ivy-menu-bar-view-zoom-reset
   (new menu-item%
@@ -554,8 +554,8 @@
                    (unless (equal? (image-path) +root-path+)
                      (send (ivy-canvas) zoom-to 1.0)))]))
 
-(new separator-menu-item%
-     [parent ivy-menu-bar-view-zoom])
+(void (new separator-menu-item%
+           [parent ivy-menu-bar-view-zoom]))
 
 (for ([n (list 10 25 50 75 100 200 400)])
   (new menu-item%

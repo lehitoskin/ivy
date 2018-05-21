@@ -909,7 +909,7 @@
   (send canvas refresh))
 
 ; curried procedure to abstract loading an image in a collection
-; mmm... curry
+; mmm... curry (see https://www.imdb.com/name/nm0000347/?ref_=fn_al_nm_1)
 (define ((load-image-in-collection direction))
   (unless (equal? (image-path) +root-path+)
     ; kill the animation thread, if applicable
