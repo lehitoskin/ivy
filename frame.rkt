@@ -982,7 +982,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     
     (define mouse-x 0)
     (define mouse-y 0)
-    
+
+    ; whether the last zoom operation was "fit"
+    (define fit #f)
+
     (define/public (get-mouse-pos)
       (values mouse-x mouse-y))
     
@@ -1073,6 +1076,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                (send (send (ivy-tag-tfield) get-editor) insert ", ")]
         [(#\return) (focus-tag-tfield)]))
 
+    ; zooms to a specific zoom-factor (1.0 == "no zoom")
+    (define/public (zoom-to factor [status #f])
+      (set! fit #f) ; always make sure this is cleared when setting a new zoom level
+      (define dc (send this get-dc))
+      (send dc set-scale factor factor)
+      (send this refresh-now)
+      (send (status-bar-zoom) set-label
+            (cond [status status]
+                  [(not (= factor 1.0)) (format "@ ~aX" (~r factor #:precision 2))]
+                  [else ""])))
+
     ; zooms view by a specified increment (positive or negative)
     (define/public (zoom-by inc)
       (define dc (send this get-dc))
@@ -1081,16 +1095,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (define new-scale
         (clamp-real (+ cur-scale-x inc) (ivl 0.1 4.0)))
       (send this zoom-to new-scale))
-
-    ; zooms to a specific zoom-factor (1.0 == "no zoom")
-    (define/public (zoom-to factor [status #f])
-      (define dc (send this get-dc))
-      (send dc set-scale factor factor)
-      (send this refresh-now)
-      (send (status-bar-zoom) set-label
-            (cond [status status]
-                  [(not (= factor 1.0)) (format "@ ~aX" (~r factor #:precision 2))]
-                  [else ""])))
 
     ; adjusts zoom level so the entire image fits, and at least one dimension
     ; will be the same size as the window.
@@ -1101,11 +1105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (define img-h (send image-bmp-master get-height))
       (define new-zoom (min (/ w img-w)
                             (/ h img-h)))
-      (send this zoom-to new-zoom "[Fit]"))
+      (send this zoom-to new-zoom "[Fit]")
+      ; must set this *after* calling zoom-to, where it is reset to false
+      (set! fit #t))
 
     (define/override (on-size width height)
       (recenter-origin width height)
-      (send this refresh-now))
+      (if fit
+          (send this zoom-to-fit)
+          (send this refresh-now)))
 
     (define/private (recenter-origin width height)
       (define dc (send this get-dc))
