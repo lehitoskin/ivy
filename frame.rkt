@@ -1083,12 +1083,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (send this zoom-to new-scale))
 
     ; zooms to a specific zoom-factor (1.0 == "no zoom")
-    (define/public (zoom-to factor)
+    (define/public (zoom-to factor [status #f])
       (define dc (send this get-dc))
       (send dc set-scale factor factor)
       (send this refresh-now)
       (send (status-bar-zoom) set-label
-            (format "@ ~aX" (~r factor #:precision 2))))
+            (cond [status status]
+                  [(not (= factor 1.0)) (format "@ ~aX" (~r factor #:precision 2))]
+                  [else ""])))
 
     ; adjusts zoom level so the entire image fits, and at least one dimension
     ; will be the same size as the window.
@@ -1099,7 +1101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (define img-h (send image-bmp-master get-height))
       (define new-zoom (min (/ w img-w)
                             (/ h img-h)))
-      (send this zoom-to new-zoom))
+      (send this zoom-to new-zoom "[Fit]"))
 
     (define/override (on-size width height)
       (recenter-origin width height)
