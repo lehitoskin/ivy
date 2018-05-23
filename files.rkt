@@ -60,6 +60,3 @@
   (make-directory* thumbnails-path)
   (unless (eq? (system-type) 'windows)
     (file-or-directory-permissions thumbnails-path #o700)))
-
-; flif decoder parameter
-(define decoder (make-parameter #f))
