@@ -83,9 +83,9 @@
 ; number of times to loop a FLIF (0 = forever)
 (define image-num-loops 0)
 (define animation-thread (make-parameter #f))
-(define decoder-thread (make-parameter #f))
+;(define decoder-thread (make-parameter #f))
 ; number from the decoder thread that shows how much the image is loaded
-(define flif-load-progress (box 0))
+;(define flif-load-progress (box 0))
 ; GIF cumulative animation
 (define cumulative? (make-parameter #f))
 (define exact-search? (make-parameter #f))
@@ -212,27 +212,39 @@
       (bytes-set! pixels (+ 2 offset) green)
       (bytes-set! pixels (+ 3 offset) blue))))
 
-(define (flif->list dec-ptr)
+(define/contract (flif->list image)
+  (-> (or/c path-string? bytes?) (listof (is-a?/c bitmap%)))
+  ; create the decoder pointer
+  (define dec-ptr (flif-create-decoder))
+  ; decode either the file from the path or by its bytes
+  (if (path-string? image)
+      (flif-decoder-decode-file! dec-ptr image)
+      (flif-decoder-decode-memory! dec-ptr image))
   ; only look at the first frame if we want a static image
   (define num (if (want-animation?) (flif-decoder-num-images dec-ptr) 1))
-  (define dimensions (flif-dimensions (image-path)))
-  (for/list ([i (in-range num)])
-    (define image (flif-decoder-get-image dec-ptr i))
-    (define width (first dimensions))
-    (define height (second dimensions))
-    ; make sure to decode with the proper depth
-    (define reader (if (= (flif-image-get-depth image) 8)
-                       flif-image-read-rgba8
-                       flif-image-read-rgba16))
-    (define pixels (reader image width height))
-    (rgba->argb! pixels)
-    (define bitmap (make-object bitmap% width height #f #t))
-    (send bitmap set-argb-pixels 0 0 width height pixels)
-    bitmap))
+  ;(define width (flif-image-get-width image))
+  ;(define height (flif-image-get-height image))
+  (define lst
+    (for/list ([i (in-range num)])
+      (define img-ptr (flif-decoder-get-image dec-ptr i))
+      (define width (flif-image-get-width img-ptr))
+      (define height (flif-image-get-height img-ptr))
+      ; make sure to decode with the proper depth
+      (define reader (if (= (flif-image-get-depth img-ptr) 8)
+                         flif-image-read-rgba8
+                         flif-image-read-rgba16))
+      (define pixels (reader img-ptr width height))
+      (rgba->argb! pixels)
+      (define bitmap (make-object bitmap% width height #f #t))
+      (send bitmap set-argb-pixels 0 0 width height pixels)
+      bitmap))
+  (flif-destroy-decoder! dec-ptr)
+  lst)
 
-(define (progressive-callback quality bytes-read decode-over? user-data context)
+#;(define (progressive-callback quality bytes-read decode-over? user-data context)
   (flif-decoder-generate-preview context)
-  (define lst (flif->list (decoder)))
+  (define image (flif-decoder-get-image (decoder) 0))
+  (define lst (flif->list (decoder) image))
   (set! image-bmp-master (first lst))
   (cond [(and (want-animation?) (> (length lst) 1))
          (set! image-lst-timings
@@ -684,24 +696,23 @@
        ; load animated flif
        [(and (want-animation?) (flif? img) (flif-animated? img))
         (cumulative? #f)
-        (decoder (flif-create-decoder))
+        (define dec-ptr (flif-create-decoder))
         ; progressive decoding
         ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
         ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
         ; regular decoding
-        (flif-decoder-decode-file! (decoder) img)
-        (let ([image (flif-decoder-get-image (decoder) 0)]
-              [num-frames (flif-decoder-num-images (decoder))])
-          (define timing-delay (flif-image-get-frame-delay image))
-          (define lst (flif->list (decoder)))
+        (flif-decoder-decode-file! dec-ptr img)
+        (let ([img-ptr (flif-decoder-get-image dec-ptr 0)]
+              [num-frames (flif-decoder-num-images dec-ptr)])
+          (define timing-delay (flif-image-get-frame-delay img-ptr))
+          (define lst (flif->list img))
           (set! image-bmp-master (first lst))
           (set! image-lst-master lst)
           (set! image-lst (map (λ (flaf-frame) (scale-image flaf-frame scale)) lst))
           (set! image-lst-timings (make-list num-frames (/ timing-delay 1000)))
           (set! image-pict #f)
-          (set! image-num-loops (flif-decoder-num-loops (decoder)))
-          (flif-destroy-decoder! (decoder))
-          (decoder #f))
+          (set! image-num-loops (flif-decoder-num-loops dec-ptr))
+          (flif-destroy-decoder! dec-ptr))
         ; set the new frame label
         (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
         ; set the gui information
@@ -733,18 +744,8 @@
                  (and (set! image-bmp-master (load-svg-from-file img)) #t)]
                 [(flif? img)
                  (cumulative? #f)
-                 (decoder (flif-create-decoder))
-                 ; set the load progress to 0
-                 ;(set-box! flif-load-progress 0)
-                 ; progressive decoding
-                 ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
-                 ;(flif-decoder-set-first-callback-quality! (decoder) 5000)
-                 ; regular decoding
-                 (flif-decoder-decode-file! (decoder) img)
-                 (define lst (flif->list (decoder)))
+                 (define lst (flif->list img))
                  (set! image-bmp-master (first lst))
-                 (flif-destroy-decoder! (decoder))
-                 (decoder #f)
                  (load-image (first lst) scale)]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
@@ -979,7 +980,7 @@
       (flif-destroy-decoder! (decoder))
       (displayln "done")
       (decoder #f))
-    (when (decoder)
+    #;(when (decoder)
       (flif-abort-decoder! (decoder))
       (flif-destroy-decoder! (decoder))
       (decoder #f))

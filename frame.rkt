@@ -39,7 +39,7 @@
         (printf "Waiting for thread ~a to finish...~n" (car pair))
         (sync (cdr pair))))
     ; clean up the decoder pointer
-    (when (decoder)
+    #;(when (decoder)
       (flif-abort-decoder! (decoder))
       (flif-destroy-decoder! (decoder))
       (decoder #f))
@@ -307,7 +307,7 @@
             (flif-destroy-decoder! (decoder))
             (displayln "done")
             (decoder #f))
-          (when (decoder)
+          #;(when (decoder)
             (flif-abort-decoder! (decoder))
             (flif-destroy-decoder! (decoder))
             (decoder #f))

@@ -16,7 +16,7 @@
          riff
          txexpr
          xml
-         (only-in "files.rkt" ivy-version decoder))
+         (only-in "files.rkt" ivy-version))
 (provide add-embed-tags!
          dc:subject->list
          del-embed-tags!
