@@ -83,9 +83,6 @@
 ; number of times to loop a FLIF (0 = forever)
 (define image-num-loops 0)
 (define animation-thread (make-parameter #f))
-;(define decoder-thread (make-parameter #f))
-; number from the decoder thread that shows how much the image is loaded
-;(define flif-load-progress (box 0))
 ; GIF cumulative animation
 (define cumulative? (make-parameter #f))
 (define exact-search? (make-parameter #f))
@@ -222,8 +219,6 @@
       (flif-decoder-decode-memory! dec-ptr image))
   ; only look at the first frame if we want a static image
   (define num (if (want-animation?) (flif-decoder-num-images dec-ptr) 1))
-  ;(define width (flif-image-get-width image))
-  ;(define height (flif-image-get-height image))
   (define lst
     (for/list ([i (in-range num)])
       (define img-ptr (flif-decoder-get-image dec-ptr i))
@@ -240,28 +235,6 @@
       bitmap))
   (flif-destroy-decoder! dec-ptr)
   lst)
-
-#;(define (progressive-callback quality bytes-read decode-over? user-data context)
-  (flif-decoder-generate-preview context)
-  (define image (flif-decoder-get-image (decoder) 0))
-  (define lst (flif->list (decoder) image))
-  (set! image-bmp-master (first lst))
-  (cond [(and (want-animation?) (> (length lst) 1))
-         (set! image-lst-timings
-               (let ([image (flif-decoder-get-image (decoder) 0)])
-                 (make-list (length lst) (flif-image-get-frame-delay image))))
-         (set! image-num-loops (flif-decoder-num-loops (decoder)))
-         (load-image (map bitmap lst) 'default)]
-        [else (load-image (first lst) 'default)])
-  ; set the new frame label
-  ;(define-values (base name must-be-dir?) (split-path (image-path)))
-  #;(send (send (ivy-canvas) get-parent)
-        set-label
-        (format "(~a%) ~a" (exact->inexact (/ quality 100)) (path->string name)))
-  ; set the load progress
-  ;(set-box! flif-load-progress quality)
-  ; the fewer the calls, the faster the total decoding
-  (+ quality 5000))
 
 ; objects that will be used extensively in transparency-grid
 (define dgray-color (make-object color% 128 128 128))
@@ -697,9 +670,6 @@
        [(and (want-animation?) (flif? img) (flif-animated? img))
         (cumulative? #f)
         (define dec-ptr (flif-create-decoder))
-        ; progressive decoding
-        ;(flif-decoder-set-callback! (decoder) progressive-callback #f)
-        ;(flif-decoder-set-first-callback-quality! (decoder) 10000)
         ; regular decoding
         (flif-decoder-decode-file! dec-ptr img)
         (let ([img-ptr (flif-decoder-get-image dec-ptr 0)]
@@ -973,17 +943,6 @@
     ; kill the animation thread, if applicable
     (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
       (kill-thread (animation-thread)))
-    #;(unless (or (false? (decoder-thread)) (thread-dead? (decoder-thread)))
-      (kill-thread (decoder-thread))
-      (displayln "load-image-in-collection; aborting decoder...")
-      (flif-abort-decoder! (decoder))
-      (flif-destroy-decoder! (decoder))
-      (displayln "done")
-      (decoder #f))
-    #;(when (decoder)
-      (flif-abort-decoder! (decoder))
-      (flif-destroy-decoder! (decoder))
-      (decoder #f))
     (send (ivy-tag-tfield) set-field-background color-white)
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
