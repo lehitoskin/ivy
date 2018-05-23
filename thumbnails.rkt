@@ -50,9 +50,7 @@
         [(#".svg" #".SVG")
          (load-svg-from-file path)]
         [(#".flif" #".FLIF" #".flaf" #".FLAF")
-         (parameterize ([want-animation? #f])
-           (define bmp (first (flif->list path)))
-           bmp)]
+         (first (flif->list path #:animation? #f))]
         [else (read-bitmap path)]))
     (define thumb-path (path->md5 path))
     ; use a temporary file in case there's concurrent

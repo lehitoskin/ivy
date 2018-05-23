@@ -155,6 +155,8 @@
 
 ; get index of an item in the list
 ; numbering starts from 0
+;
+; may replace with index-of from Racket v6.7
 (define/contract (get-index item lst)
   (any/c list? . -> . (or/c integer? false?))
   (define len (length lst))
@@ -209,8 +211,8 @@
       (bytes-set! pixels (+ 2 offset) green)
       (bytes-set! pixels (+ 3 offset) blue))))
 
-(define/contract (flif->list image)
-  (-> (or/c path-string? bytes?) (listof (is-a?/c bitmap%)))
+(define/contract (flif->list image #:animation? [animation? (want-animation?)])
+  ((or/c path-string? bytes?) . -> . (listof (is-a?/c bitmap%)))
   ; create the decoder pointer
   (define dec-ptr (flif-create-decoder))
   ; decode either the file from the path or by its bytes
@@ -218,7 +220,7 @@
       (flif-decoder-decode-file! dec-ptr image)
       (flif-decoder-decode-memory! dec-ptr image))
   ; only look at the first frame if we want a static image
-  (define num (if (want-animation?) (flif-decoder-num-images dec-ptr) 1))
+  (define num (if animation? (flif-decoder-num-images dec-ptr) 1))
   (define lst
     (for/list ([i (in-range num)])
       (define img-ptr (flif-decoder-get-image dec-ptr i))
