@@ -847,7 +847,7 @@
                 #;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master))
 
               (define img-width (inexact->exact (round #;(pict-width image-pict) (send image-bmp-master get-width))))
-              (define img-height (inexact->exact (round #;(pict-height image-pict) (send image-bmp-master get-width))))
+              (define img-height (inexact->exact (round #;(pict-height image-pict) (send image-bmp-master get-height))))
               (define img-center-x (/ img-width 2))
               (define img-center-y (/ img-height 2))
 
@@ -869,6 +869,8 @@
               (define hscroll (> img-width canvas-width))
               (define vscroll (> img-width canvas-height))
               (send canvas show-scrollbars hscroll vscroll))))
+
+  (send canvas zoom-to-fit)
   
   ; tell the scrollbars to adjust for the size of the image
   #;(let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
