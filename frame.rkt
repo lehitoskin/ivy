@@ -4,6 +4,7 @@
 (require framework
          images/flomap
          pict
+         pict/convert
          (only-in plot/utils
                   clamp-real
                   ivl)
@@ -573,7 +574,7 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate image-pict (/ pi 2)) 'same)))]))
+                     (load-image (rotate (pict-convert image-bmp-master) (/ pi 2)) 'same)))]))
 
 (define ivy-menu-bar-view-rotate-right
   (new menu-item%
@@ -583,7 +584,7 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate image-pict (- (/ pi 2))) 'same)))]))
+                     (load-image (rotate  (pict-convert image-bmp-master) (- (/ pi 2))) #;'same)))]))
 
 (define ivy-menu-bar-view-flip-horizontal
   (new menu-item%
@@ -593,9 +594,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
+                       (flomap-flip-horizontal (bitmap->flomap #;(pict->bitmap image-pict)) image-bmp-master))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
+                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
 
 (define ivy-menu-bar-view-flip-vertical
   (new menu-item%
@@ -605,9 +606,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
+                       (flomap-flip-vertical (bitmap->flomap #;(pict->bitmap image-pict) image-bmp-master)))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
+                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
 
 (define ivy-menu-bar-view-sort-alpha
   (new menu-item%
@@ -1119,7 +1120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       (define dc (send this get-dc))
       (send dc set-origin
         (/ width 2)
-        (/ height 2)))))
+        (/ height 2)))
+
+    (define/public (recenter)
+      (define w (send this get-width))
+      (define h (send this get-height))
+      (recenter-origin w h))))
 
 (ivy-canvas
  (new ivy-canvas%

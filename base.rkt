@@ -48,14 +48,14 @@
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
 ; pict of the currently displayed image
-(define image-pict #f)
+;(define image-pict #f)
 ; the cached XMP metadata of the image
 (define image-xmp (box empty))
 (define xmp-threads (make-hash))
 ; bitmap to actually display
 ; eliminate image "jaggies"
 ; reduce amount of times we use pict->bitmap, as this takes a very long time
-(define image-bmp (make-bitmap 50 50))
+;(define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 ; the only extensions ivy will accept - ignores everything else
@@ -94,7 +94,7 @@
 (define color-red (make-object color% "red"))
 
 ; contract for image scaling
-(define image-scale/c
+#;(define image-scale/c
   (or/c 'default
         'cmd
         'larger
@@ -410,7 +410,7 @@
 ; img is either a pict or a bitmap%
 ; type is a symbol
 ; returns a pict
-(define/contract (scale-image img type)
+#;(define/contract (scale-image img type)
   ((or/c (is-a?/c bitmap%) pict?) image-scale/c . -> . pict?)
   (define canvas (ivy-canvas))
   ; width and height of the image
@@ -580,9 +580,9 @@
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
 ; the position message
-(define/contract (load-image img [scale 'default])
+(define/contract (load-image img #;[scale 'default])
   (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
-       (image-scale/c)
+       ;(image-scale/c)
        void?)
   (define canvas (ivy-canvas))
   (define dc (send canvas get-dc))
@@ -620,7 +620,8 @@
                           (set! image-lst empty)
                           (set! image-lst-timings empty)
                           ; just load the static image instead
-                          (load-image (bitmap img) scale)
+                          ;(load-image (bitmap img) scale)
+                          (load-image (bitmap img))
                           (send sbe set-label
                                 (format "Error loading file ~v"
                                         (string-truncate (path->string name) 30))))])
@@ -633,9 +634,9 @@
               (close-input-port bmp-in-port)
               (bitmap bmp)))
           (set! image-lst-master lst)
-          (set! image-lst (map (λ (gif-frame) (scale-image gif-frame scale)) lst))
+          (set! image-lst #;(map (λ (gif-frame) (scale-image gif-frame scale)) lst) lst)
           (set! image-lst-timings (gif-timings img))
-          (set! image-pict #f))
+          #;(set! image-pict #f))
         (define size (file-size (image-path)))
         (send sbd set-label
               (format "~a x ~a pixels  ~a"
@@ -667,9 +668,9 @@
           (define lst (flif->list img))
           (set! image-bmp-master (first lst))
           (set! image-lst-master lst)
-          (set! image-lst (map (λ (flaf-frame) (scale-image flaf-frame scale)) lst))
+          (set! image-lst #;(map (λ (flaf-frame) (scale-image flaf-frame scale)) lst) lst)
           (set! image-lst-timings (make-list num-frames (/ timing-delay 1000)))
-          (set! image-pict #f)
+          ;(set! image-pict #f)
           (set! image-num-loops (flif-decoder-num-loops dec-ptr))
           (flif-destroy-decoder! dec-ptr))
         ; set the new frame label
@@ -705,12 +706,13 @@
                  (cumulative? #f)
                  (define lst (flif->list img))
                  (set! image-bmp-master (first lst))
-                 (load-image (first lst) scale)]
+                 ;(load-image (first lst) scale)]
+                 (load-image (first lst))]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
-               (set! image-pict (scale-image image-bmp-master scale))
-               (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))
+               ;(set! image-pict (scale-image image-bmp-master scale))
+               ;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master)
                (define size (file-size (image-path)))
                (cond
                  [(flif? (image-path))
@@ -810,20 +812,20 @@
      (send tag-tfield refresh)]
     [(list? img)
      ; scale the image in the desired direction
-     (set! image-lst (map (λ (pct) (scale-image pct scale)) img))]
+     (set! image-lst #;(map (λ (pct) (scale-image pct scale)) img) img)]
     [else
      ; we already have the image loaded
      (set! image-lst-master empty)
      (set! image-lst empty)
      (set! image-lst-timings empty)
-     (set! image-pict (scale-image img scale))
-     (set! image-bmp (pict->bitmap (transparency-grid-append image-pict)))])
+     ;(set! image-pict (scale-image img scale))
+     #;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master)])
   
   (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
     (kill-thread (animation-thread)))
   
   (if (not (empty? image-lst))
-      ; image-lst contains a list of picts, display the animated gif
+      ; image-lst contains a list of picts, display the animation
       (send canvas set-on-paint!
             (λ (canvas dc)
               (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
@@ -838,35 +840,38 @@
       ; otherwise, display the static image
       (send canvas set-on-paint!
             (λ (canvas dc)
-              (when (and (path? img) (eq? scale 'default))
+              #;(when #;(and (path? img) (eq? scale 'default)) (path? img)
                 ; have the canvas re-scale the image so when the canvas is
                 ; resized, it'll also be the proper size
-                (set! image-pict (scale-image image-bmp-master 'default))
-                (set! image-bmp (pict->bitmap (transparency-grid-append image-pict))))
-              
-              (define img-width (inexact->exact (round (pict-width image-pict))))
-              (define img-height (inexact->exact (round (pict-height image-pict))))
-              
+                ;(set! image-pict (scale-image image-bmp-master 'default))
+                #;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master))
+
+              (define img-width (inexact->exact (round #;(pict-width image-pict) (send image-bmp-master get-width))))
+              (define img-height (inexact->exact (round #;(pict-height image-pict) (send image-bmp-master get-width))))
               (define img-center-x (/ img-width 2))
               (define img-center-y (/ img-height 2))
-              (define canvas-x (send canvas get-width))
-              (define canvas-y (send canvas get-height))
-              (define canvas-center-x (/ canvas-x 2))
-              (define canvas-center-y (/ canvas-y 2))
+
+              (define canvas-width (send canvas get-width))
+              (define canvas-height (send canvas get-height))
+              (define canvas-center-x (/ canvas-width 2))
+              (define canvas-center-y (/ canvas-height 2))
               
               ; keep the background black
               (send canvas set-canvas-background color-black)
 
               ; center the image on the canvas
-              (send dc draw-bitmap image-bmp (- img-center-x) (- img-center-y))
+              (send canvas recenter)
+              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y))
+              ;(send canvas on-size canvas-width canvas-height)
+              ;(send canvas zoom-to-fit)
 
               ; configure scrollbars
-              (define hscroll (> img-width canvas-x))
-              (define vscroll (> img-width canvas-y))
+              (define hscroll (> img-width canvas-width))
+              (define vscroll (> img-width canvas-height))
               (send canvas show-scrollbars hscroll vscroll))))
   
   ; tell the scrollbars to adjust for the size of the image
-  (let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
+  #;(let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
         [img-y (inexact->exact (round (pict-height (if image-pict image-pict (first image-lst)))))])
     ; will complain if width/height is less than 1
     (define width (if (< img-x 1) 1 img-x))
