@@ -212,7 +212,9 @@
       (bytes-set! pixels (+ 3 offset) blue))))
 
 (define/contract (flif->list image #:animation? [animation? (want-animation?)])
-  ((or/c path-string? bytes?) . -> . (listof (is-a?/c bitmap%)))
+  (->* ([or/c path-string? bytes?])
+       (#:animation? boolean?)
+       (listof (is-a?/c bitmap%)))
   ; create the decoder pointer
   (define dec-ptr (flif-create-decoder))
   ; decode either the file from the path or by its bytes
