@@ -870,7 +870,7 @@
               (define vscroll (> img-width canvas-height))
               (send canvas show-scrollbars hscroll vscroll))))
 
-  (send canvas zoom-to-fit)
+  (send canvas center-fit)
   
   ; tell the scrollbars to adjust for the size of the image
   #;(let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]

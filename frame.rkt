@@ -1110,6 +1110,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       ; must set this *after* calling zoom-to, where it is reset to false
       (set! fit #t))
 
+    ; only zooms out if the image is too big to fit on either dimension
+    (define/public (center-fit)
+      (define w (send this get-width))
+      (define h (send this get-height))
+      (define img-w (send image-bmp-master get-width))
+      (define img-h (send image-bmp-master get-height))
+      (cond [(or (> img-w w)
+                 (> img-h h))
+             (send this zoom-to-fit)]
+            [else (send this zoom-to 1.0)]))
+
     (define/override (on-size width height)
       (recenter-origin width height)
       (if fit
