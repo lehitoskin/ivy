@@ -1077,11 +1077,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
                (send (send (ivy-tag-tfield) get-editor) insert ", ")]
         [(#\return) (focus-tag-tfield)]))
 
+    (define/private (configure-scrollbars zoom-factor)
+      (define client-w (send this get-width))
+      (define client-h (send this get-height))
+      (define img-w (send image-bmp-master get-width))
+      (define img-h (send image-bmp-master get-height))
+      (define virtual-w (max client-w (inexact->exact (round (* img-w zoom-factor)))))
+      (define virtual-h (max client-h (inexact->exact (round (* img-h zoom-factor)))))
+      (define scroll-x 0.5)
+      (define scroll-y 0.5)
+      (send this init-auto-scrollbars virtual-w virtual-h scroll-x scroll-y))
+
     ; zooms to a specific zoom-factor (1.0 == "no zoom")
     (define/public (zoom-to factor [status #f])
       (set! fit #f) ; always make sure this is cleared when setting a new zoom level
       (define dc (send this get-dc))
       (send dc set-scale factor factor)
+      (configure-scrollbars factor)
       (send this refresh-now)
       (send (status-bar-zoom) set-label
             (cond [status status]

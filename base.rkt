@@ -47,15 +47,9 @@
 (define image-path (make-parameter +root-path+))
 ; master bitmap of loaded image-path
 (define image-bmp-master (make-bitmap 50 50))
-; pict of the currently displayed image
-;(define image-pict #f)
 ; the cached XMP metadata of the image
 (define image-xmp (box empty))
 (define xmp-threads (make-hash))
-; bitmap to actually display
-; eliminate image "jaggies"
-; reduce amount of times we use pict->bitmap, as this takes a very long time
-;(define image-bmp (make-bitmap 50 50))
 ; directory containing the currently displayed image
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 ; the only extensions ivy will accept - ignores everything else
@@ -92,27 +86,6 @@
 (define color-spring-green (make-object color% "spring green"))
 (define color-gold (make-object color% "gold"))
 (define color-red (make-object color% "red"))
-
-; contract for image scaling
-#;(define image-scale/c
-  (or/c 'default
-        'cmd
-        'larger
-        'wheel-larger
-        'smaller
-        'wheel-smaller
-        'same
-        'none
-        10
-        20
-        30
-        40
-        50
-        60
-        70
-        80
-        90
-        100))
 
 ; a supported file must have an extension
 (define/contract (supported-file? img)
@@ -406,61 +379,6 @@
       (hc-append (- x) grid pct)
       (hc-append (- offset x) grid pct)))
 
-; scales an image to the current canvas size
-; img is either a pict or a bitmap%
-; type is a symbol
-; returns a pict
-#;(define/contract (scale-image img type)
-  ((or/c (is-a?/c bitmap%) pict?) image-scale/c . -> . pict?)
-  (define canvas (ivy-canvas))
-  ; width and height of the image
-  (define img-width (if (pict? img)
-                        (pict-width img)
-                        (send img get-width)))
-  (define img-height (if (pict? img)
-                         (pict-height img)
-                         (send img get-height)))
-  
-  ; width and height of the canvas
-  (define max-width (send canvas get-width))
-  (define max-height (send canvas get-height))
-  
-  (case type
-    ; might deal with either pict or bitmap% for initial scaling
-    [(default)
-     (cond [(and (> img-width max-width)
-                 (> img-height max-height))
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
-           [(> img-width max-width)
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width img-height)]
-           [(> img-height max-height)
-            (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
-           [else (bitmap img)])]
-    [(cmd)
-     ; canvas is very small before everything is completely loaded
-     ; these are the effective dimensions of the canvas
-     (set! max-width 800)
-     (set! max-height 516)
-     (cond [(and (> img-width max-width)
-                 (> img-height max-height))
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width max-height)]
-           [(> img-width max-width)
-            (scale-to-fit (if (pict? img) img (bitmap img)) max-width img-height)]
-           [(> img-height max-height)
-            (scale-to-fit (if (pict? img) img (bitmap img)) img-width max-height)]
-           [else (bitmap img)])]
-    ; only used by zoom-in, definitely a pict
-    [(larger wheel-larger)
-     (scale-to-fit img (* img-width 1.1) (* img-height 1.1))]
-    ; only used by zoom-out, definitely a pict
-    [(smaller wheel-smaller)
-     (scale-to-fit img (* img-width 0.9) (* img-height 0.9))]
-    [(same) img]
-    [(10 20 30 40 50 60 70 80 90 100)
-     (define num (/ type 100))
-     (scale-to-fit img (* img-width num) (* img-height num))]
-    [(none) (bitmap img)]))
-
 ; janky!
 (define ivy-canvas (make-parameter #f))
 (define ivy-tag-tfield (make-parameter #f))
@@ -580,9 +498,8 @@
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
 ; the position message
-(define/contract (load-image img #;[scale 'default])
+(define/contract (load-image img)
   (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
-       ;(image-scale/c)
        void?)
   (define canvas (ivy-canvas))
   (define dc (send canvas get-dc))
@@ -620,7 +537,6 @@
                           (set! image-lst empty)
                           (set! image-lst-timings empty)
                           ; just load the static image instead
-                          ;(load-image (bitmap img) scale)
                           (load-image (bitmap img))
                           (send sbe set-label
                                 (format "Error loading file ~v"
@@ -634,9 +550,8 @@
               (close-input-port bmp-in-port)
               (bitmap bmp)))
           (set! image-lst-master lst)
-          (set! image-lst #;(map (λ (gif-frame) (scale-image gif-frame scale)) lst) lst)
-          (set! image-lst-timings (gif-timings img))
-          #;(set! image-pict #f))
+          (set! image-lst lst)
+          (set! image-lst-timings (gif-timings img)))
         (define size (file-size (image-path)))
         (send sbd set-label
               (format "~a x ~a pixels  ~a"
@@ -668,9 +583,8 @@
           (define lst (flif->list img))
           (set! image-bmp-master (first lst))
           (set! image-lst-master lst)
-          (set! image-lst #;(map (λ (flaf-frame) (scale-image flaf-frame scale)) lst) lst)
+          (set! image-lst lst)
           (set! image-lst-timings (make-list num-frames (/ timing-delay 1000)))
-          ;(set! image-pict #f)
           (set! image-num-loops (flif-decoder-num-loops dec-ptr))
           (flif-destroy-decoder! dec-ptr))
         ; set the new frame label
@@ -706,13 +620,10 @@
                  (cumulative? #f)
                  (define lst (flif->list img))
                  (set! image-bmp-master (first lst))
-                 ;(load-image (first lst) scale)]
                  (load-image (first lst))]
                 [else (send image-bmp-master load-file img 'unknown/alpha)]))
         (cond [load-success
                (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
-               ;(set! image-pict (scale-image image-bmp-master scale))
-               ;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master)
                (define size (file-size (image-path)))
                (cond
                  [(flif? (image-path))
@@ -811,15 +722,13 @@
      ; ensure the text-field displays the changes we just made
      (send tag-tfield refresh)]
     [(list? img)
-     ; scale the image in the desired direction
-     (set! image-lst #;(map (λ (pct) (scale-image pct scale)) img) img)]
+     ; this is actually a list of frames
+     (set! image-lst img)]
     [else
      ; we already have the image loaded
      (set! image-lst-master empty)
      (set! image-lst empty)
-     (set! image-lst-timings empty)
-     ;(set! image-pict (scale-image img scale))
-     #;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master)])
+     (set! image-lst-timings empty)])
   
   (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
     (kill-thread (animation-thread)))
@@ -840,14 +749,8 @@
       ; otherwise, display the static image
       (send canvas set-on-paint!
             (λ (canvas dc)
-              #;(when #;(and (path? img) (eq? scale 'default)) (path? img)
-                ; have the canvas re-scale the image so when the canvas is
-                ; resized, it'll also be the proper size
-                ;(set! image-pict (scale-image image-bmp-master 'default))
-                #;(set! image-bmp #;(pict->bitmap (transparency-grid-append image-pict)) image-bmp-master))
-
-              (define img-width (inexact->exact (round #;(pict-width image-pict) (send image-bmp-master get-width))))
-              (define img-height (inexact->exact (round #;(pict-height image-pict) (send image-bmp-master get-height))))
+              (define img-width (inexact->exact (round (send image-bmp-master get-width))))
+              (define img-height (inexact->exact (round (send image-bmp-master get-height))))
               (define img-center-x (/ img-width 2))
               (define img-center-y (/ img-height 2))
 
@@ -861,59 +764,9 @@
 
               ; center the image on the canvas
               (send canvas recenter)
-              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y))
-              ;(send canvas on-size canvas-width canvas-height)
-              ;(send canvas zoom-to-fit)
+              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y)))))
 
-              ; configure scrollbars
-              (define hscroll (> img-width canvas-width))
-              (define vscroll (> img-width canvas-height))
-              (send canvas show-scrollbars hscroll vscroll))))
-
-  (send canvas center-fit)
-  
-  ; tell the scrollbars to adjust for the size of the image
-  #;(let ([img-x (inexact->exact (round (pict-width (if image-pict image-pict (first image-lst)))))]
-        [img-y (inexact->exact (round (pict-height (if image-pict image-pict (first image-lst)))))])
-    ; will complain if width/height is less than 1
-    (define width (if (< img-x 1) 1 img-x))
-    (define height (if (< img-y 1) 1 img-y))
-    (define-values (virtual-x virtual-y) (send canvas get-virtual-size))
-    
-    (case scale
-      ; zoom with the center of the current center
-      [(smaller larger)
-       (define-values (client-x client-y) (send canvas get-client-size))
-       (define client-center-x (/ client-x 2))
-       (define client-center-y (/ client-y 2))
-       (define ratio-x (exact->inexact (/ client-center-x virtual-x)))
-       (define ratio-y (exact->inexact (/ client-center-y virtual-y)))
-       (send canvas init-auto-scrollbars width height
-             (if (> ratio-x 1.0)
-                 1.0
-                 ratio-x)
-             (if (> ratio-y 1.0)
-                 1.0
-                 ratio-y))]
-      ; place scrollbars on mouse location
-      [(wheel-smaller wheel-larger)
-       (define-values (mouse-x mouse-y) (send canvas get-mouse-pos))
-       ; coordinates of top left corner of visible section of the virtual canvas
-       (define-values (visible-x visible-y) (send canvas get-view-start))
-       ; position of mouse over the entire displayed image
-       (define mouse/visible-x (if (> mouse-x virtual-x)
-                                   virtual-x
-                                   (+ mouse-x visible-x)))
-       (define mouse/visible-y (if (> mouse-y virtual-y)
-                                   virtual-y
-                                   (+ mouse-y visible-y)))
-       (send canvas init-auto-scrollbars width height
-             (exact->inexact (/ mouse/visible-x virtual-x))
-             (exact->inexact (/ mouse/visible-y virtual-y)))]
-      [else
-       ; otherwise just set it to the top left corner
-       (send canvas init-auto-scrollbars width height 0.0 0.0)]))
-  (send canvas refresh))
+  (send canvas center-fit))
 
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry (see https://www.imdb.com/name/nm0000347/?ref_=fn_al_nm_1)
