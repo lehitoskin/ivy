@@ -979,7 +979,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
 (define ivy-canvas%
   (class canvas%
     (super-new)
-    (init-field paint-callback)
+    (init-field paint-callback
+                [canvas-backgorund color-black])
     
     (define mouse-x 0)
     (define mouse-y 0)
@@ -1078,25 +1079,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         [(#\return) (focus-tag-tfield)]))
 
     (define/private (configure-scrollbars zoom-factor)
-      (define client-w (send this get-width))
-      (define client-h (send this get-height))
-      (define img-w (send image-bmp-master get-width))
-      (define img-h (send image-bmp-master get-height))
-      (define virtual-w (max client-w (inexact->exact (round (* img-w zoom-factor)))))
-      (define virtual-h (max client-h (inexact->exact (round (* img-h zoom-factor)))))
-      (define scroll-x 0.5)
-      (define scroll-y 0.5)
-      (send this init-auto-scrollbars virtual-w virtual-h scroll-x scroll-y))
+      (let* ([img-w (send image-bmp-master get-width)]
+             [img-h (send image-bmp-master get-height)]
+             [zoomed-img-w (inexact->exact (round (* img-w zoom-factor)))]
+             [zoomed-img-h (inexact->exact (round (* img-h zoom-factor)))]
+             [client-w (send this get-width)]
+             [client-h (send this get-height)]
+             [virtual-w (max client-w zoomed-img-w)]
+             [virtual-h (max client-h zoomed-img-h)]
+             [scroll-x 0.5] ; TODO
+             [scroll-y 0.5]) ; TODO
+        (send this init-auto-scrollbars virtual-w virtual-h scroll-x scroll-y)
+        (send this show-scrollbars
+              (> zoomed-img-w client-w)
+              (> zoomed-img-h client-h))))
 
-    ; zooms to a specific zoom-factor (1.0 == "no zoom")
-    (define/public (zoom-to factor [status #f])
+    ; zooms to a specific zoom-factor (1.0 == "no zoom"),
+    ; with optional staus bar label override
+    (define/public (zoom-to factor [status-label #f])
       (set! fit #f) ; always make sure this is cleared when setting a new zoom level
       (define dc (send this get-dc))
       (send dc set-scale factor factor)
       (configure-scrollbars factor)
       (send this refresh-now)
       (send (status-bar-zoom) set-label
-            (cond [status status]
+            (cond [status-label status-label]
                   [(not (= factor 1.0)) (format "@ ~aX" (~r factor #:precision 2))]
                   [else ""])))
 
@@ -1112,26 +1119,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     ; adjusts zoom level so the entire image fits, and at least one dimension
     ; will be the same size as the window.
     (define/public (zoom-to-fit)
-      (define w (send this get-width))
-      (define h (send this get-height))
-      (define img-w (send image-bmp-master get-width))
-      (define img-h (send image-bmp-master get-height))
-      (define new-zoom (min (/ w img-w)
-                            (/ h img-h)))
-      (send this zoom-to new-zoom "[Fit]")
-      ; must set this *after* calling zoom-to, where it is reset to false
-      (set! fit #t))
+      (let* ([client-w (send this get-width)]
+             [client-h (send this get-height)]
+             [img-w (send image-bmp-master get-width)]
+             [img-h (send image-bmp-master get-height)]
+             [new-zoom (min (/ client-w img-w)
+                            (/ client-h img-h))])
+        (send this zoom-to new-zoom "[Fit]")
+        ; must set this *after* calling zoom-to, where it is reset to false
+        (set! fit #t)))
 
     ; only zooms out if the image is too big to fit on either dimension
     (define/public (center-fit)
-      (define w (send this get-width))
-      (define h (send this get-height))
-      (define img-w (send image-bmp-master get-width))
-      (define img-h (send image-bmp-master get-height))
-      (cond [(or (> img-w w)
-                 (> img-h h))
-             (send this zoom-to-fit)]
-            [else (send this zoom-to 1.0)]))
+      (let ([client-w (send this get-width)]
+            [client-h (send this get-height)]
+            [img-w (send image-bmp-master get-width)]
+            [img-h (send image-bmp-master get-height)])
+        (cond [(or (> img-w client-w)
+                   (> img-h client-h))
+               (send this zoom-to-fit)]
+              [else (send this zoom-to 1.0)])))
 
     (define/override (on-size width height)
       (recenter-origin width height)
@@ -1146,9 +1153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
         (/ height 2)))
 
     (define/public (recenter)
-      (define w (send this get-width))
-      (define h (send this get-height))
-      (recenter-origin w h))))
+      (define-values [virtual-w virtual-h] (send this get-virtual-size))
+      (recenter-origin virtual-w virtual-h))))
 
 (ivy-canvas
  (new ivy-canvas%

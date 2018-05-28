@@ -732,7 +732,9 @@
   
   (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
     (kill-thread (animation-thread)))
-  
+
+  (send canvas center-fit)
+
   (if (not (empty? image-lst))
       ; image-lst contains a list of picts, display the animation
       (send canvas set-on-paint!
@@ -754,19 +756,14 @@
               (define img-center-x (/ img-width 2))
               (define img-center-y (/ img-height 2))
 
-              (define canvas-width (send canvas get-width))
-              (define canvas-height (send canvas get-height))
+              (define-values [canvas-width canvas-height]
+                (send canvas get-virtual-size))
               (define canvas-center-x (/ canvas-width 2))
               (define canvas-center-y (/ canvas-height 2))
-              
-              ; keep the background black
-              (send canvas set-canvas-background color-black)
 
               ; center the image on the canvas
               (send canvas recenter)
-              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y)))))
-
-  (send canvas center-fit))
+              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y))))))
 
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry (see https://www.imdb.com/name/nm0000347/?ref_=fn_al_nm_1)
