@@ -718,7 +718,11 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (is-dc:subject? . -> . list?)
   (define found (findf*-txexpr dc:sub is-rdf:li?))
   (if found
-      (flatten (map (λ (item) (get-elements item)) found))
+      (for/fold ([lst empty])
+                ([element (map get-elements found)])
+        (if (> (length element) 1)
+            (append lst (list (apply string-append element)))
+            (append lst element)))
       empty))
 
 ; set the tag inside xexpr with the contents of tx.

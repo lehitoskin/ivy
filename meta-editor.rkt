@@ -168,28 +168,32 @@
   (send attr-tfield set-value "")
   (send attr-choice set-string-selection ""))
 
+(define (tab-panel-defaults)
+  (define num (send tab-panel get-number))
+  (when (> num 1)
+    (for ([tab (in-range (- num 1))])
+      (send tab-panel delete 1)))
+  (send tab-panel set-item-label 0 "default"))
+
 (define (meta-editor-defaults)
   ; set tabs to default
-  (let ([num (send tab-panel get-number)])
-    (cond [(= num 1)
-           (send tab-panel set-item-label 0 "default")]
-          [else
-           ; delete all but one tab
-           (for ([tab (in-range (- num 1))])
-             (send tab-panel delete 1))
-           (send tab-panel set-item-label 0 "default")]))
+  (tab-panel-defaults)
   (fields-defaults)
   (send xmp-lbox set-string-selection "dc:subject"))
 
 (define (langs-hash found)
-  (define elem+attrs (map (λ (tx) (findf-txexpr tx is-rdf:li?)) found))
-  (for/hash ([tx (in-list elem+attrs)])
-    (define elem (first (get-elements tx)))
+  (define elem+attrs (map (λ (tx) (findf*-txexpr tx is-rdf:li?)) found))
+  (for/hash ([tx (in-list (first elem+attrs))])
+    (define elem
+      (let ([li (get-elements tx)])
+        (if (> (length li) 1)
+            (apply string-append li)
+              (first li))))
     (define lang
       (first
        (filter
         (λ (pair)
-          (equal? (first pair) 'xml:lang))
+          (eq? (first pair) 'xml:lang))
         (get-attrs tx))))
     (values (second lang) elem)))
 
@@ -246,14 +250,7 @@
                      ; set some fields to defaults
                      (fields-defaults)
                      ; set tabs to default
-                     (let ([num (send tab-panel get-number)])
-                       (cond [(= num 1)
-                              (send tab-panel set-item-label 0 "default")]
-                             [else
-                              ; delete all but one tab
-                              (for ([tab (in-range (- num 1))])
-                                (send tab-panel delete 1))
-                              (send tab-panel set-item-label 0 "default")]))
+                     (tab-panel-defaults)
                      (case sel
                        ; just in case get-string-selection returns #f
                        [(||) (void)]
@@ -286,7 +283,11 @@
                          dc:type)
                         (when found
                           (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
-                          (define lst (flatten (map get-elements rdf:li)))
+                          (define lst
+                            (for/list ([elem (in-list (map get-elements rdf:li))])
+                              (if (> (length elem) 1)
+                                  (apply string-append elem)
+                                  (first elem))))
                           (send dc-tfield set-value (string-join lst ", ")))]
                        ; grab the attrs from rdf:Description
                        [(xmp:BaseURL xmp:Label xmp:Rating)
@@ -306,7 +307,11 @@
                        ; everything else is just a single value
                        [else
                         (when found
-                          (define lst (flatten (map get-elements found)))
+                          (define lst
+                            (for/list ([elem (in-list (map get-elements found))])
+                              (if (> (length elem) 1)
+                                  (apply string-append elem)
+                                  (first elem))))
                           (send dc-tfield set-value (string-join lst ", ")))])))]))
 
 (define dc-vpanel
