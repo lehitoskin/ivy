@@ -28,6 +28,7 @@
          is-rdf:li?
          is-tag?
          make-xmp-xexpr
+         rdf:li-fixer
          set-embed-tags!
          set-embed-xmp!
          set-xmp-tag
@@ -713,16 +714,21 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                      ([tag (in-list lst)])
              (append bag `((rdf:li () ,tag)))))))
 
+; fixes issues when we have multiple elements inside a single rdf:li
+(define/contract (rdf:li-fixer rdf:li)
+  ((listof is-rdf:li?) . -> . list?)
+  (for/fold ([lst empty])
+            ([elem (map get-elements rdf:li)])
+    (if (> (length elem) 1)
+        (append lst (list (apply string-append elem)))
+        (append lst elem))))
+
 ; take a dc:subject entry and return a list of tags
 (define/contract (dc:subject->list dc:sub)
   (is-dc:subject? . -> . list?)
   (define found (findf*-txexpr dc:sub is-rdf:li?))
   (if found
-      (for/fold ([lst empty])
-                ([element (map get-elements found)])
-        (if (> (length element) 1)
-            (append lst (list (apply string-append element)))
-            (append lst element)))
+      (rdf:li-fixer found)
       empty))
 
 ; set the tag inside xexpr with the contents of tx.
