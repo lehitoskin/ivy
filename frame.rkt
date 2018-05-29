@@ -100,7 +100,7 @@
 
 (define (set-fullscreen going-to-be-fullscreen?)
   (define was-fullscreen? (send ivy-frame is-fullscreened?))
-  (unless (= was-fullscreen? going-to-be-fullscreen?)
+  (unless (eq? was-fullscreen? going-to-be-fullscreen?)
     (send ivy-frame fullscreen going-to-be-fullscreen?)
     (unless macosx?
       (on-fullscreen-event going-to-be-fullscreen?))))
