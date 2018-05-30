@@ -184,7 +184,7 @@
 (define (langs-hash found)
   (define elem+attrs (map (λ (tx) (findf*-txexpr tx is-rdf:li?)) found))
   (for/hash ([tx (in-list (first elem+attrs))])
-    (define elem (first (rdf:li-fixer (list tx))))
+    (define elem (rdf:li-fixer tx))
     (define lang
       (first
        (filter
@@ -279,7 +279,7 @@
                          dc:type)
                         (when found
                           (define rdf:li (findf*-txexpr (first found) is-rdf:li?))
-                          (define lst (rdf:li-fixer rdf:li))
+                          (define lst (map rdf:li-fixer rdf:li))
                           (send dc-tfield set-value (string-join lst ", ")))]
                        ; grab the attrs from rdf:Description
                        [(xmp:BaseURL xmp:Label xmp:Rating)
@@ -299,7 +299,7 @@
                        ; everything else is just a single value
                        [else
                         (when found
-                          (define lst (rdf:li-fixer found))
+                          (define lst (map rdf:li-fixer found))
                           (send dc-tfield set-value (string-join lst ", ")))])))]))
 
 (define dc-vpanel

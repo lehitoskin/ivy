@@ -715,20 +715,20 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
              (append bag `((rdf:li () ,tag)))))))
 
 ; fixes issues when we have multiple elements inside a single rdf:li
+; enter a single rdf:li, return a single string
 (define/contract (rdf:li-fixer rdf:li)
-  ((listof is-rdf:li?) . -> . list?)
-  (for/fold ([lst empty])
-            ([elem (map get-elements rdf:li)])
-    (if (> (length elem) 1)
-        (append lst (list (apply string-append elem)))
-        (append lst elem))))
+  (is-rdf:li? . -> . string?)
+  (define elem (get-elements rdf:li))
+  (if (> (length elem) 1)
+      (apply string-append elem)
+      (first elem)))
 
 ; take a dc:subject entry and return a list of tags
 (define/contract (dc:subject->list dc:sub)
   (is-dc:subject? . -> . list?)
   (define found (findf*-txexpr dc:sub is-rdf:li?))
   (if found
-      (rdf:li-fixer found)
+      (map rdf:li-fixer found)
       empty))
 
 ; set the tag inside xexpr with the contents of tx.
