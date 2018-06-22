@@ -690,12 +690,16 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 
 ; remove the tags in taglist from the image
 (define/contract (del-embed-tags! img taglist)
-  (embed-support? list? . -> . void?)
+  (embed-support? (or/c list? string?) . -> . void?)
   ; get the tags from the image (if any)
   (define embed-lst (get-embed-tags img))
+  (define resolved-tag-lst
+    (if (list? taglist)
+        taglist
+        (list taglist)))
   (unless (empty? embed-lst)
     ; remove taglist items from embed-list
-    (define new-taglist (remove* taglist embed-lst))
+    (define new-taglist (remove* resolved-tag-lst embed-lst))
     (set-embed-tags! img new-taglist)))
 
 (define ((is-tag? sym) xexpr) (and (txexpr? xexpr) (eq? sym (get-tag xexpr))))

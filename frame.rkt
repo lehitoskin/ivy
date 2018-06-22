@@ -4,8 +4,10 @@
 (require framework
          images/flomap
          pict
+         pict/convert
          racket/bool
          racket/class
+         (only-in racket/format ~r)
          racket/gui/base
          racket/list
          racket/math
@@ -19,6 +21,7 @@
          "embed.rkt"
          "error-log.rkt"
          "files.rkt"
+         "ivy-canvas.rkt"
          "meta-editor.rkt"
          "search-dialog.rkt"
          "tag-browser.rkt")
@@ -95,12 +98,17 @@
 
 ;; Fullscreen handling ;;
 
-(define (toggle-fullscreen canvas frame)
-  (define was-fullscreen?  (send frame is-fullscreened?))
+(define (set-fullscreen going-to-be-fullscreen?)
+  (define was-fullscreen? (send ivy-frame is-fullscreened?))
+  (unless (eq? was-fullscreen? going-to-be-fullscreen?)
+    (send ivy-frame fullscreen going-to-be-fullscreen?)
+    (unless macosx?
+      (on-fullscreen-event going-to-be-fullscreen?))))
+
+(define (toggle-fullscreen canvas)
+  (define was-fullscreen?  (send ivy-frame is-fullscreened?))
   (define going-to-be-fullscreen? (not was-fullscreen?))
-  (send frame fullscreen going-to-be-fullscreen?)
-  (unless macosx?
-    (on-fullscreen-event going-to-be-fullscreen?)))
+  (set-fullscreen going-to-be-fullscreen?))
 
 (define (on-fullscreen-event is-fullscreen?)
   (cond [is-fullscreen?
@@ -509,23 +517,57 @@
        [callback (λ (i e)
                    (show-tag-browser))]))
 
-(define ivy-menu-bar-view-zoom-to
+(define ivy-menu-bar-view-zoom
   (new menu%
        [parent ivy-menu-bar-view]
-       [label "Zoom To"]
-       [help-string "Zoom the image to a specified percentage."]))
+       [label "Zoom"]
+       [help-string "Zoom the image."]))
 
 
-(for ([n (in-range 10 110 10)])
+(define ivy-menu-bar-view-zoom-in
   (new menu-item%
-       [parent ivy-menu-bar-view-zoom-to]
+       [parent ivy-menu-bar-view-zoom]
+       [label "Zoom In"]
+       [help-string "Zoom the image by 10%"]
+       [shortcut #\=]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-by 0.1)))]))
+
+
+(define ivy-menu-bar-view-zoom-out
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Zoom Out"]
+       [help-string "Zoom the image out by 10%"]
+       [shortcut #\-]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-by -0.1)))]))
+
+(void (new separator-menu-item%
+           [parent ivy-menu-bar-view-zoom]))
+
+(define ivy-menu-bar-view-zoom-reset
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Reset"]
+       [help-string "Zoom the image out by 10%"]
+       [shortcut #\0]
+       [callback (λ (i e)
+                   (unless (equal? (image-path) +root-path+)
+                     (send (ivy-canvas) zoom-to 1.0)))]))
+
+(void (new separator-menu-item%
+           [parent ivy-menu-bar-view-zoom]))
+
+(for ([n (list 10 25 50 75 100 200 400)])
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
        [label (format "~a%" n)]
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst-master)
-                         (load-image (bitmap image-bmp-master) n)
-                         (load-image image-lst-master n))))]))
+                      (send (ivy-canvas) zoom-to (/ n 100.0))))]))
 
 (define ivy-menu-bar-view-rotate-left
   (new menu-item%
@@ -535,7 +577,7 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate image-pict (/ pi 2)) 'same)))]))
+                     (load-image (rotate (pict-convert image-bmp-master) (/ pi 2)) 'same)))]))
 
 (define ivy-menu-bar-view-rotate-right
   (new menu-item%
@@ -545,7 +587,7 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate image-pict (- (/ pi 2))) 'same)))]))
+                     (load-image (rotate  (pict-convert image-bmp-master) (- (/ pi 2))) #;'same)))]))
 
 (define ivy-menu-bar-view-flip-horizontal
   (new menu-item%
@@ -555,9 +597,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-horizontal (bitmap->flomap (pict->bitmap image-pict))))
+                       (flomap-flip-horizontal (bitmap->flomap #;(pict->bitmap image-pict)) image-bmp-master))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
+                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
 
 (define ivy-menu-bar-view-flip-vertical
   (new menu-item%
@@ -567,9 +609,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-vertical (bitmap->flomap (pict->bitmap image-pict))))
+                       (flomap-flip-vertical (bitmap->flomap #;(pict->bitmap image-pict) image-bmp-master)))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) 'same)))]))
+                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
 
 (define ivy-menu-bar-view-sort-alpha
   (new menu-item%
@@ -733,11 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (and image-pict
-                              (empty? image-lst))
-                         (load-image image-pict 'larger)
-                         (load-image image-lst 'larger))))]))
+                     (send (ivy-canvas) zoom-by 0.1)))]))
 
 (define ivy-actions-zoom-out
   (new button%
@@ -746,11 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (and image-pict
-                              (empty? image-lst))
-                         (load-image image-pict 'smaller)
-                         (load-image image-lst 'smaller))))]))
+                     (send (ivy-canvas) zoom-by -0.1)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
@@ -759,10 +793,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst)
-                         (load-image image-bmp-master 'none)
-                         (load-image (image-path) 'none))))]))
+                     (send (ivy-canvas) zoom-to 1.0)))]))
 
 (define ivy-actions-zoom-fit
   (new button%
@@ -771,10 +802,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [callback (λ (button event)
                    ; do nothing if we've pressed ctrl+n
                    (unless (equal? (image-path) +root-path+)
-                     (collect-garbage 'incremental)
-                     (if (empty? image-lst)
-                         (load-image image-bmp-master)
-                         (load-image (image-path)))))]))
+                     (send (ivy-canvas) zoom-to-fit)))]))
 
 
 (ivy-actions-rating
@@ -948,111 +976,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     (send txt set-position (send txt last-position)))
   (send (ivy-tag-tfield) focus))
 
-(define ivy-canvas%
-  (class canvas%
-    (super-new)
-    (init-field paint-callback)
-    
-    (define mouse-x 0)
-    (define mouse-y 0)
-    
-    (define/public (get-mouse-pos)
-      (values mouse-x mouse-y))
-    
-    (define (do-on-paint)
-      (when paint-callback
-        (paint-callback this (send this get-dc))))
-    
-    (define/override (on-paint)
-      (do-on-paint))
-    
-    ; proc: ((is-a?/c canvas%) (is-a?/c dc<%>) . -> . any)
-    (define/public (set-on-paint! proc)
-      (set! paint-callback proc))
-    
-    (define/override (on-drop-file pathname)
-      ; append the image to the current collection
-      (define-values (base name must-be-dir?) (split-path pathname))
-      (define directory? (directory-exists? pathname))
-      (cond
-        ; empty collection
-        [(equal? (first (pfs)) +root-path+)
-         (cond [directory?
-                (define files
-                  (for/fold ([lst empty])
-                            ([p (in-directory pathname)])
-                    (if (supported-file? p)
-                        (append lst (list p))
-                        lst)))
-                (image-dir pathname)
-                (pfs files)
-                (image-path (first files))
-                (load-image (first files))]
-               [else
-                (image-dir base)
-                (pfs (list pathname))
-                (image-path pathname)
-                (load-image pathname)])]
-        ; collection has images; appending to collection
-        [else
-         (define files
-           (if (directory-exists? pathname)
-               (for/fold ([lst empty])
-                         ([p (in-directory pathname)])
-                 (if (supported-file? p)
-                     (append lst (list p))
-                     lst))
-               (list pathname)))
-         ; no duplicate paths allowed!
-         (pfs (remove-duplicates (append (pfs) files)))
-         ; change label because it usually isn't called until
-         ; (load-image) is called and we want to see the changes now
-         (send (status-bar-position) set-label
-               (format "~a / ~a"
-                       (+ (get-index (image-path) (pfs)) 1)
-                       (length (pfs))))]))
-    
-    (define/override (on-event evt)
-      (define type (send evt get-event-type))
-      (case type
-        ; track where the mouse is
-        [(enter motion)
-         (set! mouse-x (send evt get-x))
-         (set! mouse-y (send evt get-y))]))
-    
-    (define/override (on-char key)
-      (define type (send key get-key-code))
-      (case type
-        [(wheel-down)
-         ; do nothing if we've pressed ctrl+n
-         (unless (equal? (image-path) +root-path+)
-           (collect-garbage 'incremental)
-           (if (and image-pict
-                    (empty? image-lst))
-               (load-image image-pict 'wheel-smaller)
-               (load-image image-lst 'wheel-smaller)))]
-        [(wheel-up)
-         ; do nothing if we've pressed ctrl+n
-         (unless (equal? (image-path) +root-path+)
-           (collect-garbage 'incremental)
-           (if (and image-pict
-                    (empty? image-lst))
-               (load-image image-pict 'wheel-larger)
-               (load-image image-lst 'wheel-larger)))]
-        ; osx does things a little different
-        [(f11) (unless macosx?
-                 (toggle-fullscreen this ivy-frame))]
-        ; only do something if we're fullscreened,
-        ; since the tag bar isn't available in fullscreen anyway
-        [(escape) (when (and (send ivy-frame is-fullscreened?) (not macosx?))
-                    (toggle-fullscreen this ivy-frame))]
-        [(left) (load-previous-image)]
-        [(right) (load-next-image)]
-        [(home) (load-first-image)]
-        [(end) (load-last-image)]
-        [(#\,) (focus-tag-tfield)
-               (send (send (ivy-tag-tfield) get-editor) insert ", ")]
-        [(#\return) (focus-tag-tfield)]))))
+(define (insert-tag-tfield-comma)
+  (send (send (ivy-tag-tfield) get-editor) insert ", "))
+
+; forward define for use by zoom methods
+(define status-bar-zoom (make-parameter #f))
 
 (ivy-canvas
  (new ivy-canvas%
@@ -1060,6 +988,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
       [label "Ivy Image Canvas"]
       [style '(hscroll vscroll)]
       [stretchable-height #t]
+      [focus-tag-tfield focus-tag-tfield]
+      [insert-tag-tfield-comma insert-tag-tfield-comma]
+      [status-bar-position status-bar-position]
+      [status-bar-zoom status-bar-zoom]
+      [set-fullscreen set-fullscreen]
+      [toggle-fullscreen toggle-fullscreen]
       [paint-callback (λ (canvas dc)
                         (send canvas set-canvas-background color-black))]))
 (send (ivy-canvas) accept-drop-files #t)
@@ -1088,6 +1022,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
        [alignment '(right center)]))
 
 (status-bar-dimensions
+ (new message%
+      [parent dimensions-hpanel]
+      [label ""]
+      [auto-resize #t]))
+
+(status-bar-zoom
  (new message%
       [parent dimensions-hpanel]
       [label ""]
