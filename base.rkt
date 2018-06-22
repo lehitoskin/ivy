@@ -391,9 +391,9 @@
 (define want-animation? (make-parameter #t))
 
 (define/contract (animation-callback canvas dc lst)
-  ((is-a?/c canvas%) (is-a?/c dc<%>) list? . -> . void?)
-  (define img-x (inexact->exact (round (pict-width (first lst)))))
-  (define img-y (inexact->exact (round (pict-height (first lst)))))
+  ((is-a?/c canvas%) (is-a?/c dc<%>) (listof (is-a?/c bitmap%)) . -> . void?)
+  (define img-x (inexact->exact (round (send (first lst) get-width))))
+  (define img-y (inexact->exact (round (send (first lst) get-height))))
   (define img-center-x (/ img-x 2))
   (define img-center-y (/ img-y 2))
   
@@ -412,10 +412,10 @@
        (for/list ([bit-frame (gif-images (image-path))]
                   [master-frame (in-list image-lst-master)]
                   [gif-frame (in-list image-lst)])
-         (define master-width (pict-width master-frame))
-         (define master-height (pict-height master-frame))
-         (define gif-width (pict-width gif-frame))
-         (define gif-height (pict-height gif-frame))
+         (define master-width (send master-frame get-width))
+         (define master-height (send master-frame get-height))
+         (define gif-width (send gif-frame get-width))
+         (define gif-height (send gif-frame get-height))
          ; grab the frame's image descriptor
          ; starting with the graphics control extension
          (define matched (car (regexp-match-positions (byte-regexp (bytes #x21 #xf9)) bit-frame)))
@@ -447,7 +447,8 @@
              [times 0])
     ; remove any previous frames from the canvas
     (unless (cumulative?) (send dc clear))
-    (draw-pict img-frame dc (+ x-loc (first offsets)) (+ y-loc (second offsets)))
+    (send dc recenter)
+    (send dc draw-bitmap img-frame (+ x-loc (first offsets)) (+ y-loc (second offsets)))
     (sleep timing)
     (cond
       ; loop forever
@@ -499,7 +500,7 @@
 ; takes care of updating the dimensions message and
 ; the position message
 (define/contract (load-image img)
-  (->* ([or/c path? pict? (is-a?/c bitmap%) (listof pict?)])
+  (->* ([or/c path? (is-a?/c bitmap%) (listof (is-a?/c bitmap%))])
        void?)
   (define canvas (ivy-canvas))
   (define dc (send canvas get-dc))
@@ -526,7 +527,7 @@
         (define load-success (send image-bmp-master load-file img))
         ; set the new frame label
         (send ivy-frame set-label (string-truncate (path->string name) +label-max+))
-        ; make a list of picts
+        ; make a list of bitmaps
         (with-handlers
             ([exn:fail? (λ (e)
                           (eprintf "Error loading animated gif ~v: ~a\n"
@@ -537,7 +538,7 @@
                           (set! image-lst empty)
                           (set! image-lst-timings empty)
                           ; just load the static image instead
-                          (load-image (bitmap img))
+                          (load-image img)
                           (send sbe set-label
                                 (format "Error loading file ~v"
                                         (string-truncate (path->string name) 30))))])
@@ -548,7 +549,7 @@
               (define bmp (make-object bitmap% 50 50))
               (send bmp load-file bmp-in-port 'gif/alpha)
               (close-input-port bmp-in-port)
-              (bitmap bmp)))
+              bmp))
           (set! image-lst-master lst)
           (set! image-lst lst)
           (set! image-lst-timings (gif-timings img)))
@@ -733,6 +734,10 @@
   (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
     (kill-thread (animation-thread)))
 
+  ;;; DEBUG ;;;
+  (eprintf "DEBUG, just before set-on-paint!~n")
+  (eprintf "DEBUG, empty? image-lst: ~v~n" (empty? image-lst))
+
   (send canvas center-fit)
 
   (if (not (empty? image-lst))
@@ -751,8 +756,9 @@
       ; otherwise, display the static image
       (send canvas set-on-paint!
             (λ (canvas dc)
-              (define img-width (inexact->exact (round (send image-bmp-master get-width))))
-              (define img-height (inexact->exact (round (send image-bmp-master get-height))))
+              (define bmp (if (path? img) image-bmp-master img))
+              (define img-width (inexact->exact (round (send bmp get-width))))
+              (define img-height (inexact->exact (round (send bmp get-height))))
               (define img-center-x (/ img-width 2))
               (define img-center-y (/ img-height 2))
 
@@ -763,7 +769,7 @@
 
               ; center the image on the canvas
               (send canvas recenter)
-              (send dc draw-bitmap image-bmp-master (- img-center-x) (- img-center-y))))))
+              (send dc draw-bitmap bmp (- img-center-x) (- img-center-y))))))
 
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry (see https://www.imdb.com/name/nm0000347/?ref_=fn_al_nm_1)
