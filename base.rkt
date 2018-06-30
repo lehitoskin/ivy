@@ -369,15 +369,15 @@
           [else (apply vl-append base-grid)])))
 
 (define/contract (transparency-grid-append img)
-  ((or/c (is-a?/c bitmap%) pict?) . -> . pict?)
+  ((or/c (is-a?/c bitmap%) pict?) . -> . (is-a?/c bitmap%))
   (define x (if (pict? img) (pict-width img) (send img get-width)))
   (define pct (if (pict? img) img (bitmap img)))
   (define grid (transparency-grid img))
   ; generated grid size is imperfect
   (define offset (- x (pict-width grid)))
   (if (= offset 0)
-      (hc-append (- x) grid pct)
-      (hc-append (- offset x) grid pct)))
+      (pict->bitmap (hc-append (- x) grid pct))
+      (pict->bitmap (hc-append (- offset x) grid pct))))
 
 ; janky!
 (define ivy-canvas (make-parameter #f))
@@ -447,7 +447,7 @@
              [times 0])
     ; remove any previous frames from the canvas
     (unless (cumulative?) (send dc clear))
-    (send dc recenter)
+    (send canvas recenter)
     (send dc draw-bitmap img-frame (+ x-loc (first offsets)) (+ y-loc (second offsets)))
     (sleep timing)
     (cond
@@ -734,42 +734,40 @@
   (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
     (kill-thread (animation-thread)))
 
-  ;;; DEBUG ;;;
-  (eprintf "DEBUG, just before set-on-paint!~n")
-  (eprintf "DEBUG, empty? image-lst: ~v~n" (empty? image-lst))
-
   (send canvas center-fit)
 
-  (if (not (empty? image-lst))
-      ; image-lst contains a list of picts, display the animation
-      (send canvas set-on-paint!
-            (λ (canvas dc)
-              (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
-                (kill-thread (animation-thread)))
+  (cond [(not (empty? image-lst))
+         ; image-lst contains a list of picts, display the animation
+         (define lst (map transparency-grid-append image-lst))
+         
+         (send canvas set-on-paint!
+               (λ (canvas dc)
+                 (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
+                   (kill-thread (animation-thread)))
               
-              (send dc set-background "black")
+                 (send dc set-background "black")
               
-              (animation-thread
-               (thread
-                (λ ()
-                  (animation-callback canvas dc image-lst))))))
-      ; otherwise, display the static image
-      (send canvas set-on-paint!
-            (λ (canvas dc)
-              (define bmp (if (path? img) image-bmp-master img))
-              (define img-width (inexact->exact (round (send bmp get-width))))
-              (define img-height (inexact->exact (round (send bmp get-height))))
-              (define img-center-x (/ img-width 2))
-              (define img-center-y (/ img-height 2))
-
-              (define-values [canvas-width canvas-height]
-                (send canvas get-virtual-size))
-              (define canvas-center-x (/ canvas-width 2))
-              (define canvas-center-y (/ canvas-height 2))
-
-              ; center the image on the canvas
-              (send canvas recenter)
-              (send dc draw-bitmap bmp (- img-center-x) (- img-center-y))))))
+                 (animation-thread
+                  (thread
+                   (λ ()
+                     (animation-callback canvas dc lst))))))]
+        [else
+         ; image-lst contains a list of picts, display the animation
+         (define bmp (transparency-grid-append (if (path? img) image-bmp-master img)))
+         (define img-width (inexact->exact (round (send bmp get-width))))
+         (define img-height (inexact->exact (round (send bmp get-height))))
+         (define img-center-x (/ img-width 2))
+         (define img-center-y (/ img-height 2))
+         (define-values [canvas-width canvas-height]
+           (send canvas get-virtual-size))
+         (define canvas-center-x (/ canvas-width 2))
+         (define canvas-center-y (/ canvas-height 2))
+         
+         (send canvas set-on-paint!
+               (λ (canvas dc)
+                 ; center the image on the canvas
+                 (send canvas recenter)
+                 (send dc draw-bitmap bmp (- img-center-x) (- img-center-y))))]))
 
 ; curried procedure to abstract loading an image in a collection
 ; mmm... curry (see https://www.imdb.com/name/nm0000347/?ref_=fn_al_nm_1)
