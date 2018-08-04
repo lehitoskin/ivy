@@ -399,21 +399,25 @@
             (map string->path (remove-duplicates sorted))]
            ; turn all the strings in paths, keep only duplicate items
            [(and)
-            (cond [(= (length lst-quotes) 1)
-                   (define sorted (sort (flatten results) string<?))
-                   (map string->path (remove-duplicates sorted))]
-                  [else
-                   (define duplicates
-                     (remove-duplicates
-                      (for/fold ([dups empty])
-                                ([tags (in-list results)]
-                                 [i (in-naturals)])
-                        ; ensure each image contains each tag
-                        (cond [(= i 0)
-                               (append dups tags)]
-                              [else
-                               (keep-duplicates (append dups tags))]))))
-                   (map string->path duplicates)])])]))
+            (cond
+              ; if the AND results don't match the search,
+              ; one of the tags may not exist!
+              [(< (length results) (length lst-quotes)) empty]
+              [(= (length lst-quotes) 1)
+               (define sorted (sort (flatten results) string<?))
+               (map string->path (remove-duplicates sorted))]
+              [else
+               (define duplicates
+                 (remove-duplicates
+                  (for/fold ([dups empty])
+                            ([tags (in-list results)]
+                             [i (in-naturals)])
+                    ; ensure each image contains each tag
+                    (cond [(= i 0)
+                           (append dups tags)]
+                          [else
+                           (keep-duplicates (append dups tags))]))))
+               (map string->path duplicates)])])]))
 
 ; return a list of paths or empty
 (define/contract (search-db-inexact #:db-conn [db-conn sqlc] type tag-lst)
