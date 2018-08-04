@@ -16,7 +16,7 @@
     (string->symbol
      (send type-rbox get-item-label
            (send type-rbox get-selection))))
-  ; make sure there aren't any nonexistant files in the dictionary
+  ; make sure there aren't any nonexistant files in the database
   (clean-db!)
   (define imgs
     (if (empty? tags)
