@@ -440,9 +440,7 @@
                    (if (string-contains-ci (first db-pair) tag)
                        (append db-accum (second db-pair))
                        db-accum)))
-               (if (empty? search)
-                   tag-accum
-                   (append tag-accum (list search))))))
+               (append tag-accum (list search)))))
          (if (or (= (length tag-lst) 1) (eq? type 'or))
              (remove-duplicates (flatten results))
              (remove-duplicates
