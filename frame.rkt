@@ -577,7 +577,7 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate (pict-convert image-bmp-master) (/ pi 2)) 'same)))]))
+                     (load-image (pict->bitmap (rotate (bitmap image-bmp-master) (/ pi 2))))))]))
 
 (define ivy-menu-bar-view-rotate-right
   (new menu-item%
@@ -587,7 +587,8 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (collect-garbage 'incremental)
-                     (load-image (rotate  (pict-convert image-bmp-master) (- (/ pi 2))) #;'same)))]))
+                     (load-image
+                      (pict->bitmap (rotate (bitmap image-bmp-master) (- (/ pi 2)))))))]))
 
 (define ivy-menu-bar-view-flip-horizontal
   (new menu-item%
@@ -597,9 +598,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-horizontal (bitmap->flomap #;(pict->bitmap image-pict)) image-bmp-master))
+                       (flomap-flip-horizontal (bitmap->flomap image-bmp-master)))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
+                     (load-image (flomap->bitmap flo))))]))
 
 (define ivy-menu-bar-view-flip-vertical
   (new menu-item%
@@ -609,9 +610,9 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (define flo
-                       (flomap-flip-vertical (bitmap->flomap #;(pict->bitmap image-pict) image-bmp-master)))
+                       (flomap-flip-vertical (bitmap->flomap image-bmp-master)))
                      (collect-garbage 'incremental)
-                     (load-image (bitmap (flomap->bitmap flo)) #;'same)))]))
+                     (load-image (flomap->bitmap flo))))]))
 
 (define ivy-menu-bar-view-sort-alpha
   (new menu-item%
