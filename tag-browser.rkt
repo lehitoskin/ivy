@@ -398,4 +398,9 @@
   (update-tag-browser)
   (unless (send browser-frame is-shown?)
     (send browser-frame center 'both)
+    (send tag-filter-tfield focus)
+    ; select filter contents on-show
+    (let ([txt (send tag-filter-tfield get-editor)])
+      (send txt move-position 'home)
+      (send txt move-position 'end #t))
     (send browser-frame show #t)))
