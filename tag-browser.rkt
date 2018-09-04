@@ -90,8 +90,8 @@
         [else
          (printf "Changing tag label from ~v to ~v\n" old-tag-label new-tag-label)
          ; get the image list from the old tag
-         (define imagelist (map path->string (search-db-exact 'or (list old-tag-label))))
-         (for ([img (in-list imagelist)])
+         (define img-lst (map path->string (search-db-exact 'or (list old-tag-label))))
+         (for ([img (in-list img-lst)])
            (add-tags! img (list new-tag-label))
            (del-tags! img (list old-tag-label))
            (when (embed-support? img)
@@ -154,8 +154,7 @@
         (λ (button evt)
           (define sel (send img-lbox get-selection))
           (cond [(number? sel)
-                 (define img-label (or (send img-lbox get-data sel)
-                                       (send img-lbox get-string sel)))
+                 (define img-label (send img-lbox get-data sel))
                  ; 15 the tallest any column can be
                  (define tag-grid (grid-list (image-taglist img-label) 15))
                  ; remove any children vpanel might have
@@ -202,7 +201,7 @@
 
 (define (edit-tags-callback lbox tfield)
   (define sel (send lbox get-selection))
-  (define img (send lbox get-string sel))
+  (define img (send lbox get-data sel))
   (define tags (send tfield get-value))
   ; empty tag string means add no new tags
   (unless (string-null? tags)
@@ -234,11 +233,11 @@
 
 ; begin tag filtering/search definitions
 
-(define should-use-regex (make-parameter #f))
+(define use-regex? (make-parameter #f))
 
 (define (filter-query tfield)
   (or (send (send tfield get-editor) get-text)
-      (if (should-use-regex)
+      (if (use-regex?)
           ".*"
           "")))
 
@@ -249,7 +248,7 @@
 
 (define (filter-tags filter-str regex)
   (λ (tag)
-    (if (should-use-regex)
+    (if (use-regex?)
         (regexp-match filter-str tag)
         (string-contains-ci tag filter-str))))
 
@@ -266,7 +265,7 @@
        [label "Regex"]
        [value #f]
        [callback (λ (chk evt)
-                   (should-use-regex (not (should-use-regex)))
+                   (use-regex? (not (use-regex?)))
                    (update-tag-browser))]))
 
 ; end tag filtering/search definitions
@@ -288,25 +287,27 @@
        [callback (λ (lbox evt)
                    (define sel (send lbox get-selection))
                    (define tag-label (if sel (send lbox get-string sel) ""))
-                   (define img-list (search-db-exact 'or (list tag-label)))
-                   (send img-lbox set-label (format "Image List (~a)" (length img-list)))
+                   (define img-lst (map path->string (search-db-exact 'or (list tag-label))))
+                   (send img-lbox set-label (format "Image List (~a)" (length img-lst)))
                    (send img-lbox clear)
                    (remove-children thumb-vpanel (send thumb-vpanel get-children))
-                   (for ([img (in-list img-list)])
-                     (define img-path-str (path->string img))
-                     (define img-label-str (if (> (string-length img-path-str) 200)
-                                               (format "~a..." (substring img-path-str 0 197))
-                                               img-path-str))
-                     (send img-lbox append img-label-str img-path-str))
+                   ; add paths to the image lbox, truncating if necessary
+                   (send img-lbox set
+                         (for/list ([img (in-list img-lst)])
+                           (string-truncate img +label-max+)))
+                   ; add full path string data to the entry
+                   (for ([img (in-list img-lst)]
+                         [n (in-naturals)])
+                     (send img-lbox set-data n img))
                    ; double click to load the tag category
                    (when (eq? (send evt get-event-type) 'list-box-dclick)
-                     (define img-path (string->path (send img-lbox get-string 0)))
+                     (define img-path (string->path (send img-lbox get-data 0)))
                      (define-values (base name dir?) (split-path img-path))
                      (image-dir base)
                      ; populate pfs with the images in the tag category
                      (define lst
-                       (for/list ([img (in-range (send img-lbox get-number))])
-                         (string->path (send img-lbox get-string img))))
+                       (for/list ([n (in-range (send img-lbox get-number))])
+                         (string->path (send img-lbox get-data n))))
                      (pfs lst)
                      (send (ivy-tag-tfield) set-field-background color-white)
                      (image-path img-path)
@@ -350,7 +351,7 @@
                     ; populate pfs with the images in the tag category
                     (define lst
                       (for/list ([img (in-range (send lbox get-number))])
-                        (string->path (send lbox get-string img))))
+                        (string->path (send lbox get-data img))))
                     (pfs lst)
                     (send (ivy-tag-tfield) set-field-background color-white)
                     (image-path img-path)
@@ -386,12 +387,17 @@
   (remove-children thumb-vpanel (send thumb-vpanel get-children))
   ; get every tag in the database
   (define tag-labels (sort
-                       (filter (filter-tags filter-str should-use-regex)
-                         (table-column 'tags 'Tag_Label))
-                       string<?))
-  ; add them to the list-box
-  (for ([tag (in-list tag-labels)])
-    (send tag-lbox append tag))
+                      (filter (filter-tags filter-str use-regex?)
+                              (table-column 'tags 'Tag_Label))
+                      string<?))
+  ; add them to the list-box, truncating if necessary
+  (send tag-lbox set
+        (for/list ([img (in-list tag-labels)])
+          (string-truncate img +label-max+)))
+  ; set data for the unmodified label string
+  (for ([img (in-list tag-labels)]
+        [n (in-naturals)])
+    (send tag-lbox set-data n img))
   (send updating-frame show #f))
 
 (define (show-tag-browser)
