@@ -54,6 +54,77 @@
 ; make sure the path provided is a proper absolute path
 (define relative->absolute (compose1 simple-form-path expand-user-path))
 
+; resize ivy-frame based on the dimensions of the image
+(define (resize-ivy-frame path)
+  ; resize ivy-frame so that the image isn't horribly squished if it's large
+  (when (supported-file? path)
+    ; determine the monitor dimensions
+    (define-values (monitor-width monitor-height) (get-display-size))
+    ; approximate canvas offset
+    (define canvas-offset 84)
+    (define max-width (- monitor-width canvas-offset 100))
+    (define max-height (- monitor-height 100))
+    (define pct (if (flif? path)
+                    (let ([dimensions (flif-dimensions path)])
+                      (rectangle (first dimensions) (second dimensions)))
+                    (bitmap path)))
+    (define pct-width (pict-width pct))
+    (define pct-height (pict-height pct))
+    (cond
+      ; all good, let's resize the frame
+      [(and (< pct-width max-width)
+            (< pct-height max-height))
+       (send ivy-frame resize
+             (inexact->exact (floor pct-width))
+             (+ (inexact->exact (floor pct-height)) canvas-offset))]
+      ; image is the same size as the monitor
+      [(and (= pct-width max-width)
+            (= pct-height max-height))
+       (define resized (scale-to-fit pct
+                                     pct-width
+                                     (- max-height canvas-offset)))
+       (send ivy-frame resize
+             (- (inexact->exact (floor (pict-width resized))) canvas-offset)
+             max-height)]
+      ; wide image
+      [(and (>= pct-width max-width)
+            (<= pct-height max-height))
+       (define y
+         (cond [(> pct-height (- max-height canvas-offset))
+                max-height]
+               [(<= pct-height (- max-height canvas-offset))
+                (+ pct-height canvas-offset)]
+               [else pct-height]))
+       (define resized (scale-to-fit pct max-width y))
+       (send ivy-frame resize
+             max-width
+             (+ (inexact->exact (floor (pict-height resized))) canvas-offset))]
+      ; tall image
+      [(and (<= pct-width max-width)
+            (>= pct-height max-height))
+       (define resized (scale-to-fit pct
+                                     pct-width
+                                     (- max-height canvas-offset)))
+       (send ivy-frame resize
+             (inexact->exact (floor (pict-width resized)))
+             max-height)]
+      ; both wide and tall
+      [(and (> pct-width max-width)
+            (> pct-height max-height))
+       (define resized (scale-to-fit pct max-width (- max-height canvas-offset)))
+       (send ivy-frame resize
+             (inexact->exact (floor (pict-width resized)))
+             (+ (inexact->exact (floor (pict-height resized))) canvas-offset))])))
+
+; application handler stuff
+(application-file-handler
+ (λ (path)
+   ; only bother resizing the GUI if we're starting fresh
+   ;(when (empty? (pfs)) (resize-ivy-frame (list path)))
+   (resize-ivy-frame path)
+   ; actually load the file
+   (send (ivy-canvas) on-drop-file path)))
+
 ; accept command-line path to load image
 (command-line
  #:program "Ivy"
@@ -149,8 +220,7 @@
   (verbose? #t)]
  #:args args
  ; hijack requested-images for -M
- (unless (or (not (show-frame?))
-             (empty? args))
+ (unless (or (not (show-frame?)) (empty? args))
    ; if there are directories as paths, scan them
    (define absolute-paths
      (remove-duplicates
@@ -170,65 +240,7 @@
           ; (path-files dir) filters only supported images
           (pfs (path-files base))])
    (image-path (first absolute-paths))
-   ; resize ivy-frame so that the image isn't horribly squished if it's large
-   (when (supported-file? (image-path))
-     ; determine the monitor dimensions
-     (define-values (monitor-width monitor-height) (get-display-size))
-     ; approximate canvas offset
-     (define canvas-offset 84)
-     (define max-width (- monitor-width canvas-offset 100))
-     (define max-height (- monitor-height 100))
-     (define pct (if (flif? (image-path))
-                     (let ([dimensions (flif-dimensions (image-path))])
-                       (rectangle (first dimensions) (second dimensions)))
-                     (bitmap (image-path))))
-     (define pct-width (pict-width pct))
-     (define pct-height (pict-height pct))
-     (cond
-       ; all good, let's resize the frame
-       [(and (< pct-width max-width)
-             (< pct-height max-height))
-        (send ivy-frame resize
-              (inexact->exact (floor pct-width))
-              (+ (inexact->exact (floor pct-height)) canvas-offset))]
-       ; image is the same size as the monitor
-       [(and (= pct-width max-width)
-             (= pct-height max-height))
-        (define resized (scale-to-fit pct
-                                      pct-width
-                                      (- max-height canvas-offset)))
-        (send ivy-frame resize
-              (- (inexact->exact (floor (pict-width resized))) canvas-offset)
-              max-height)]
-       ; wide image
-       [(and (>= pct-width max-width)
-             (<= pct-height max-height))
-        (define y
-          (cond [(> pct-height (- max-height canvas-offset))
-                 max-height]
-                [(<= pct-height (- max-height canvas-offset))
-                 (+ pct-height canvas-offset)]
-                [else pct-height]))
-        (define resized (scale-to-fit pct max-width y))
-        (send ivy-frame resize
-              max-width
-              (+ (inexact->exact (floor (pict-height resized))) canvas-offset))]
-       ; tall image
-       [(and (<= pct-width max-width)
-             (>= pct-height max-height))
-        (define resized (scale-to-fit pct
-                                      pct-width
-                                      (- max-height canvas-offset)))
-        (send ivy-frame resize
-              (inexact->exact (floor (pict-width resized)))
-              max-height)]
-       ; both wide and tall
-       [(and (> pct-width max-width)
-             (> pct-height max-height))
-        (define resized (scale-to-fit pct max-width (- max-height canvas-offset)))
-        (send ivy-frame resize
-              (inexact->exact (floor (pict-width resized)))
-              (+ (inexact->exact (floor (pict-height resized))) canvas-offset))])))
+   (resize-ivy-frame (image-path)))
  
  (cond
    ; we aren't search for tags on the cmdline, open frame
