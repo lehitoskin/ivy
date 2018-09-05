@@ -116,14 +116,43 @@
              (inexact->exact (floor (pict-width resized)))
              (+ (inexact->exact (floor (pict-height resized))) canvas-offset))])))
 
+(define (set-image-paths! paths)
+  ; if there are directories as paths, scan them
+  (define absolute-paths
+    (remove-duplicates
+     (for/fold ([imgs empty])
+               ([ap (map relative->absolute paths)])
+       ; directory?
+       (if (directory-exists? ap)
+           (append imgs (dir-files ap))
+           (append imgs (list ap))))))
+  (cond [(> (length absolute-paths) 1)
+         ; we want to load a collection
+         (pfs absolute-paths)]
+        [else
+         ; we want to load the image from the directory
+         (define-values (base name dir?) (split-path (first absolute-paths)))
+         (image-dir base)
+         ; (path-files dir) filters only supported images
+         (pfs (path-files base))])
+  (image-path (first absolute-paths)))
+
 ; application handler stuff
 (application-file-handler
  (λ (path)
-   ; only bother resizing the GUI if we're starting fresh
-   ;(when (empty? (pfs)) (resize-ivy-frame (list path)))
-   (resize-ivy-frame path)
-   ; actually load the file
-   (send (ivy-canvas) on-drop-file path)))
+   (when (supported-file? path)
+     (cond [(equal? (image-path) +root-path+)
+            ; only bother resizing ivy-frame if we're starting fresh
+            (resize-ivy-frame path)
+            ; center the frame
+            (send ivy-frame center 'both)
+            ; prep work
+            (set-image-paths! (list path))
+            ; actually load the file
+            (load-image path)]
+           [else
+            ; append image to the collection
+            (send (ivy-canvas) on-drop-file path)]))))
 
 ; accept command-line path to load image
 (command-line
@@ -222,24 +251,7 @@
  ; hijack requested-images for -M
  (unless (or (not (show-frame?)) (empty? args))
    ; if there are directories as paths, scan them
-   (define absolute-paths
-     (remove-duplicates
-      (for/fold ([imgs empty])
-                ([ap (map relative->absolute args)])
-        ; directory?
-        (if (directory-exists? ap)
-            (append imgs (dir-files ap))
-            (append imgs (list ap))))))
-   (cond [(> (length absolute-paths) 1)
-          ; we want to load a collection
-          (pfs absolute-paths)]
-         [else
-          ; we want to load the image from the directory
-          (define-values (base name dir?) (split-path (first absolute-paths)))
-          (image-dir base)
-          ; (path-files dir) filters only supported images
-          (pfs (path-files base))])
-   (image-path (first absolute-paths))
+   (set-image-paths! args)
    (resize-ivy-frame (image-path)))
  
  (cond
