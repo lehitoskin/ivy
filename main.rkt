@@ -2,8 +2,7 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require pict
-         racket/class
+(require racket/class
          racket/cmdline
          racket/gui/base
          racket/list
@@ -55,66 +54,63 @@
 (define relative->absolute (compose1 simple-form-path expand-user-path))
 
 ; resize ivy-frame based on the dimensions of the image
-(define (resize-ivy-frame path)
-  ; resize ivy-frame so that the image isn't horribly squished if it's large
-  (when (supported-file? path)
-    ; determine the monitor dimensions
-    (define-values (monitor-width monitor-height) (get-display-size))
-    ; approximate canvas offset
-    (define canvas-offset 84)
-    (define max-width (- monitor-width canvas-offset 100))
-    (define max-height (- monitor-height 100))
-    (define pct (if (flif? path)
-                    (let ([dimensions (flif-dimensions path)])
-                      (rectangle (first dimensions) (second dimensions)))
-                    (bitmap path)))
-    (define pct-width (pict-width pct))
-    (define pct-height (pict-height pct))
-    (cond
-      ; all good, let's resize the frame
-      [(and (< pct-width max-width)
-            (< pct-height max-height))
-       (send ivy-frame resize
-             (inexact->exact (floor pct-width))
-             (+ (inexact->exact (floor pct-height)) canvas-offset))]
-      ; image is the same size as the monitor
-      [(and (= pct-width max-width)
-            (= pct-height max-height))
-       (define resized (scale-to-fit pct
-                                     pct-width
-                                     (- max-height canvas-offset)))
-       (send ivy-frame resize
-             (- (inexact->exact (floor (pict-width resized))) canvas-offset)
-             max-height)]
-      ; wide image
-      [(and (>= pct-width max-width)
-            (<= pct-height max-height))
-       (define y
-         (cond [(> pct-height (- max-height canvas-offset))
-                max-height]
-               [(<= pct-height (- max-height canvas-offset))
-                (+ pct-height canvas-offset)]
-               [else pct-height]))
-       (define resized (scale-to-fit pct max-width y))
-       (send ivy-frame resize
-             max-width
-             (+ (inexact->exact (floor (pict-height resized))) canvas-offset))]
-      ; tall image
-      [(and (<= pct-width max-width)
-            (>= pct-height max-height))
-       (define resized (scale-to-fit pct
-                                     pct-width
-                                     (- max-height canvas-offset)))
-       (send ivy-frame resize
-             (inexact->exact (floor (pict-width resized)))
-             max-height)]
-      ; both wide and tall
-      [(and (> pct-width max-width)
-            (> pct-height max-height))
-       (define resized (scale-to-fit pct max-width (- max-height canvas-offset)))
-       (send ivy-frame resize
-             (inexact->exact (floor (pict-width resized)))
-             (+ (inexact->exact (floor (pict-height resized))) canvas-offset))])))
+(define (resize-ivy-frame bmp)
+  ; determine the monitor dimensions
+  (define-values (monitor-width monitor-height) (get-display-size))
+  ; approximate canvas offset
+  (define canvas-offset 84)
+  (define max-width (- monitor-width 100))
+  (define max-height (- monitor-height 100))
+  (define bmp-width (send bmp get-width))
+  (define bmp-height (send bmp get-height))
+  
+  (cond
+    ; all good, let's shrink the frame
+    [(and (< bmp-width max-width)
+          (< bmp-height max-height))
+     (send ivy-frame resize
+           (inexact->exact (floor bmp-width))
+           (+ (inexact->exact (floor bmp-height)) canvas-offset))]
+    ; image is the same size as the monitor
+    [(and (= bmp-width max-width)
+          (= bmp-height max-height))
+     (define resized
+       (let ([scale (/ (- max-height canvas-offset) bmp-height)])
+         (* bmp-height scale)))
+     (send ivy-frame resize resized max-height)]
+    ; wide image
+    [(and (>= bmp-width max-width)
+          (<= bmp-height max-height))
+     (define y
+       (cond [(> bmp-height (- max-height canvas-offset))
+              max-height]
+             [(<= bmp-height (- max-height canvas-offset))
+              (+ bmp-height canvas-offset)]
+             [else bmp-height]))
+     (define scale
+       (let ([scale-w (/ max-width bmp-width)]
+             [scale-y (/ max-height y)])
+         (if (<= scale-w scale-y) scale-w scale-y)))
+     (define resized-height (* y scale))
+     (send ivy-frame resize
+           max-width
+           (+ (inexact->exact (floor resized-height)) canvas-offset))]
+    ; tall image
+    [(and (<= bmp-width max-width)
+          (>= bmp-height max-height))
+     (define resized
+       (let ([scale (/ (- max-height canvas-offset) bmp-height)])
+         (* bmp-width scale)))
+     (send ivy-frame resize (inexact->exact (floor resized)) max-height)]
+    ; both wide and tall
+    [(and (> bmp-width max-width)
+          (> bmp-height max-height))
+     (define scale
+       (let ([scale-x (/ max-width bmp-width)]
+             [scale-y (/ (- max-height canvas-offset) bmp-height)])
+         (if (<= scale-x scale-y) scale-x scale-y)))
+     (define resized-width (* bmp-width scale))
+     (send ivy-frame resize (inexact->exact (floor resized-width)) max-height)]))
 
 (define (set-image-paths! paths)
   ; if there are directories as paths, scan them
@@ -142,14 +138,14 @@
  (λ (path)
    (when (supported-file? path)
      (cond [(equal? (image-path) +root-path+)
-            ; only bother resizing ivy-frame if we're starting fresh
-            (resize-ivy-frame path)
-            ; center the frame
-            (send ivy-frame center 'both)
             ; prep work
             (set-image-paths! (list path))
             ; actually load the file
-            (load-image path)]
+            (load-image path)
+            ; only bother resizing ivy-frame if we're starting fresh
+            (resize-ivy-frame image-bmp-master)
+            ; center the frame
+            (send ivy-frame center 'both)]
            [else
             ; append image to the collection
             (send (ivy-canvas) on-drop-file path)]))))
@@ -251,8 +247,7 @@
  ; hijack requested-images for -M
  (unless (or (not (show-frame?)) (empty? args))
    ; if there are directories as paths, scan them
-   (set-image-paths! args)
-   (resize-ivy-frame (image-path)))
+   (set-image-paths! args))
  
  (cond
    ; we aren't search for tags on the cmdline, open frame
@@ -265,7 +260,9 @@
     (send ivy-frame show #t)
     ; canvas won't resize until the frame is shown.
     (when (supported-file? (image-path))
-      (load-image (image-path)))]
+      (load-image (image-path))
+      (resize-ivy-frame image-bmp-master)
+      (send ivy-frame center 'both))]
    ; only searching for tags
    [(and (search-type)
          (not (excluding?))
