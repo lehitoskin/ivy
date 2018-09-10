@@ -723,13 +723,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
   [macosx?
    (application-about-handler show-about-dialog)]
   [else
-   (define ivy-menu-bar-help-about
+   (void
      (new menu-item%
           [parent ivy-menu-bar-help]
           [label "&About"]
           [help-string "Display license information."]
-          [callback show-about-dialog]))
-   #f])
+          [callback show-about-dialog]))])
 
 (define ivy-menu-bar-help-statistics
   (new menu-item%
