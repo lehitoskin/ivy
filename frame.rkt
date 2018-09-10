@@ -700,16 +700,10 @@
 
 ; Help window items
 
-(define ivy-menu-bar-help-about
-  (new menu-item%
-       [parent ivy-menu-bar-help]
-       [label "&About"]
-       [help-string "Display license information."]
-       [callback
-        (λ (i e)
-          (message-box "Ivy - About"
-                       (format "Ivy ~a, the Taggable Image Viewer
-Copyright (C) 2016  Lehi Toskin
+(define (show-about-dialog [i #f] [e #f])
+  (message-box "Ivy - About"
+               (format "Ivy ~a, the Taggable Image Viewer
+Copyright © 2016  Lehi Toskin
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -723,7 +717,19 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>."
-                               ivy-version)))]))
+                       ivy-version)))
+
+(cond
+  [macosx?
+   (application-about-handler show-about-dialog)]
+  [else
+   (define ivy-menu-bar-help-about
+     (new menu-item%
+          [parent ivy-menu-bar-help]
+          [label "&About"]
+          [help-string "Display license information."]
+          [callback show-about-dialog]))
+   #f])
 
 (define ivy-menu-bar-help-statistics
   (new menu-item%
