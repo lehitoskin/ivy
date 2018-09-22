@@ -265,10 +265,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define itxt-hash (make-itxt-hash itxt-bstr))
   (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
-  (with-output-to-file png
-    (λ () (display new-png))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (call-with-atomic-output-file png (λ (out tmp-png) (void (write-bytes new-png out)))))
 
 (define (add-embed-jpeg! jpeg taglist)
   (define jpeg-bytes (if (bytes? jpeg)
@@ -347,15 +344,16 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                                            (cdr marker))
                                        len
                                        (bytes-length len-bstr))))
-  (with-output-to-file flif
-    (λ () (printf "~a~a~a~a~a"
-                  before
-                  #"eXmp"
-                  (length->bytes (bytes-length deflated-bstr))
-                  deflated-bstr
-                  after))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (call-with-atomic-output-file
+   flif
+   (λ (out tmp-flif)
+     (fprintf out
+              "~a~a~a~a~a"
+              before
+              #"eXmp"
+              (length->bytes (bytes-length deflated-bstr))
+              deflated-bstr
+              after))))
 
 (define (set-embed-flif! flif taglist)
   (define old-xmp (get-embed-flif flif))
@@ -375,10 +373,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define itxt-hash (make-itxt-hash itxt-bstr))
   (define new-hash (itxt-set png-hash itxt-hash "XML:com.adobe.xmp"))
   (define new-png (hash->png new-hash))
-  (with-output-to-file png
-    (λ () (display new-png))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (call-with-atomic-output-file png (λ (out tmp-png) (void (write-bytes new-png out)))))
 
 ; takes a list of strings and embeds them into a valid PNG
 (define (set-embed-png! png taglist)
@@ -429,15 +424,15 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                     (integer->integer-bytes len 2 #f #t)
                     jpeg-XMP-id
                     xmp-bstr)))
-  (with-output-to-file jpeg
-    (λ ()
-      ; sandwich the new XMP APP1 between the old data
-      (printf "~a~a~a"
+  (call-with-atomic-output-file
+   jpeg
+   (λ (out tmp-jpeg)
+     ; sandwich the new XMP APP1 beteen the old data
+     (fprintf out
+              "~a~a~a"
               bstr-before
               app1-bstr
-              bstr-after))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+              bstr-after))))
 
 ; what a giant mess this is
 (define (set-embed-jpeg! jpeg taglist)
@@ -490,10 +485,14 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
   (define after-bstr (if (empty? pos-pair)
                          (bytes #x3b)
                          (subbytes bstr (+ (first (first pos-pair)) (second (first pos-pair))))))
-  (with-output-to-file gif
-    (λ () (printf "~a~a~a" before-bstr new-appn-xmp after-bstr))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (call-with-atomic-output-file
+   gif
+   (λ (out tmp-gif)
+     (fprintf out
+              "~a~a~a"
+              before-bstr
+              new-appn-xmp
+              after-bstr))))
 
 ; embed the taglist into the gif
 ; application extension only available for GIF89a!
@@ -539,10 +538,7 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
                   (string->bytes/utf-8 xmp-str)
                   #"</metadata>"
                   after))
-  (with-output-to-file svg
-    (λ () (display xmp-bstr))
-    #:mode 'binary
-    #:exists 'truncate/replace))
+  (call-with-atomic-output-file svg (λ (out tmp-svg) (void (write-bytes xmp-bstr out)))))
 
 (define/contract (set-embed-svg! img taglist)
   ((and/c path-string? embed-support?) (listof string?) . -> . void?)
