@@ -7,6 +7,7 @@
          png-image
          racket/contract
          racket/draw
+         racket/file
          racket/list
          racket/path
          racket/string
@@ -53,17 +54,9 @@
          (first (flif->list path #:animation? #f))]
         [else (read-bitmap path)]))
     (define thumb-path (path->md5 path))
-    ; use a temporary file in case there's concurrent
-    ; thumbnail generation going on
-    (define thumb-tmp
-      (build-path thumbnails-path
-                  (string-append (number->string (current-seconds)) "_ivy-tmp.png")))
     ; use pict to scale the image to 128x128
     (define thumb-pct (bitmap thumb-bmp))
     (define thumb-small (pict->bitmap (scale-to-fit thumb-pct 128 128)))
-    (define thumb-port-out (open-output-file thumb-tmp
-                                             #:mode 'binary
-                                             #:exists 'truncate/replace))
     (printf "Writing bytes to ~a~n" thumb-path)
     (define thumb-hash (png->hash (convert thumb-small 'png-bytes)))
     ; set thumbnail attributes
@@ -99,10 +92,11 @@
                              (make-text-chunk mime "Thumb::Mimetype"))
                             "Thumb::Mimetype")])
         (text-set mty (make-text-hash (make-text-chunk software "Software")) "Software")))
-    ; save to disk
-    (write-bytes (hash->png setted) thumb-port-out)
-    (close-output-port thumb-port-out)
-    ; rename thumb-tmp to thumb-path
-    (rename-file-or-directory thumb-tmp thumb-path #t)
+    ; use a temporary file in case there's concurrent thumbnail generation going on
+    (call-with-atomic-output-file
+     thumb-path
+     (λ (thumb-out thumb-tmp)
+       ; save to disk
+       (write-bytes (hash->png setted) thumb-out)))
     (unless (eq? (system-type) 'windows)
       (file-or-directory-permissions thumb-path #o600))))
