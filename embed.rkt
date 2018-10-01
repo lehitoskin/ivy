@@ -163,10 +163,11 @@ GIF XMP keyword: #"XMP Data" with auth #"XMP"
 #|     SVG stuff     |#
 
 (define (svg? img)
-  (define bstr (if (bytes? img)
-                   img
-                   (file->bytes img)))
-  (bytes=? (subbytes bstr 0 13) #"<?xml version"))
+  (define header #"<?xml version")
+  (define in (open-input-file img))
+  (define type (read-bytes in (bytes-length header)))
+  (close-input-port in)
+  (bytes=? header type))
 
 (define (svg-has-tag? in bstr)
   (and (regexp-try-match (byte-regexp bstr) in) #t))
