@@ -6,6 +6,7 @@
          racket/string
          (only-in srfi/13 string-contains-ci)
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "embed.rkt"
          "files.rkt"
@@ -233,11 +234,11 @@
 
 ; begin tag filtering/search definitions
 
-(define use-regex? (make-parameter #f))
+(define use-regex? (hash-ref config-hash 'browse-regex?))
 
 (define (filter-query tfield)
   (or (send (send tfield get-editor) get-text)
-      (if (use-regex?)
+      (if use-regex?
           ".*"
           "")))
 
@@ -248,7 +249,7 @@
 
 (define (filter-tags filter-str regex)
   (λ (tag)
-    (if (use-regex?)
+    (if use-regex?
         (regexp-match filter-str tag)
         (string-contains-ci tag filter-str))))
 
@@ -263,9 +264,11 @@
   (new check-box%
        [parent tag-filter-layout]
        [label "Regex"]
-       [value #f]
+       [value use-regex?]
        [callback (λ (chk evt)
-                   (use-regex? (not (use-regex?)))
+                   (set! use-regex? (not use-regex?))
+                   (hash-set! config-hash 'browse-regex? use-regex?)
+                   (save-config)
                    (update-tag-browser))]))
 
 ; end tag filtering/search definitions

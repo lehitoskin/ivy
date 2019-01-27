@@ -11,6 +11,7 @@
          txexpr
          xml
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "embed.rkt"
          "error-log.rkt"
