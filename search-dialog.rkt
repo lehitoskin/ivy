@@ -4,6 +4,7 @@
          racket/gui/base
          racket/list
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "search-results.rkt")
 (provide search-tag-dialog
@@ -12,10 +13,7 @@
 (define (ok-callback)
   (send search-tag-dialog show #f)
   (define tags (tfield->list search-tfield))
-  (define search-type
-    (string->symbol
-     (send type-rbox get-item-label
-           (send type-rbox get-selection))))
+  (define search-type (string->symbol (hash-ref config-hash 'search-type)))
   ; make sure there aren't any nonexistant files in the database
   (clean-db!)
   (define imgs
@@ -82,9 +80,11 @@
   (new check-box%
        [parent checkbox-pane]
        [label "Exact"]
-       [value #f]
+       [value (hash-ref config-hash 'search-exact?)]
        [callback (λ (button event)
-                   (exact-search? (send button get-value)))]))
+                   (exact-search? (send button get-value))
+                   (hash-set! config-hash 'search-exact? (exact-search?))
+                   (save-config))]))
 
 (define type-pane
   (new pane%
@@ -96,7 +96,13 @@
        [parent type-pane]
        [label "Search type"]
        [choices '("and" "or")]
-       [style '(horizontal)]))
+       [selection (let ([s (hash-ref config-hash 'search-type)])
+                    (if (string=? s "and") 0 1))]
+       [style '(horizontal)]
+       [callback (λ (rbox evt)
+                   (define search-type (send rbox get-item-label (send rbox get-selection)))
+                   (hash-set! config-hash 'search-type search-type)
+                   (save-config))]))
 
 (define button-hpanel
   (new horizontal-panel%

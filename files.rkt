@@ -27,6 +27,7 @@
                  "Library/Application Support/ivy")]))
 
 (define master-file (build-path ivy-path "catalog.sqlite"))
+(define config-file (build-path ivy-path "config.rktd"))
 
 ; path for cached thumbnails
 ; - on *NIX, use ~/.cache/thumbnails/normal

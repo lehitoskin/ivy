@@ -16,6 +16,7 @@
          txexpr
          xml
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "db-statistics.rkt"
          "embed.rkt"
@@ -501,12 +502,14 @@
        [checked (want-animation?)]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                     (when (and (not (equal? (image-path) +root-path+))
-                                (or (and (gif? (image-path))
-                                         (gif-animated? (image-path)))
-                                    (and (flif? (image-path))
-                                         (flif-animated? (image-path)))))
-                       (load-image (image-path))))]))
+                   (hash-set! config-hash 'animation? (want-animation?))
+                   (save-config)
+                   (when (and (not (equal? (image-path) +root-path+))
+                              (or (and (gif? (image-path))
+                                       (gif-animated? (image-path)))
+                                  (and (flif? (image-path))
+                                       (flif-animated? (image-path)))))
+                     (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
   (new menu-item%
