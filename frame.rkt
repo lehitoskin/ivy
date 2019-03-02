@@ -229,7 +229,8 @@
 (define ivy-menu-bar-dir-open
   (new menu-item%
        [parent ivy-menu-bar-file]
-       [label "Open directory"]
+       [label "Open &directory as collection"]
+       [shortcut #\D]
        [help-string "Open a directory to view."]
        [callback
         (λ (i e)
