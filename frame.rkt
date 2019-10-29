@@ -562,6 +562,19 @@
                    (unless (equal? (image-path) +root-path+)
                      (send (ivy-canvas) zoom-to 1.0)))]))
 
+(define ivy-menu-bar-view-zoom-to-fit
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Fit"]
+       [help-string "Zoom the image to fit the window"]
+       [shortcut #\0]
+       [shortcut-prefix (list (if macosx?
+                                  'option
+                                  'alt))]
+       [callback (λ (i e)
+                   (send (ivy-canvas) zoom-to-fit))]))
+
+
 (void (new separator-menu-item%
            [parent ivy-menu-bar-view-zoom]))
 
