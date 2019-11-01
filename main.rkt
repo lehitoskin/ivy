@@ -252,7 +252,7 @@
 
  (unless (show-frame?)
    (uncaught-exception-handler (λ (err)
-                                 (printf "ERROR ~v~n" err)
+                                 (printf "ivy: error: ~a~n" (exn-message err))
                                  (exit 1))))
 
  (cond
