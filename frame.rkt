@@ -439,6 +439,10 @@
   (new menu-item%
        [parent ivy-menu-bar-edit]
        [label "Copy Image Path"]
+       [shortcut-prefix (if macosx?
+                            (list 'cmd 'shift)
+                            (list 'ctl 'shift))]
+       [shortcut #\C]
        [help-string "Copy the current image's path"]
        [callback (λ (i e)
                    (unless (eq? (image-path) +root-path+)

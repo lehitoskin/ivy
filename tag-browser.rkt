@@ -230,6 +230,26 @@
        [callback (λ (button evt)
                    (edit-tags-callback img-lbox edit-tags-tfield))]))
 
+(define browser-menu-bar-copy-separator
+  (new separator-menu-item%
+       [parent browser-menu-bar-edit]))
+
+(define browser-menu-bar-edit-copy-path
+  (new menu-item%
+       [parent browser-menu-bar-edit]
+       [label "Copy Selected Image Path"]
+       [shortcut-prefix (if macosx?
+                            (list 'cmd 'shift)
+                            (list 'ctl 'shift))]
+       [shortcut #\C]
+       [help-string "Copy the current image's path"]
+       [callback (λ (i e)
+                   (define selected-path (send img-lbox get-string-selection))
+                   (when selected-path
+                     (send the-clipboard set-clipboard-string
+                           selected-path
+                           (current-seconds))))]))
+
 ; end menu bar definitions
 
 ; begin tag filtering/search definitions
