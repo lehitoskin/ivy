@@ -669,7 +669,7 @@
                (eprintf "Error loading file ~v\n" img)
                (send sbe set-label
                      (format "Error loading file ~v"
-                             (string-truncate (path->string name) 30)))])])
+                             (path->string name)))])])
      
      ; pick what string to display for tags...
      (define-values [db-tags-lst db-tags]
