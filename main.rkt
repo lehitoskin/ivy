@@ -249,7 +249,12 @@
  (unless (or (not (show-frame?)) (empty? args))
    ; if there are directories as paths, scan them
    (set-image-paths! args))
- 
+
+ (unless (show-frame?)
+   (uncaught-exception-handler (λ (err)
+                                 (printf "ivy: error: ~a~n" (exn-message err))
+                                 (exit 1))))
+
  (cond
    ; we aren't search for tags on the cmdline, open frame
    [(show-frame?)
