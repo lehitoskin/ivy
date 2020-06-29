@@ -175,7 +175,7 @@
                    (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
                    (pfs (path-files base))])
-            (send (ivy-tag-tfield) set-field-background color-white)
+            (send (ivy-tag-tfield) set-default-background)
             (image-path img-path)
             (collect-garbage 'incremental)
             (load-image img-path)))]))
@@ -248,7 +248,7 @@
                      (define-values (base name dir?) (split-path img-path))
                      (image-dir base)
                      (pfs (path-files base))])
-              (send (ivy-tag-tfield) set-field-background color-white)
+              (send (ivy-tag-tfield) set-default-background)
               (image-path img-path)
               (collect-garbage 'incremental)
               (load-image img-path))))]))
@@ -313,7 +313,7 @@
           (send (ivy-actions-rating) set-string-selection "0 🌟")
           (send (status-bar-position) set-label "0 / 0")
           (send (ivy-tag-tfield) set-value "")
-          (send (ivy-tag-tfield) set-field-background color-white)
+          (send (ivy-tag-tfield) set-default-background)
           (send (status-bar-dimensions) set-label "0 x 0")
           (send (ivy-canvas) init-auto-scrollbars 100 100 0.0 0.0)
           (collect-garbage 'incremental))]))
@@ -335,7 +335,7 @@
                    (define new-pfs
                      (filter (λ (path) (db-has-key? 'images (path->string path))) (pfs)))
                    (pfs new-pfs)
-                   (send (ivy-tag-tfield) set-field-background color-white)
+                   (send (ivy-tag-tfield) set-default-background)
                    (image-path (first new-pfs))
                    (collect-garbage 'incremental)
                    (load-image (image-path))
@@ -351,7 +351,7 @@
                    (define new-pfs
                      (filter (λ (path) (not (db-has-key? 'images (path->string path)))) (pfs)))
                    (pfs new-pfs)
-                   (send (ivy-tag-tfield) set-field-background color-white)
+                   (send (ivy-tag-tfield) set-default-background)
                    (image-path (first new-pfs))
                    (collect-garbage 'incremental)
                    (load-image (image-path))
@@ -871,7 +871,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
 
 (define (on-escape-key tfield)
   (unless (equal? (image-path) +root-path+)
-    (send tfield set-field-background color-white)
+    (send tfield set-default-background)
     (define-values (base name-path must-be-dir?) (split-path (image-path)))
     (if (string=? (send tfield get-value) (incoming-tags))
         (send (ivy-canvas) focus)
@@ -883,6 +883,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>."
     (super-new)
     
     (define editor (send this get-editor))
+    (define default-background (send this get-field-background))
+
+    (define/public (set-default-background)
+      (send this set-field-background default-background))
     
     (define/override (on-subwindow-char receiver event)
       (define type (send event get-key-code))

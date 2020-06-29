@@ -309,7 +309,7 @@
                        (for/list ([n (in-range (send img-lbox get-number))])
                          (string->path (send img-lbox get-data n))))
                      (pfs lst)
-                     (send (ivy-tag-tfield) set-field-background color-white)
+                     (send (ivy-tag-tfield) set-default-background)
                      (image-path img-path)
                      (load-image img-path)))]))
 
@@ -353,7 +353,7 @@
                       (for/list ([img (in-range (send lbox get-number))])
                         (string->path (send lbox get-data img))))
                     (pfs lst)
-                    (send (ivy-tag-tfield) set-field-background color-white)
+                    (send (ivy-tag-tfield) set-default-background)
                     (image-path img-path)
                     (load-image img-path))])))]))
 

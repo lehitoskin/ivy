@@ -776,7 +776,7 @@
     ; kill the animation thread, if applicable
     (unless (or (false? (animation-thread)) (thread-dead? (animation-thread)))
       (kill-thread (animation-thread)))
-    (send (ivy-tag-tfield) set-field-background color-white)
+    (send (ivy-tag-tfield) set-default-background)
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
       [(previous)

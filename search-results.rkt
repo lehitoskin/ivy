@@ -41,7 +41,7 @@
        [help-string "Create a collection containing the search results."]
        [callback (λ (button event)
                    (unless (empty? searched-images)
-                     (send (ivy-tag-tfield) set-field-background color-white)
+                     (send (ivy-tag-tfield) set-default-background)
                      (pfs searched-images)
                      (load-image (first searched-images))
                      (send results-frame show #f)))]))
@@ -58,7 +58,7 @@
                      (cond
                        ; empty collection, create a new one
                        [(equal? (first (pfs)) (build-path "/"))
-                        (send (ivy-tag-tfield) set-field-background color-white)
+                        (send (ivy-tag-tfield) set-default-background)
                         (pfs searched-images)
                         (load-image (first searched-images))]
                        ; append to the current collection
@@ -183,7 +183,7 @@
                              [callback
                               (λ (snp evt)
                                 (pfs imgs)
-                                (send (ivy-tag-tfield) set-field-background color-white)
+                                (send (ivy-tag-tfield) set-default-background)
                                 (load-image img-path))]))
        (close-input-port in))
 
