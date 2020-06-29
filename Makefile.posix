@@ -1,12 +1,12 @@
 DESTDIR = /usr/local
-DOCDIR = "$(DESTDIR)/share/doc/ivy-2.3.0"
+DOCDIR = "$(DESTDIR)/share/doc/ivy-2.3.1"
 MANDIR = "$(DESTDIR)/share/man/man1"
 
 RACO = raco
 RFLAGS = --vv --gui
 
 MAIN = main.rkt
-SOURCES = $(MAIN) base.rkt db.rkt db-statistics.rkt embed.rkt error-log.rkt files.rkt frame.rkt meta-editor.rkt search-dialog.rkt search-results.rkt tag-browser.rkt thumbnails.rkt
+SOURCES = $(MAIN) base.rkt config.rkt db.rkt db-statistics.rkt embed.rkt error-log.rkt files.rkt frame.rkt meta-editor.rkt search-dialog.rkt search-results.rkt tag-browser.rkt thumbnails.rkt
 BINARY = ivy
 IMAGES = img/ivy-logo-128px.png img/ivy-logo-256px.png img/ivy-logo-48px.png  img/ivy-logo-64px.png img/ivy-logo-16px.png  img/ivy-logo-32px.png  img/ivy-logo-512px.png
 DOCS = doc/ivy.html doc/ivy.md README.md

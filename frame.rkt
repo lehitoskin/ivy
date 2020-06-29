@@ -16,6 +16,7 @@
          txexpr
          xml
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "db-statistics.rkt"
          "embed.rkt"
@@ -228,7 +229,8 @@
 (define ivy-menu-bar-dir-open
   (new menu-item%
        [parent ivy-menu-bar-file]
-       [label "Open directory"]
+       [label "Open &directory as collection"]
+       [shortcut #\D]
        [help-string "Open a directory to view."]
        [callback
         (λ (i e)
@@ -437,6 +439,10 @@
   (new menu-item%
        [parent ivy-menu-bar-edit]
        [label "Copy Image Path"]
+       [shortcut-prefix (if macosx?
+                            (list 'cmd 'shift)
+                            (list 'ctl 'shift))]
+       [shortcut #\C]
        [help-string "Copy the current image's path"]
        [callback (λ (i e)
                    (unless (eq? (image-path) +root-path+)
@@ -501,12 +507,14 @@
        [checked (want-animation?)]
        [callback (λ (i e)
                    (want-animation? (send i is-checked?))
-                     (when (and (not (equal? (image-path) +root-path+))
-                                (or (and (gif? (image-path))
-                                         (gif-animated? (image-path)))
-                                    (and (flif? (image-path))
-                                         (flif-animated? (image-path)))))
-                       (load-image (image-path))))]))
+                   (hash-set! config-hash 'animation? (want-animation?))
+                   (save-config)
+                   (when (and (not (equal? (image-path) +root-path+))
+                              (or (and (gif? (image-path))
+                                       (gif-animated? (image-path)))
+                                  (and (flif? (image-path))
+                                       (flif-animated? (image-path)))))
+                     (load-image (image-path))))]))
 
 (define ivy-menu-bar-view-tag-browser
   (new menu-item%
@@ -557,6 +565,19 @@
        [callback (λ (i e)
                    (unless (equal? (image-path) +root-path+)
                      (send (ivy-canvas) zoom-to 1.0)))]))
+
+(define ivy-menu-bar-view-zoom-to-fit
+  (new menu-item%
+       [parent ivy-menu-bar-view-zoom]
+       [label "Fit"]
+       [help-string "Zoom the image to fit the window"]
+       [shortcut #\0]
+       [shortcut-prefix (list (if macosx?
+                                  'option
+                                  'alt))]
+       [callback (λ (i e)
+                   (send (ivy-canvas) zoom-to-fit))]))
+
 
 (void (new separator-menu-item%
            [parent ivy-menu-bar-view-zoom]))

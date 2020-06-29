@@ -6,6 +6,7 @@
          racket/string
          (only-in srfi/13 string-contains-ci)
          "base.rkt"
+         "config.rkt"
          "db.rkt"
          "embed.rkt"
          "files.rkt"
@@ -229,15 +230,35 @@
        [callback (λ (button evt)
                    (edit-tags-callback img-lbox edit-tags-tfield))]))
 
+(define browser-menu-bar-copy-separator
+  (new separator-menu-item%
+       [parent browser-menu-bar-edit]))
+
+(define browser-menu-bar-edit-copy-path
+  (new menu-item%
+       [parent browser-menu-bar-edit]
+       [label "Copy Selected Image Path"]
+       [shortcut-prefix (if macosx?
+                            (list 'cmd 'shift)
+                            (list 'ctl 'shift))]
+       [shortcut #\C]
+       [help-string "Copy the current image's path"]
+       [callback (λ (i e)
+                   (define selected-path (send img-lbox get-string-selection))
+                   (when selected-path
+                     (send the-clipboard set-clipboard-string
+                           selected-path
+                           (current-seconds))))]))
+
 ; end menu bar definitions
 
 ; begin tag filtering/search definitions
 
-(define use-regex? (make-parameter #f))
+(define use-regex? (hash-ref config-hash 'browse-regex?))
 
 (define (filter-query tfield)
   (or (send (send tfield get-editor) get-text)
-      (if (use-regex?)
+      (if use-regex?
           ".*"
           "")))
 
@@ -248,7 +269,7 @@
 
 (define (filter-tags filter-str regex)
   (λ (tag)
-    (if (use-regex?)
+    (if use-regex?
         (regexp-match filter-str tag)
         (string-contains-ci tag filter-str))))
 
@@ -263,9 +284,11 @@
   (new check-box%
        [parent tag-filter-layout]
        [label "Regex"]
-       [value #f]
+       [value use-regex?]
        [callback (λ (chk evt)
-                   (use-regex? (not (use-regex?)))
+                   (set! use-regex? (not use-regex?))
+                   (hash-set! config-hash 'browse-regex? use-regex?)
+                   (save-config)
                    (update-tag-browser))]))
 
 ; end tag filtering/search definitions

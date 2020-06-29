@@ -6,7 +6,7 @@
          racket/file)
 (provide (all-defined-out))
 
-(define ivy-version "2.3.0")
+(define ivy-version "2.3.1")
 
 ; base directory where ivy will put all of its files
 (define ivy-path
@@ -27,6 +27,7 @@
                  "Library/Application Support/ivy")]))
 
 (define master-file (build-path ivy-path "catalog.sqlite"))
+(define config-file (build-path ivy-path "config.rktd"))
 
 ; path for cached thumbnails
 ; - on *NIX, use ~/.cache/thumbnails/normal

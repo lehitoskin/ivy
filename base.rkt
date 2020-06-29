@@ -19,6 +19,7 @@
          (only-in srfi/13
                   string-contains-ci
                   string-null?)
+         "config.rkt"
          "db.rkt"
          "embed.rkt"
          "files.rkt")
@@ -388,7 +389,7 @@
 (define status-bar-position (make-parameter #f))
 (define status-bar-size (make-parameter #f))
 (define incoming-tags (make-parameter ""))
-(define want-animation? (make-parameter #f))
+(define want-animation? (make-parameter (hash-ref config-hash 'animation?)))
 
 (define/contract (animation-callback canvas dc lst)
   ((is-a?/c canvas%) (is-a?/c dc<%>) (listof (is-a?/c bitmap%)) . -> . void?)
@@ -668,7 +669,7 @@
                (eprintf "Error loading file ~v\n" img)
                (send sbe set-label
                      (format "Error loading file ~v"
-                             (string-truncate (path->string name) 30)))])])
+                             (path->string name)))])])
      
      ; pick what string to display for tags...
      (define-values [db-tags-lst db-tags]
