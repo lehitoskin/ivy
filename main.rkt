@@ -51,6 +51,9 @@
 (define set-rating? (make-parameter #f))
 (define rating-to-set (make-parameter "0"))
 
+(define show-tagged? (make-parameter #f))
+(define show-untagged? (make-parameter #f))
+
 ; make sure the path provided is a proper absolute path
 (define relative->absolute (compose1 simple-form-path expand-user-path))
 
@@ -128,7 +131,7 @@
          (pfs absolute-paths)]
         [else
          ; we want to load the image from the directory
-         (define-values (base name dir?) (split-path (first absolute-paths)))
+         (define base (path-only (first absolute-paths)))
          (image-dir base)
          ; (path-files dir) filters only supported images
          (pfs (path-files base))])
@@ -225,6 +228,14 @@
   (show-frame? #f)
   (set-rating? #t)
   (rating-to-set rating)]
+ [("-t" "--tagged")
+  "List tagged images in a given directory."
+  (show-frame? #f)
+  (show-tagged? #t)]
+ [("-u" "--untagged")
+  "List untagged images in a given directory."
+  (show-frame? #f)
+  (show-untagged? #t)]
  #:once-each
  [("-e" "--exact-search")
   "Search the tags database for exact matches."
@@ -542,7 +553,29 @@
                   ; copy the file over, do not overwrite dest if exists
                   (when (verbose?)
                     (printf "Moving ~v to ~v~n" old-path new-path))
-                  (rename-file-or-directory old-path new-path #f)])))])])
+                  (rename-file-or-directory old-path new-path #f)])))])]
+   [(show-tagged?)
+    (cond [(empty? args)
+           (raise-argument-error 'show-tagged "at least one directory" 0)
+           (exit:exit)]
+          [else
+           (for ([dir (in-list args)])
+             (define files (for/list ([f (in-directory dir)]) f))
+             (define absolute-paths (map (compose1 path->string relative->absolute) files))
+             (for ([path (in-list absolute-paths)])
+               (when (db-has-key? 'images path)
+                 (printf "~a~n" path))))])]
+   [(show-untagged?)
+    (cond [(empty? args)
+           (raise-argument-error 'show-tagged "at least one directory" 0)
+           (exit:exit)]
+          [else
+           (for ([dir (in-list args)])
+             (define files (for/list ([f (in-directory dir)]) f))
+             (define absolute-paths (map (compose1 path->string relative->absolute) files))
+             (for ([path (in-list absolute-paths)])
+               (unless (db-has-key? 'images path)
+                 (printf "~a~n" path))))])])
  ; exit explicitly
  (unless (show-frame?)
    (exit:exit)))
