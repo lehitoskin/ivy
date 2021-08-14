@@ -497,7 +497,7 @@
        [help-string "Enter fullscreen mode."]
        [shortcut (if macosx? #\F #f)]
        [shortcut-prefix (if macosx? '(ctl cmd) (get-default-shortcut-prefix))]
-       [callback (λ (i e) (toggle-fullscreen (ivy-canvas) ivy-frame))]))
+       [callback (λ (i e) (toggle-fullscreen (ivy-canvas)))]))
 
 (define ivy-menu-bar-view-animation
   (new checkable-menu-item%
